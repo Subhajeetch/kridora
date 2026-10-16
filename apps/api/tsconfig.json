@@ -1,0 +1,7 @@
+{
+  "extends": "@fatebyai/typescript-config/node.json",
+  "compilerOptions": {
+    "types": ["node"]
+  },
+  "include": ["src"]
+}
