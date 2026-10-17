@@ -1,5 +1,5 @@
 {
-  "extends": "@fatebyai/typescript-config/node.json",
+  "extends": "@kridora/typescript-config/node.json",
   "compilerOptions": {
     "types": ["node"]
   },

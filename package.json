@@ -1,5 +1,5 @@
 {
-  "name": "fatebyai",
+  "name": "kridora",
   "private": true,
   "scripts": {
     "build": "turbo run build",

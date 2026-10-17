@@ -1,7 +1,7 @@
 {
-  "name": "@fatebyai/api",
+  "name": "@kridora/api",
   "version": "1.0.0",
-  "description": "This is the API for the FatebyAI project. It serves as the backend for the application, handling requests and responses.",
+  "description": "This is the API for the Kridora project. It serves as the backend for the application, handling requests and responses.",
   "main": "index.js",
   "scripts": {
     "dev": "tsx watch --env-file=../../.env src/index.ts",
@@ -19,7 +19,7 @@
     "fastify": "^5.12.7"
   },
   "devDependencies": {
-    "@fatebyai/typescript-config": "workspace:*",
+    "@kridora/typescript-config": "workspace:*",
     "@types/node": "^24.19.2",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2"
