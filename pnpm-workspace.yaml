@@ -1,5 +1,12 @@
 packages:
   - "apps/*"
   - "packages/*"
+
+# pnpm blocks dependency install scripts by default. esbuild (used by tsx and Vite) needs its
+# postinstall to fetch the right native binary.
 allowBuilds:
   esbuild: true
+
+# Same thing for pnpm 10 (older key name); harmless on newer versions.
+onlyBuiltDependencies:
+  - esbuild

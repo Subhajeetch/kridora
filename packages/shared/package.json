@@ -1,0 +1,20 @@
+{
+  "name": "@kridora/shared",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Types, validation and game config shared by the API and the web app.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "check-types": "tsc"
+  },
+  "dependencies": {
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@kridora/typescript-config": "workspace:*",
+    "typescript": "7.0.2"
+  }
+}

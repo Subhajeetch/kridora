@@ -8,7 +8,8 @@
     "build": "tsc -p tsconfig.json",
     "start": "tsx src/index.ts",
     "typecheck": "tsc --noEmit",
-    "check-types": "tsc"
+    "check-types": "tsc",
+    "test:e2e": "tsx scripts/e2e-rooms.mts"
   },
   "keywords": [],
   "author": "",
@@ -16,11 +17,23 @@
   "type": "module",
   "dependencies": {
     "@fastify/autoload": "^6.5.1",
-    "fastify": "^5.12.7"
+    "@fastify/cors": "^11.3.1",
+    "@fastify/helmet": "^13.2.0",
+    "@fastify/rate-limit": "^11.2.1",
+    "@kridora/db": "workspace:*",
+    "@kridora/shared": "workspace:*",
+    "@socket.io/redis-adapter": "^8.3.0",
+    "better-auth": "^1.7.10",
+    "fastify": "^5.12.7",
+    "fastify-plugin": "^6.0.1",
+    "ioredis": "^6.0.0",
+    "socket.io": "^4.8.4",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@kridora/typescript-config": "workspace:*",
     "@types/node": "^24.19.2",
+    "socket.io-client": "^4.8.4",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2"
   }

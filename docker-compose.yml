@@ -1,0 +1,45 @@
+# Local development infrastructure: PostgreSQL + Redis.
+#   docker compose up -d      start
+#   docker compose down       stop (data is kept in named volumes)
+#   docker compose down -v    stop AND wipe all data
+name: kridora
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: kridora-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-kridora}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-kridora}
+      POSTGRES_DB: ${POSTGRES_DB:-kridora}
+    ports:
+      # Bound to localhost only so it is never exposed on your network.
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-kridora} -d ${POSTGRES_DB:-kridora}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: kridora-redis
+    restart: unless-stopped
+    # AOF persistence so room state survives a Redis restart.
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  postgres_data:
+  redis_data:

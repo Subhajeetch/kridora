@@ -1,0 +1,10 @@
+{
+  "extends": "@kridora/typescript-config/base.json",
+  "compilerOptions": {
+    "types": [],
+    "erasableSyntaxOnly": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
+  },
+  "include": ["src"]
+}
