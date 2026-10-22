@@ -1,4 +1,4 @@
-import type { GameSlug, RoomPlayer, RoomSnapshot, RoomStatus, RoomVisibility, SocketUser } from "@kridora/shared";
+import type { GameSlug, LudoGameState, RoomPlayer, RoomSnapshot, RoomStatus, RoomVisibility, SocketUser } from "@kridora/shared";
 
 /** What we persist in Redis for a room. Same as the public snapshot plus server-only fields. */
 export interface StoredRoom {
@@ -14,6 +14,7 @@ export interface StoredRoom {
   createdAt: number;
   ownerTransferAt: number | null;
   matchId: string | null;
+  ludoState?: LudoGameState;
 }
 
 export type SessionUser = SocketUser;
@@ -27,4 +28,5 @@ export interface RoomNotifier {
   state(room: RoomSnapshot): void;
   kicked(userId: string, code: string): void;
   closed(code: string): void;
+  ludoState(code: string, state: LudoGameState): void;
 }

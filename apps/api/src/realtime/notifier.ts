@@ -15,6 +15,9 @@ export function createNotifier(io: AppServer): RoomNotifier {
     kicked(userId, code) {
       io.to(userChannel(userId)).emit("room:kicked", { code });
     },
+    ludoState(code, state) {
+      io.to(roomChannel(code)).emit("ludo:state", state);
+    },
     closed(code) {
       io.to(roomChannel(code)).emit("room:closed", { code });
       io.in(roomChannel(code)).socketsLeave(roomChannel(code));

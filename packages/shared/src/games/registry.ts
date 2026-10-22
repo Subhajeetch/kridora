@@ -33,6 +33,18 @@ export const GAME_DEFINITIONS = {
     maxPlayers: 8,
     requirements: { allPlayersReady: true, allPlayersConnected: true },
   },
+  ludo: {
+    slug: "ludo",
+    name: "Ludo",
+    tagline: "A little luck. A lot of friendly rivalry.",
+    description:
+      "Race four pieces around the board, send rivals back to their yards and be the first to bring every piece home.",
+    accent: "#fb7185",
+    playTime: "15-30 min",
+    minPlayers: 2,
+    maxPlayers: 4,
+    requirements: { allPlayersReady: true, allPlayersConnected: true },
+  },
 } satisfies Record<string, GameDefinition>;
 
 export type GameSlug = keyof typeof GAME_DEFINITIONS;

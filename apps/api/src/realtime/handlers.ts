@@ -3,6 +3,7 @@ import {
   emptySchema,
   joinPublicSchema,
   joinRoomSchema,
+  ludoMoveSchema,
   setReadySchema,
   setVisibilitySchema,
   targetPlayerSchema,
@@ -51,6 +52,9 @@ const handlers: Record<ClientToServerEventName, HandlerDef> = {
   "room:transfer-owner": define(targetPlayerSchema, (ctx, p) => ctx.rooms.transferOwner(ctx.userId, p.userId)),
   "room:kick": define(targetPlayerSchema, (ctx, p) => ctx.rooms.kickPlayer(ctx.userId, p.userId)),
   "room:start": define(emptySchema, (ctx) => ctx.rooms.startGame(ctx.userId)),
+  "ludo:get-state": define(emptySchema, (ctx) => ctx.rooms.getLudoState(ctx.userId)),
+  "ludo:roll": define(emptySchema, (ctx) => ctx.rooms.rollLudoDice(ctx.userId)),
+  "ludo:move": define(ludoMoveSchema, (ctx, p) => ctx.rooms.moveLudoToken(ctx.userId, p.tokenIndex)),
 };
 
 /** Allows `max` events per `windowMs` per socket. */

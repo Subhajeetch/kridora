@@ -1,14 +1,20 @@
+import { randomInt } from "node:crypto";
 import { createMatch, type Database } from "@kridora/db";
 import {
   EMPTY_ROOM_CLOSE_DELAY_MS,
   evaluateStartRequirements,
+  createLudoGameState,
   getGameDefinition,
+  getLudoMovableTokens,
+  getLudoTrackSquare,
   isGameEnabled,
+  LUDO_SAFE_SQUARES,
   OWNER_TRANSFER_DELAY_MS,
   PLAYER_DISCONNECT_GRACE_MS,
   type AppEnvironment,
   type ErrorCode,
   type GameSlug,
+  type LudoGameState,
   type RoomPlayer,
   type RoomSnapshot,
   type RoomVisibility,
@@ -132,6 +138,29 @@ export function createRoomService({ redis, db, notifier, log, appEnv }: RoomServ
 
   /** Removes a player; moves ownership if they owned the room; destroys the room if it is now empty. */
   async function removePlayerLocked(room: StoredRoom, userId: string): Promise<void> {
+    if (room.ludoState) {
+      const removedIndex = room.ludoState.players.findIndex((player) => player.userId === userId);
+      if (removedIndex >= 0) {
+        const wasTakingTurn = room.ludoState.currentPlayerIndex === removedIndex;
+        const removedName = room.ludoState.players[removedIndex]!.name;
+        room.ludoState.players = room.ludoState.players.filter((player) => player.userId !== userId);
+        room.ludoState.lastRolls.splice(removedIndex, 1);
+        room.ludoState.currentPlayerIndex = room.ludoState.players.length
+          ? (wasTakingTurn ? removedIndex : room.ludoState.currentPlayerIndex - Number(removedIndex < room.ludoState.currentPlayerIndex)) % room.ludoState.players.length
+          : 0;
+        if (wasTakingTurn) {
+          room.ludoState.dice = null;
+          room.ludoState.movableTokens = [];
+        }
+        if (room.ludoState.players.length === 1) {
+          room.ludoState.winnerId = room.ludoState.players[0]!.userId;
+          room.ludoState.lastAction = `${room.ludoState.players[0]!.name} wins by forfeit.`;
+        } else {
+          room.ludoState.lastAction = `${removedName} left the game.`;
+        }
+        room.ludoState.updatedAt = Date.now();
+      }
+    }
     room.players = room.players.filter((p) => p.userId !== userId);
     await store.clearUserSlot(userId, room.code);
     await store.unschedule(deadline.player(room.code, userId));
@@ -147,6 +176,7 @@ export function createRoomService({ redis, db, notifier, log, appEnv }: RoomServ
       room.ownerTransferAt = null;
     }
     await commit(room);
+    if (room.ludoState) notifier.ludoState(room.code, room.ludoState);
   }
 
   /** Runs `fn` with the room the user is currently in, locked. */
@@ -367,6 +397,105 @@ export function createRoomService({ redis, db, notifier, log, appEnv }: RoomServ
     });
   }
 
+  function assertLudoGame(room: StoredRoom): LudoGameState {
+    if (room.gameSlug !== "ludo" || room.status !== "in_progress") {
+      throw new AppError("ROOM_IN_PROGRESS", "Ludo has not started in this room");
+    }
+    room.ludoState ??= createLudoGameState(room.players.map(({ userId, name }) => ({ userId, name })));
+    return room.ludoState;
+  }
+
+  async function getLudoState(userId: string): Promise<LudoGameState> {
+    return withUserRoom(userId, async (room) => {
+      const state = assertLudoGame(room);
+      await store.save(room);
+      return state;
+    });
+  }
+
+  async function rollLudoDice(userId: string): Promise<LudoGameState> {
+    return withUserRoom(userId, async (room) => {
+      const state = assertLudoGame(room);
+      if (state.winnerId) throw new AppError("ROOM_IN_PROGRESS", "This Ludo game is already over");
+      const player = state.players[state.currentPlayerIndex];
+      if (!player) throw new AppError("INTERNAL_ERROR", "Ludo turn state is invalid");
+      if (player.userId !== userId) throw new AppError("INVALID_TARGET", "Wait for your turn");
+      if (state.dice !== null) throw new AppError("INVALID_TARGET", "Choose one of your highlighted pieces first");
+
+      const roll = randomInt(1, 7);
+      const movable = getLudoMovableTokens(player, roll);
+      state.lastRolls[state.currentPlayerIndex] = roll;
+      state.dice = roll;
+      state.movableTokens = movable;
+      state.lastAction = `${player.name} rolled a ${roll}.`;
+      if (movable.length === 0) {
+        state.lastAction += roll === 6 ? " No piece can move." : " No move this turn.";
+        state.currentPlayerIndex = (state.currentPlayerIndex + 1) % state.players.length;
+        state.dice = null;
+        state.movableTokens = [];
+      }
+      state.updatedAt = Date.now();
+      await store.save(room);
+      notifier.ludoState(room.code, state);
+      return state;
+    });
+  }
+
+  async function moveLudoToken(userId: string, tokenIndex: number): Promise<LudoGameState> {
+    return withUserRoom(userId, async (room) => {
+      const state = assertLudoGame(room);
+      if (state.winnerId) throw new AppError("ROOM_IN_PROGRESS", "This Ludo game is already over");
+      const playerIndex = state.currentPlayerIndex;
+      const player = state.players[playerIndex];
+      if (!player) throw new AppError("INTERNAL_ERROR", "Ludo turn state is invalid");
+      if (player.userId !== userId) throw new AppError("INVALID_TARGET", "Wait for your turn");
+      if (state.dice === null || !state.movableTokens.includes(tokenIndex)) {
+        throw new AppError("INVALID_TARGET", "That piece cannot move");
+      }
+
+      const roll = state.dice;
+      const previousProgress = player.tokens[tokenIndex];
+      if (previousProgress === undefined) throw new AppError("INVALID_TARGET", "That piece does not exist");
+      const nextProgress = previousProgress < 0 ? 0 : previousProgress + roll;
+      player.tokens[tokenIndex] = nextProgress;
+      let captured = false;
+
+      const landingSquare = getLudoTrackSquare(player.color, nextProgress);
+      if (landingSquare !== null && !LUDO_SAFE_SQUARES.has(landingSquare)) {
+        state.players.forEach((opponent, opponentIndex) => {
+          if (opponentIndex === playerIndex) return;
+          opponent.tokens = opponent.tokens.map((progress) => {
+            if (getLudoTrackSquare(opponent.color, progress) !== landingSquare) return progress;
+            captured = true;
+            return -1;
+          });
+        });
+      }
+
+      const reachedHome = nextProgress === 57;
+      state.lastAction = `${player.name} moved a piece${captured ? " and sent a rival back to the yard" : ""}${reachedHome ? " home" : ""}.`;
+      if (player.tokens.every((progress) => progress === 57)) {
+        state.winnerId = player.userId;
+        state.lastAction = `${player.name} brought every piece home and wins!`;
+        state.dice = null;
+        state.movableTokens = [];
+      } else if (roll === 6 || captured) {
+        state.dice = null;
+        state.movableTokens = [];
+        state.lastAction += roll === 6 ? " Roll again!" : " Capture bonus: roll again!";
+      } else {
+        state.currentPlayerIndex = (playerIndex + 1) % state.players.length;
+        state.dice = null;
+        state.movableTokens = [];
+      }
+
+      state.updatedAt = Date.now();
+      await store.save(room);
+      notifier.ludoState(room.code, state);
+      return state;
+    });
+  }
+
   /* ------------------------------------------------------------------ connection lifecycle */
 
   /** Called for every new socket. Reattaches the user to their room and marks them online. */
@@ -465,6 +594,9 @@ export function createRoomService({ redis, db, notifier, log, appEnv }: RoomServ
     transferOwner,
     kickPlayer,
     startGame,
+    getLudoState,
+    rollLudoDice,
+    moveLudoToken,
     handleConnect,
     handleDisconnect,
     processDueDeadlines,

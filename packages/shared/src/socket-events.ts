@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { AckFn } from "./errors";
 import type { RoomSnapshot } from "./room";
 import { roomCodeSchema } from "./validation";
+import type { LudoGameState } from "./games/ludo";
 
 export const createRoomSchema = z.object({
   gameSlug: z.string().min(1).max(40),
@@ -20,6 +21,7 @@ export const setReadySchema = z.object({ ready: z.boolean() });
 export const targetPlayerSchema = z.object({
   userId: z.string().min(1).max(128),
 });
+export const ludoMoveSchema = z.object({ tokenIndex: z.number().int().min(0).max(3) });
 
 export type CreateRoomPayload = z.input<typeof createRoomSchema>;
 export type JoinRoomPayload = z.input<typeof joinRoomSchema>;
@@ -27,6 +29,7 @@ export type JoinPublicPayload = z.input<typeof joinPublicSchema>;
 export type SetVisibilityPayload = z.input<typeof setVisibilitySchema>;
 export type SetReadyPayload = z.input<typeof setReadySchema>;
 export type TargetPlayerPayload = z.input<typeof targetPlayerSchema>;
+export type LudoMovePayload = z.input<typeof ludoMoveSchema>;
 export type EmptyPayload = z.input<typeof emptySchema>;
 
 export interface ClientToServerEvents {
@@ -51,6 +54,9 @@ export interface ClientToServerEvents {
   ) => void;
   "room:kick": (payload: TargetPlayerPayload, ack: AckFn<RoomSnapshot>) => void;
   "room:start": (payload: EmptyPayload, ack: AckFn<RoomSnapshot>) => void;
+  "ludo:get-state": (payload: EmptyPayload, ack: AckFn<LudoGameState>) => void;
+  "ludo:roll": (payload: EmptyPayload, ack: AckFn<LudoGameState>) => void;
+  "ludo:move": (payload: LudoMovePayload, ack: AckFn<LudoGameState>) => void;
 }
 
 export type ClientToServerEventName = keyof ClientToServerEvents;
@@ -62,6 +68,7 @@ export interface ServerToClientEvents {
   "room:closed": (payload: { code: string }) => void;
   /** The owner removed you from the room. */
   "room:kicked": (payload: { code: string }) => void;
+  "ludo:state": (state: LudoGameState) => void;
 }
 
 export type InterServerEvents = Record<never, never>;

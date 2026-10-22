@@ -10,4 +10,5 @@ import type { GameComponentProps } from "./types"
 export const gameComponents: Record<GameSlug, LazyExoticComponent<ComponentType<GameComponentProps>>> = {
   monopoly: lazy(() => import("./monopoly/main")),
   fatebyai: lazy(() => import("./fatebyai/main")),
+  ludo: lazy(() => import("./ludo/main")),
 }
