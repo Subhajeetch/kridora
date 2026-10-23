@@ -1,4 +1,5 @@
 import { displayNameSchema, emailSchema, passwordSchema } from "@kridora/shared"
+import { X } from "lucide-react"
 import { useState, type FormEvent } from "react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"
@@ -12,6 +13,8 @@ interface AuthDialogProps {
   open: boolean
   /** Leave undefined to force the visitor to pick a name or log in before continuing. */
   onOpenChange?: (open: boolean) => void
+  onSuccess?: () => void
+  initialMode?: Mode
 }
 
 const TITLES: Record<Mode, string> = {
@@ -37,9 +40,9 @@ function messageFor(error: { code?: string | undefined; message?: string | undef
   }
 }
 
-export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
+export function AuthDialog({ open, onOpenChange, onSuccess, initialMode = "guest" }: AuthDialogProps) {
   const { googleEnabled } = usePublicConfig()
-  const [mode, setMode] = useState<Mode>("guest")
+  const [mode, setMode] = useState<Mode>(initialMode)
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -89,12 +92,18 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
 
     if (mode === "guest") {
       if (!validate({ name })) return
-      void run(() => startGuestSession(displayNameSchema.parse(name)))
+      void run(async () => {
+        await startGuestSession(displayNameSchema.parse(name))
+        onOpenChange?.(false)
+        onSuccess?.()
+      })
     } else if (mode === "login") {
       if (!validate({ email, password })) return
       void run(async () => {
         const res = await authClient.signIn.email({ email: emailSchema.parse(email), password })
         if (res.error) throw new Error(messageFor(res.error))
+        onOpenChange?.(false)
+        onSuccess?.()
       })
     } else if (mode === "signup") {
       if (!validate({ name, email, password })) return
@@ -133,6 +142,18 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
   return (
     <Dialog open={open} {...(onOpenChange ? { onOpenChange } : {})}>
       <DialogContent>
+        {onOpenChange && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            aria-label="Close"
+            className="absolute top-4 right-4 rounded-xl text-muted-foreground hover:text-foreground"
+            onClick={() => onOpenChange(false)}
+          >
+            <X className="size-4" />
+          </Button>
+        )}
         <DialogTitle>{TITLES[mode]}</DialogTitle>
 
         {mode === "guest" && (

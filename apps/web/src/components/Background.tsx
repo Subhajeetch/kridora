@@ -1,25 +1,46 @@
-import { motion, useReducedMotion } from "framer-motion"
+import { motion, useReducedMotion, type Transition } from "framer-motion"
 
-const ORBS = [
-  { className: "left-[-10%] top-[-15%] h-[34rem] w-[34rem] bg-violet-600/30", x: [0, 60, 0], y: [0, 40, 0], duration: 26 },
-  { className: "right-[-12%] top-[20%] h-[30rem] w-[30rem] bg-amber-500/15", x: [0, -50, 0], y: [0, 60, 0], duration: 32 },
-  { className: "bottom-[-20%] left-[25%] h-[32rem] w-[32rem] bg-sky-500/20", x: [0, 40, 0], y: [0, -50, 0], duration: 29 },
+interface OrbConfig {
+  id: string
+  className: string
+  x: number[]
+  y: number[]
+  transition: Transition
+}
+
+const ORBS: readonly OrbConfig[] = [
+  {
+    id: "pink-orb",
+    className: "left-[-10%] top-[-12%] h-[34rem] w-[34rem] bg-neon-pink/15",
+    x: [0, 56, 0],
+    y: [0, 38, 0],
+    transition: { duration: 28, repeat: Infinity, ease: "easeInOut" },
+  },
+  {
+    id: "cyan-orb",
+    className: "bottom-[-16%] right-[-10%] h-[32rem] w-[32rem] bg-neon-cyan/10",
+    x: [0, -48, 0],
+    y: [0, -42, 0],
+    transition: { duration: 34, repeat: Infinity, ease: "easeInOut" },
+  },
 ]
 
 /** Fixed, slow-moving colour glow behind every page. Static when the player prefers reduced motion. */
 export function Background() {
   const reduce = useReducedMotion()
   return (
-    <div aria-hidden="true" className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-background">
+    <div aria-hidden="true" className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-void">
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_-10%,#2a0f5c_0%,#120a2e_38%,#07050f_75%)]" />
       {ORBS.map((orb) => (
         <motion.div
-          key={orb.className}
+          key={orb.id}
           className={`absolute rounded-full blur-3xl ${orb.className}`}
           animate={reduce ? undefined : { x: orb.x, y: orb.y }}
-          transition={{ duration: orb.duration, repeat: Infinity, ease: "easeInOut" }}
+          transition={orb.transition}
         />
       ))}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_40%,oklch(0.145_0_0)_100%)]" />
+      <div className="bg-stars absolute inset-0 opacity-50" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_45%,#07050f_100%)]" />
     </div>
   )
 }
