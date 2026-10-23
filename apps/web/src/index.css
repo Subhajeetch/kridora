@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Iosevka+Charon+Mono:ital,wght@0,300;0,400;0,500;0,700;1,300;1,400;1,500;1,700&family=Saira+Semi+Condensed:wght@100;200;300;400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Russo+One&display=swap');
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
@@ -41,41 +41,52 @@
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --background: #07050f;
+  --foreground: #f4f1ff;
+  --card: #120d2b;
+  --card-foreground: #f4f1ff;
+  --popover: #150f33;
+  --popover-foreground: #f4f1ff;
+  --primary: #fad46f;
+  --primary-foreground: #1a1033;
+  --secondary: #1d1646;
+  --secondary-foreground: #f4f1ff;
+  --muted: #1a1340;
+  --muted-foreground: #a9a3d1;
+  --accent: #241a5a;
+  --accent-foreground: #f4f1ff;
+  --destructive: #ff4d6d;
+  --border: rgba(139, 124, 255, 0.22);
+  --input: rgba(139, 124, 255, 0.28);
+  --ring: #22e4ff;
+  --chart-1: #22e4ff;
+  --chart-2: #ff3db8;
+  --chart-3: #8b5cf6;
+  --chart-4: #fad46f;
+  --chart-5: #5dff9a;
+  --sidebar: #0d0a1f;
+  --sidebar-foreground: #f4f1ff;
+  --sidebar-primary: #8b5cf6;
+  --sidebar-primary-foreground: #f4f1ff;
+  --sidebar-accent: #241a5a;
+  --sidebar-accent-foreground: #f4f1ff;
+  --sidebar-border: rgba(139, 124, 255, 0.22);
+  --sidebar-ring: #22e4ff;
 }
 
 @theme inline {
-  --font-sans: "Iosevka Charon Mono", "Saira Semi Condensed", sans-serif;
+  --font-sans: "Chakra Petch", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Russo One", "Chakra Petch", ui-sans-serif, system-ui, sans-serif;
+  --color-void: #07050f;
+  --color-night: #0d0a1f;
+  --color-panel: #120d2b;
+  --color-panel-2: #1b1442;
+  --color-neon-cyan: #22e4ff;
+  --color-neon-pink: #ff3db8;
+  --color-neon-violet: #8b5cf6;
+  --color-coin: #fad46f;
+  --color-coin-edge: #b86e00;
+  --color-ok: #5dff9a;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -126,3 +137,241 @@
     @apply font-sans bg-background text-foreground;
   }
 }
+
+@keyframes marquee {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes twinkle {
+
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+
+  50% {
+    opacity: 0.75;
+  }
+}
+
+@keyframes shimmer {
+  to {
+    background-position: 200% center;
+  }
+}
+
+@keyframes blink {
+
+  0%,
+  49% {
+    opacity: 1;
+  }
+
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes bar-load {
+
+  0%,
+  100% {
+    transform: scaleX(0.08);
+  }
+
+  60% {
+    transform: scaleX(0.72);
+  }
+}
+
+@keyframes btn-shine {
+
+  0%,
+  60% {
+    transform: translateX(0) skewX(-20deg);
+  }
+
+  100% {
+    transform: translateX(520%) skewX(-20deg);
+  }
+}
+
+@keyframes cta-ping {
+  from {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+
+  to {
+    transform: scale(1.14, 1.35);
+    opacity: 0;
+  }
+}
+
+@keyframes quest-dot {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(100cqw);
+  }
+}
+
+@layer components {
+  .bg-stars {
+    background-image:
+      radial-gradient(1.5px 1.5px at 20px 30px, rgba(255, 255, 255, 0.9), transparent),
+      radial-gradient(1px 1px at 90px 120px, rgba(34, 228, 255, 0.9), transparent),
+      radial-gradient(1.5px 1.5px at 160px 60px, rgba(255, 61, 184, 0.8), transparent),
+      radial-gradient(1px 1px at 230px 190px, rgba(255, 255, 255, 0.7), transparent);
+    background-size: 260px 260px;
+    animation: twinkle 6s ease-in-out infinite;
+  }
+
+  .scanlines {
+    background-image: repeating-linear-gradient(to bottom, rgba(255, 255, 255, 0.035) 0 1px, transparent 1px 3px);
+    mix-blend-mode: overlay;
+  }
+
+  .hero-sun {
+    background: linear-gradient(180deg, #fad46f 0%, #ff9f1c 26%, #ff3db8 62%, #8b5cf6 100%);
+    -webkit-mask-image: linear-gradient(to bottom, #000 0 52%, transparent 52% 55%, #000 55% 63%, transparent 63% 67%, #000 67% 75%, transparent 75% 80%, #000 80% 88%, transparent 88% 94%, #000 94% 100%);
+    mask-image: linear-gradient(to bottom, #000 0 52%, transparent 52% 55%, #000 55% 63%, transparent 63% 67%, #000 67% 75%, transparent 75% 80%, #000 80% 88%, transparent 88% 94%, #000 94% 100%);
+  }
+
+  .hero-sun-glow {
+    background: radial-gradient(circle, rgba(255, 61, 184, 0.45) 0%, rgba(139, 92, 246, 0.22) 40%, transparent 70%);
+  }
+
+  .text-shimmer {
+    background-image: linear-gradient(100deg, #fad46f 0%, #ff3db8 35%, #8b5cf6 55%, #22e4ff 75%, #fad46f 100%);
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: shimmer 6s linear infinite;
+  }
+
+  .btn-shine {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .btn-shine::after {
+    content: "";
+    position: absolute;
+    top: -20%;
+    bottom: -20%;
+    left: -40%;
+    width: 30%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+    transform: skewX(-20deg);
+    animation: btn-shine 4.5s ease-in-out infinite;
+  }
+
+  .cta-ping {
+    position: relative;
+    display: inline-flex;
+    border-radius: 1rem;
+  }
+
+  .cta-ping::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    border: 2px solid rgba(250, 212, 111, 0.6);
+    pointer-events: none;
+    animation: cta-ping 2.4s ease-out infinite;
+  }
+
+  .marquee-track {
+    display: flex;
+    width: max-content;
+    animation: marquee 32s linear infinite;
+  }
+
+  .load-bar {
+    transform-origin: left center;
+    animation: bar-load 2.2s ease-in-out infinite;
+  }
+
+  .quest-line {
+    container-type: inline-size;
+  }
+
+  .quest-dot {
+    animation: quest-dot 4s linear infinite;
+  }
+
+  .game-card {
+    --game-accent: #8b5cf6;
+    position: relative;
+    overflow: hidden;
+    border-radius: 1.5rem;
+    background: linear-gradient(180deg, rgba(27, 20, 66, 0.92), rgba(18, 13, 43, 0.96));
+    border: 1px solid rgba(139, 124, 255, 0.22);
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 20px 40px -24px rgba(0, 0, 0, 0.8);
+    outline: none;
+    transition: border-color 0.25s ease, box-shadow 0.25s ease;
+  }
+
+  .game-card:hover,
+  .game-card:focus-visible {
+    border-color: var(--game-accent);
+    box-shadow: 0 0 0 1px color-mix(in oklab, var(--game-accent) 70%, transparent), 0 0 38px -4px color-mix(in oklab, var(--game-accent) 55%, transparent), 0 24px 48px -24px rgba(0, 0, 0, 0.9);
+  }
+
+  .game-card__shine {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(115deg, transparent 35%, rgba(255, 255, 255, 0.16) 48%, transparent 60%);
+    transform: translateX(-120%);
+  }
+
+  .game-card:hover .game-card__shine {
+    transform: translateX(120%);
+    transition: transform 0.8s ease;
+  }
+
+  .game-card__tagline {
+    color: color-mix(in oklab, var(--game-accent) 55%, white);
+  }
+
+  .thumb-frame {
+    background:
+      radial-gradient(ellipse at 50% 40%, color-mix(in oklab, var(--game-accent, #8b5cf6) 28%, transparent), transparent 70%),
+      repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.035) 0 10px, transparent 10px 20px),
+      #0d0a1f;
+  }
+}
+
+[data-paused="true"] .hero-anim,
+[data-paused="true"] .text-shimmer,
+[data-paused="true"] .btn-shine::after,
+[data-paused="true"] .cta-ping::before {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+  .bg-stars,
+  .text-shimmer,
+  .btn-shine::after,
+  .cta-ping::before,
+  .marquee-track,
+  .load-bar,
+  .quest-dot,
+  .hero-anim {
+    animation: none !important;
+  }
+
+  .game-card:hover .game-card__shine {
+    transition: none;
+  }
+} 

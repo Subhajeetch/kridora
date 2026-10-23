@@ -13,20 +13,23 @@ const meRoutes: FastifyPluginAsync = async (app) => {
     // Account data must never be cached by browsers or proxies.
     reply.header("cache-control", "no-store");
 
+    const isGuest = Boolean(user.isAnonymous);
+    const isVerified = !isGuest && Boolean(user.emailVerified);
+
     return {
       user: {
         id: user.id,
         name: user.name,
         image: user.image ?? null,
-        isAnonymous: Boolean(user.isAnonymous),
+        isAnonymous: isGuest,
         // Guests only have a placeholder address, so never expose it.
-        email: user.isAnonymous ? null : user.email,
+        email: isGuest ? null : user.email,
         emailVerified: user.emailVerified,
       },
       profile: {
         rings: profile.ringsBalance,
-        xp: profile.xp,
-        level: levelFromXp(profile.xp),
+        xp: isVerified ? profile.xp : null,
+        level: isVerified ? levelFromXp(profile.xp) : null,
         gamesPlayed: profile.gamesPlayed,
         gamesWon: profile.gamesWon,
       },

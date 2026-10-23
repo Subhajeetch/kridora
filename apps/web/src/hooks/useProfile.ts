@@ -10,7 +10,7 @@ export interface MeResponse {
     email: string | null
     emailVerified: boolean
   }
-  profile: { rings: number; xp: number; level: number; gamesPlayed: number; gamesWon: number }
+  profile: { rings: number; xp: number | null; level: number | null; gamesPlayed: number; gamesWon: number }
 }
 
 async function fetchMe(signal?: AbortSignal): Promise<MeResponse | null> {

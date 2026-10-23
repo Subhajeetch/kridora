@@ -1,42 +1,58 @@
-import { Clock, Users } from "lucide-react"
-import { Link } from "react-router"
-import { RequireIdentity } from "@/components/RequireIdentity"
+import { motion, useReducedMotion, type Variants } from "framer-motion"
+import { Lock } from "lucide-react"
+import { GameCard } from "@/components/games/GameCard"
 import { enabledGames } from "@/config/games"
 
-export default function GamesPage() {
-  return (
-    <RequireIdentity>
-      <section className="py-8">
-        <h1 className="text-3xl font-semibold tracking-tight">Browse games</h1>
-        <p className="mt-2 text-muted-foreground">Pick a game to create a room or join one.</p>
+const gridVariants: Variants = {
+  hidden: {},
+  show: {
+    transition: {
+      staggerChildren: 0.09,
+      delayChildren: 0.1,
+    },
+  },
+}
 
-        {enabledGames.length === 0 ? (
-          <p className="mt-10 text-muted-foreground">No games are available yet. Check back soon.</p>
-        ) : (
-          <ul className="mt-8 grid gap-4 sm:grid-cols-2">
-            {enabledGames.map((game) => (
-              <li key={game.slug}>
-                <Link
-                  to={`/${game.slug}`}
-                  className="group block h-full rounded-3xl border border-white/10 bg-card/70 p-6 outline-none transition-colors hover:bg-card focus-visible:ring-3 focus-visible:ring-ring/40"
-                  style={{ borderLeft: `4px solid ${game.accent}` }}
-                >
-                  <h2 className="text-xl font-semibold">{game.name}</h2>
-                  <p className="mt-1.5 text-muted-foreground">{game.tagline}</p>
-                  <div className="mt-5 flex flex-wrap gap-x-5 gap-y-1 text-sm text-muted-foreground">
-                    <span className="inline-flex items-center gap-1.5">
-                      <Users className="size-4" /> {game.minPlayers} to {game.maxPlayers} players
-                    </span>
-                    <span className="inline-flex items-center gap-1.5">
-                      <Clock className="size-4" /> {game.playTime}
-                    </span>
-                  </div>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-    </RequireIdentity>
+export default function GamesPage() {
+  const reduce = useReducedMotion()
+  const count = enabledGames.length
+  const onlineLabel = count === 1 ? "1 GAME" : `${count} GAMES`
+
+  return (
+    <section className="py-8 sm:py-12">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="mt-2 font-display text-4xl uppercase tracking-tight sm:text-5xl">BROWSE GAMES</h1>
+          <p className="mt-1 text-muted-foreground">Pick a game to create a room or join one.</p>
+        </div>
+
+        <div className="hidden items-center gap-2 rounded-full border border-white/10 bg-panel/70 px-3.5 py-1.5 text-xs font-semibold uppercase tracking-wider text-foreground sm:inline-flex">
+          <span className="size-2 animate-pulse rounded-full bg-ok" aria-hidden="true" />
+          <span className="tabular-nums">{onlineLabel}</span>
+        </div>
+      </div>
+
+      <h2 className="sr-only">Available games</h2>
+
+      {count === 0 ? (
+        <div className="mt-10 flex flex-col items-center justify-center rounded-3xl border-2 border-dashed border-white/15 bg-panel/40 px-6 py-16 text-center">
+          <div className="grid size-12 place-items-center rounded-2xl border border-white/10 bg-panel-2 text-muted-foreground">
+            <Lock className="size-5" aria-hidden="true" />
+          </div>
+          <p className="mt-4 text-muted-foreground">No games are available yet. Check back soon.</p>
+        </div>
+      ) : (
+        <motion.ul
+          variants={gridVariants}
+          initial={reduce ? false : "hidden"}
+          animate="show"
+          className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
+        >
+          {enabledGames.map((game) => (
+            <GameCard key={game.slug} game={game} />
+          ))}
+        </motion.ul>
+      )}
+    </section>
   )
 }

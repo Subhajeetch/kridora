@@ -31,6 +31,40 @@ interface UntypedEmitter {
   timeout(ms: number): { emitWithAck(event: string, payload: unknown): Promise<Ack<unknown>> }
 }
 
+/** Waits for the socket to establish a connection. */
+export async function waitForSocketConnected(timeoutMs = 10_000): Promise<void> {
+  if (socket.connected) return
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      cleanup()
+      reject(new RequestError("TIMEOUT", "Connecting to the server timed out. Please try again."))
+    }, timeoutMs)
+
+    function onConnect() {
+      cleanup()
+      resolve()
+    }
+
+    function onError(err: Error) {
+      cleanup()
+      reject(new RequestError("OFFLINE", err.message || "Could not connect to the game server."))
+    }
+
+    function cleanup() {
+      clearTimeout(timer)
+      socket.off("connect", onConnect)
+      socket.off("connect_error", onError)
+    }
+
+    socket.once("connect", onConnect)
+    socket.once("connect_error", onError)
+
+    if (!socket.connected) {
+      socket.connect()
+    }
+  })
+}
+
 /** Sends an event and resolves with the server's data, or throws a RequestError. */
 export async function request<E extends keyof ClientToServerEvents>(
   event: E,

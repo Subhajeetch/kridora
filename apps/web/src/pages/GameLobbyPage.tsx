@@ -2,10 +2,11 @@ import { getGameDefinition, type GameSlug, type RoomSnapshot } from "@kridora/sh
 import { DoorOpen, Plus, Users } from "lucide-react"
 import { useState } from "react"
 import { useNavigate, useParams } from "react-router"
-import { RequireIdentity } from "@/components/RequireIdentity"
+import { AuthDialog } from "@/components/AuthDialog"
 import { Button } from "@/components/ui/button"
 import { findEnabledGame } from "@/config/games"
-import { describeError, request, RequestError } from "@/lib/socket"
+import { authClient } from "@/lib/auth-client"
+import { describeError, request, RequestError, waitForSocketConnected } from "@/lib/socket"
 import { useRealtime } from "@/providers/realtime-context"
 import NotFoundPage from "./NotFoundPage"
 
@@ -14,19 +15,18 @@ export default function GameLobbyPage() {
   const { slug } = useParams()
   const gameSlug = findEnabledGame(slug)
   if (!gameSlug) return <NotFoundPage />
-  return (
-    <RequireIdentity>
-      <GameEntrance slug={gameSlug} />
-    </RequireIdentity>
-  )
+  return <GameEntrance slug={gameSlug} />
 }
 
 function GameEntrance({ slug }: { slug: GameSlug }) {
   const game = getGameDefinition(slug)
   const navigate = useNavigate()
+  const { data: session } = authClient.useSession()
   const { connection, activeRoom, setActiveRoom } = useRealtime()
   const [busy, setBusy] = useState<"create" | "public" | null>(null)
   const [error, setError] = useState<RequestError | Error | null>(null)
+  const [authOpen, setAuthOpen] = useState(false)
+  const [pendingAction, setPendingAction] = useState<"create" | "public" | null>(null)
 
   const connected = connection === "connected"
   const existingRoom = error instanceof RequestError && error.code === "ALREADY_IN_ROOM" ? error : null
@@ -45,6 +45,46 @@ function GameEntrance({ slug }: { slug: GameSlug }) {
       setError(err instanceof Error ? err : new Error(describeError(err)))
     } finally {
       setBusy(null)
+    }
+  }
+
+  function handleCreateRoom() {
+    if (!session) {
+      setPendingAction("create")
+      setAuthOpen(true)
+      return
+    }
+    void enter("create", async () => {
+      await waitForSocketConnected()
+      return request("room:create", { gameSlug: slug, visibility: "private" })
+    })
+  }
+
+  function handleJoinPublic() {
+    if (!session) {
+      setPendingAction("public")
+      setAuthOpen(true)
+      return
+    }
+    void enter("public", async () => {
+      await waitForSocketConnected()
+      return request("room:join-public", { gameSlug: slug })
+    })
+  }
+
+  function handleAuthSuccess() {
+    const action = pendingAction
+    setPendingAction(null)
+    if (action === "create") {
+      void enter("create", async () => {
+        await waitForSocketConnected()
+        return request("room:create", { gameSlug: slug, visibility: "private" })
+      })
+    } else if (action === "public") {
+      void enter("public", async () => {
+        await waitForSocketConnected()
+        return request("room:join-public", { gameSlug: slug })
+      })
     }
   }
 
@@ -82,22 +122,22 @@ function GameEntrance({ slug }: { slug: GameSlug }) {
             variant="outline"
             size="lg"
             className="h-12 text-base"
-            disabled={!connected || busy !== null}
-            onClick={() => void enter("public", () => request("room:join-public", { gameSlug: slug }))}
+            disabled={busy !== null || (session ? !connected : false)}
+            onClick={handleJoinPublic}
           >
             <DoorOpen /> {busy === "public" ? "Looking..." : "Join a public room"}
           </Button>
           <Button
             size="lg"
             className="h-12 text-base"
-            disabled={!connected || busy !== null}
-            onClick={() => void enter("create", () => request("room:create", { gameSlug: slug, visibility: "private" }))}
+            disabled={busy !== null || (session ? !connected : false)}
+            onClick={handleCreateRoom}
           >
             <Plus /> {busy === "create" ? "Creating..." : "Create room"}
           </Button>
         </div>
 
-        {!connected && <p className="mt-4 text-sm text-muted-foreground">Connecting to the game server...</p>}
+        {session && !connected && <p className="mt-4 text-sm text-muted-foreground">Connecting to the game server...</p>}
 
         {error && !existingRoom && (
           <p role="alert" className="mt-4 rounded-2xl bg-destructive/10 px-4 py-3 text-sm text-destructive">
@@ -122,6 +162,15 @@ function GameEntrance({ slug }: { slug: GameSlug }) {
           </div>
         )}
       </div>
+
+      <AuthDialog
+        open={authOpen}
+        onOpenChange={(open) => {
+          setAuthOpen(open)
+          if (!open) setPendingAction(null)
+        }}
+        onSuccess={handleAuthSuccess}
+      />
     </section>
   )
 }
