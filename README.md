@@ -36,14 +36,14 @@ Make sure `.env` is in your `.gitignore`.
 
 ## Everyday commands
 
-| Command | What it does |
-| --- | --- |
-| `pnpm dev` | API + web with hot reload |
-| `pnpm check-types` | Type-check every package |
-| `pnpm lint` | ESLint (web) |
-| `pnpm db:generate` | After editing `packages/db/src/schema/*`, create a new SQL migration |
-| `pnpm db:migrate` | Apply migrations |
-| `pnpm db:studio` | Browse the database |
+| Command                               | What it does                                                                                             |
+| ------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `pnpm dev`                            | API + web with hot reload                                                                                |
+| `pnpm check-types`                    | Type-check every package                                                                                 |
+| `pnpm lint`                           | ESLint (web)                                                                                             |
+| `pnpm db:generate`                    | After editing `packages/db/src/schema/*`, create a new SQL migration                                     |
+| `pnpm db:migrate`                     | Apply migrations                                                                                         |
+| `pnpm db:studio`                      | Browse the database                                                                                      |
 | `pnpm --filter @kridora/api test:e2e` | Realtime room test (needs the API running; takes ~70s because it waits out the 40s owner-transfer timer) |
 
 ## How requests flow
@@ -58,21 +58,21 @@ behind your proxy.
 
 ## Accounts
 
-* **Guest**: name only, created with Better Auth's anonymous plugin. Not tied to an email. If the guest later logs in
+- **Guest**: name only, created with Better Auth's anonymous plugin. Not tied to an email. If the guest later logs in
   to a real account, the guest user is deleted. Guests with no live session (and no Rings history) are purged after 24h
   by an hourly job (`apps/api/src/jobs/cleanup.ts`).
-* **Email + password**: email verification is required before login. Password reset is built in.
-* **Google**: enabled automatically when `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set. Authorised redirect
+- **Email + password**: email verification is required before login. Password reset is built in.
+- **Google**: enabled automatically when `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set. Authorised redirect
   URI: `<APP_URL>/api/auth/callback/google`.
-* **Emails** are printed to the API console for now (`apps/api/src/lib/mailer.ts`). Implement the `Mailer` interface
+- **Emails** are printed to the API console for now (`apps/api/src/lib/mailer.ts`). Implement the `Mailer` interface
   with Resend / Postmark / SES later; nothing else changes.
 
 ## Rings (game currency)
 
-* `player_profiles.rings_balance` is the fast-read balance; `ring_transactions` is the append-only ledger.
-* Only change balances through `grantRings` / `spendRings` / `applyRingTransaction` from `@kridora/db`
+- `player_profiles.rings_balance` is the fast-read balance; `ring_transactions` is the append-only ledger.
+- Only change balances through `grantRings` / `spendRings` / `applyRingTransaction` from `@kridora/db`
   (row-locked, atomic, idempotent via `idempotencyKey`). Never `UPDATE` the balance directly.
-* Ad rewards, XP payouts and payment webhooks should pass an `idempotencyKey` so retries cannot double-credit.
+- Ad rewards, XP payouts and payment webhooks should pass an `idempotencyKey` so retries cannot double-credit.
 
 ## Rooms
 
@@ -84,8 +84,8 @@ See `docs/ADDING_A_GAME.md` for how games plug in.
 
 ## Production checklist
 
-* Real `BETTER_AUTH_SECRET`, `NODE_ENV=production`, `TRUST_PROXY=true` behind a proxy, HTTPS everywhere.
-* Replace the console mailer.
-* Run `pnpm db:migrate` as a deploy step.
-* Use managed Postgres and Redis (Redis persistence on; the compose file uses AOF).
-* Only slugs listed in `packages/shared/src/games/config.production.ts` are visible/playable in production.
+- Real `BETTER_AUTH_SECRET`, `NODE_ENV=production`, `TRUST_PROXY=true` behind a proxy, HTTPS everywhere.
+- Replace the console mailer.
+- Run `pnpm db:migrate` as a deploy step.
+- Use managed Postgres and Redis (Redis persistence on; the compose file uses AOF).
+- Only slugs listed in `packages/shared/src/games/config.production.ts` are visible/playable in production.
