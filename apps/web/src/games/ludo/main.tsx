@@ -1,7 +1,8 @@
 import type { LudoColor, LudoGameState, LudoPlayerState } from "@kridora/shared"
 import { getLudoTrackSquare, LUDO_COLOR_STARTS, LUDO_STAR_SQUARES, LUDO_TRACK_COORDINATES } from "@kridora/shared"
+import { motion } from "framer-motion"
 import { UserRound, Volume2, VolumeX } from "lucide-react"
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react"
 import { useAudioSettings, updateAudioSettings } from "@/lib/audio-settings"
 import { describeError, request } from "@/lib/socket"
 import { cn } from "@/lib/utils"
@@ -49,12 +50,29 @@ function cellCenter([column, row]: readonly [number, number]): [number, number] 
   return [column * CELL + CELL / 2, row * CELL + CELL / 2]
 }
 
-function getTokenCell(player: LudoPlayerState, tokenIndex: number): readonly [number, number] {
-  const progress = player.tokens[tokenIndex]
-  if (progress < 0) return HOME_YARDS[player.color][tokenIndex]
-  if (progress <= 51) return BOARD_TRACK[getLudoTrackSquare(player.color, progress) ?? 0]!
-  return HOME_LANES[player.color][Math.min(5, progress - 52)]!
+function getTokenCellAt(color: LudoColor, tokenIndex: number, progress: number): readonly [number, number] {
+  if (progress < 0) return HOME_YARDS[color][tokenIndex]
+  if (progress <= 51) return BOARD_TRACK[getLudoTrackSquare(color, progress) ?? 0]!
+  return HOME_LANES[color][Math.min(5, progress - 52)]!
 }
+
+function getTokenCell(player: LudoPlayerState, tokenIndex: number): readonly [number, number] {
+  return getTokenCellAt(player.color, tokenIndex, player.tokens[tokenIndex])
+}
+
+type DragState = {
+  tokenId: string
+  tokenIndex: number
+  playerId: string
+  color: LudoColor
+  x: number
+  y: number
+  startClientX: number
+  startClientY: number
+  pointerId: number
+}
+type BoardPosition = readonly [number, number]
+type MovementPath = { id: number; points: BoardPosition[]; step: number; launchFrom?: BoardPosition }
 
 function houseAt(column: number, row: number): LudoColor | null {
   if (column < 6 && row < 6) return "coral"
@@ -64,46 +82,260 @@ function houseAt(column: number, row: number): LudoColor | null {
   return null
 }
 
-function LudoToken({ x, y, color, rotation, movable = false, onClick, label }: {
+function LudoToken({ x, y, color, rotation, movable = false, dragging = false, dragPreview = false, movementPath, stackScale = 1, onPointerDown, onMove, label }: {
   x: number
   y: number
   color: LudoColor
   rotation: number
   movable?: boolean
-  onClick?: () => void
+  dragging?: boolean
+  dragPreview?: boolean
+  movementPath?: MovementPath
+  stackScale?: number
+  onPointerDown?: (event: ReactPointerEvent<SVGSVGElement>) => void
+  onMove?: () => void
   label: string
 }) {
   const fill = COLORS[color]
+  const center = 20
+  const radians = rotation * Math.PI / 180
+  const liftX = -13 * Math.sin(radians)
+  const liftY = -13 * Math.cos(radians)
+  const landX = 2 * Math.sin(radians)
+  const landY = 2 * Math.cos(radians)
+  const launchX = movementPath?.launchFrom ? movementPath.launchFrom[0] - x : 0
+  const launchY = movementPath?.launchFrom ? movementPath.launchFrom[1] - y : 0
+  const isLaunching = Boolean(movementPath?.launchFrom)
   return (
-    <g
-      transform={`rotate(${-rotation} ${x} ${y})`}
+    <svg
+      x={x - center}
+      y={y - center}
+      width="40"
+      height="40"
+      viewBox="0 0 40 40"
+      style={{
+        opacity: dragging && !dragPreview ? 0.28 : undefined,
+        filter: dragPreview ? "drop-shadow(0 4px 4px #0008)" : undefined,
+        touchAction: "none",
+        overflow: "visible",
+      }}
       role={movable ? "button" : undefined}
       tabIndex={movable ? 0 : undefined}
       aria-label={label}
-      className={movable ? "cursor-pointer" : "pointer-events-none"}
-      onClick={movable ? onClick : undefined}
-      onKeyDown={movable ? (event) => { if (event.key === "Enter" || event.key === " ") onClick?.() } : undefined}
+      className={movable ? (dragging ? "cursor-grabbing" : "cursor-grab") : "pointer-events-none"}
+      onPointerDown={movable ? onPointerDown : undefined}
+      onKeyDown={movable ? (event) => { if (event.key === "Enter" || event.key === " ") onMove?.() } : undefined}
     >
-      {movable && <circle cx={x} cy={y} r="19" fill={fill.main} opacity=".2" className="animate-pulse" />}
-      <g transform={`translate(${x} ${y}) scale(1.2) translate(${-x} ${-y})`}>
-        <ellipse cx={x} cy={y + 11} rx="12" ry="4.5" fill="#000" opacity=".3" />
-        <ellipse cx={x} cy={y + 8} rx="12" ry="4.5" fill={fill.deep} stroke="#20242a" strokeWidth="1.8" />
-        <path d={`M ${x - 8} ${y + 7} Q ${x - 8} ${y + 3} ${x - 5} ${y} L ${x - 5} ${y - 4} L ${x + 5} ${y - 4} L ${x + 5} ${y} Q ${x + 8} ${y + 3} ${x + 8} ${y + 7} Q ${x} ${y + 12} ${x - 8} ${y + 7} Z`} fill={fill.main} stroke="#20242a" strokeWidth="1.8" />
-        <circle cx={x} cy={y - 6} r="11" fill={fill.main} stroke="#20242a" strokeWidth="1.8" />
-        <circle cx={x} cy={y - 6} r="6.5" fill={fill.pale} stroke="#fff" strokeWidth="1.6" />
-        <circle cx={x} cy={y - 6} r="3.4" fill={fill.main} />
-        <ellipse cx={x - 4} cy={y - 10} rx="2.4" ry="1.4" fill="#fff" opacity=".65" />
-      </g>
-    </g>
+      <motion.g
+        key={movementPath ? `${movementPath.id}:${movementPath.step}` : "piece-rest"}
+        initial={movementPath ? {
+          x: isLaunching ? launchX : 0,
+          y: isLaunching ? launchY : 0,
+          scaleX: isLaunching ? 0.82 : 0.9,
+          scaleY: isLaunching ? 0.9 : 1.08,
+        } : false}
+        animate={movementPath ? {
+          x: isLaunching ? [launchX, 0] : [0, liftX, landX, 0],
+          y: isLaunching ? [launchY, 0] : [0, liftY, landY, 0],
+          scaleX: isLaunching ? [0.82 * stackScale, stackScale] : [0.9 * stackScale, 1.08 * stackScale, 0.88 * stackScale, stackScale],
+          scaleY: isLaunching ? [0.9 * stackScale, stackScale] : [1.08 * stackScale, 1.18 * stackScale, 0.84 * stackScale, stackScale],
+        } : { x: 0, y: 0, scaleX: stackScale, scaleY: stackScale }}
+        transition={movementPath ? { duration: 0.25, ease: [0.2, 0.8, 0.25, 1] } : { duration: 0 }}
+        style={{ transformBox: "fill-box", transformOrigin: "center" }}
+      >
+        <g transform={`rotate(${-rotation} ${center} ${center})`}>
+          {movable && <circle cx={center} cy={center} r="19" fill={fill.main} opacity=".2" className="animate-pulse" />}
+          <g transform={`translate(${center} ${center}) scale(1.2) translate(${-center} ${-center})`}>
+            <ellipse cx={center} cy={center + 11} rx="12" ry="4.5" fill="#000" opacity=".3" />
+            <ellipse cx={center} cy={center + 8} rx="12" ry="4.5" fill={fill.deep} stroke="#20242a" strokeWidth="1.8" />
+            <path d={`M ${center - 8} ${center + 7} Q ${center - 8} ${center + 3} ${center - 5} ${center} L ${center - 5} ${center - 4} L ${center + 5} ${center - 4} L ${center + 5} ${center} Q ${center + 8} ${center + 3} ${center + 8} ${center + 7} Q ${center} ${center + 12} ${center - 8} ${center + 7} Z`} fill={fill.main} stroke="#20242a" strokeWidth="1.8" />
+            <circle cx={center} cy={center - 6} r="11" fill={fill.main} stroke="#20242a" strokeWidth="1.8" />
+            <circle cx={center} cy={center - 6} r="6.5" fill={fill.pale} stroke="#fff" strokeWidth="1.6" />
+            <circle cx={center} cy={center - 6} r="3.4" fill={fill.main} />
+            <ellipse cx={center - 4} cy={center - 10} rx="2.4" ry="1.4" fill="#fff" opacity=".65" />
+          </g>
+        </g>
+      </motion.g>
+    </svg>
   )
 }
 
-function LudoBoard({ state, userId, onMove, rotation }: { state: LudoGameState; userId: string; onMove: (tokenIndex: number) => void; rotation: number }) {
+function LudoBoard({ state, userId, onMove, rotation, busy, audio }: { state: LudoGameState; userId: string; onMove: (tokenIndex: number) => void; rotation: number; busy: boolean; audio: ReturnType<typeof useAudioSettings> }) {
+  const svgRef = useRef<SVGSVGElement>(null)
+  const dragRef = useRef<DragState | null>(null)
+  const [drag, setDrag] = useState<DragState | null>(null)
+  const [movementPaths, setMovementPaths] = useState<Record<string, MovementPath>>({})
+  const previousProgress = useRef<Map<string, number> | null>(null)
+  const movementTimers = useRef(new Map<string, number[]>())
+  const movementSequence = useRef(0)
   const activePlayer = state.players[state.currentPlayerIndex]
-  const tokenOffsets = new Map<string, number>()
+
+  const pointerToBoardPoint = (clientX: number, clientY: number): BoardPosition | null => {
+    const rect = svgRef.current?.getBoundingClientRect()
+    if (!rect || rect.width === 0 || rect.height === 0) return null
+    const rotatedX = (clientX - rect.left) * 600 / rect.width
+    const rotatedY = (clientY - rect.top) * 600 / rect.height
+    const radians = -rotation * Math.PI / 180
+    const dx = rotatedX - 300
+    const dy = rotatedY - 300
+    return [300 + dx * Math.cos(radians) - dy * Math.sin(radians), 300 + dx * Math.sin(radians) + dy * Math.cos(radians)]
+  }
+
+  const beginDrag = (event: ReactPointerEvent<SVGSVGElement>, player: LudoPlayerState, tokenIndex: number) => {
+    if (busy || event.button !== 0) return
+    event.preventDefault()
+    event.stopPropagation()
+    const point = pointerToBoardPoint(event.clientX, event.clientY)
+    if (!point) return
+    const nextDrag = {
+      tokenId: `${player.userId}:${tokenIndex}`,
+      tokenIndex,
+      playerId: player.userId,
+      color: player.color,
+      x: point[0],
+      y: point[1],
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      pointerId: event.pointerId,
+    }
+    dragRef.current = nextDrag
+    setDrag(nextDrag)
+    svgRef.current?.setPointerCapture(event.pointerId)
+  }
+
+  const moveDrag = (event: ReactPointerEvent<SVGSVGElement>) => {
+    const current = dragRef.current
+    if (!current || event.pointerId !== current.pointerId) return
+    const point = pointerToBoardPoint(event.clientX, event.clientY)
+    if (!point) return
+    const nextDrag = { ...current, x: point[0], y: point[1] }
+    dragRef.current = nextDrag
+    setDrag(nextDrag)
+  }
+
+  const finishDrag = (event: ReactPointerEvent<SVGSVGElement>) => {
+    const current = dragRef.current
+    if (!current || event.pointerId !== current.pointerId) return
+    const player = state.players.find((candidate) => candidate.userId === current.playerId)
+    const progress = player?.tokens[current.tokenIndex]
+    const didDrag = Math.hypot(event.clientX - current.startClientX, event.clientY - current.startClientY) > 7
+    const point = pointerToBoardPoint(event.clientX, event.clientY)
+    const nextProgress = progress === undefined ? null : progress < 0 ? 0 : progress + (state.dice ?? 0)
+    const destination = nextProgress === null || nextProgress < 0 || nextProgress > 57
+      ? null
+      : getTokenCellAt(current.color, current.tokenIndex, nextProgress)
+    const landedOnDestination = Boolean(point && destination
+      && Math.floor(point[0] / CELL) === Math.floor(destination[0])
+      && Math.floor(point[1] / CELL) === Math.floor(destination[1]))
+
+    dragRef.current = null
+    setDrag(null)
+    if (!busy && (!didDrag || landedOnDestination)) onMove(current.tokenIndex)
+    if (svgRef.current?.hasPointerCapture(event.pointerId)) svgRef.current.releasePointerCapture(event.pointerId)
+  }
+
+  const cancelDrag = (event: ReactPointerEvent<SVGSVGElement>) => {
+    if (dragRef.current?.pointerId !== event.pointerId) return
+    dragRef.current = null
+    setDrag(null)
+  }
+
+  useLayoutEffect(() => {
+    const nextProgress = new Map<string, number>()
+    for (const player of state.players) {
+      player.tokens.forEach((progress, tokenIndex) => nextProgress.set(`${player.userId}:${tokenIndex}`, progress))
+    }
+    const previous = previousProgress.current
+    previousProgress.current = nextProgress
+    if (!previous) return
+
+    const moved = state.players.flatMap((player) => player.tokens.flatMap((progress, tokenIndex) => {
+      const id = `${player.userId}:${tokenIndex}`
+      const oldProgress = previous.get(id)
+      if (oldProgress === undefined || progress < 0 || progress <= oldProgress) return []
+      const from = cellCenter(getTokenCellAt(player.color, tokenIndex, oldProgress))
+      const points: BoardPosition[] = [from]
+      for (let step = oldProgress < 0 ? 0 : oldProgress + 1; step <= progress; step += 1) {
+        points.push(cellCenter(getTokenCellAt(player.color, tokenIndex, step)))
+      }
+      return [{ id, oldProgress, progress, points }]
+    }))[0]
+
+    if (!moved || moved.points.length < 2) return
+
+    const steps = moved.points.length - 1
+    const launchFrom = moved.oldProgress < 0 ? moved.points[0] : undefined
+    const initialStep = launchFrom ? 1 : 0
+    const animationId = ++movementSequence.current
+    const previousTimers = movementTimers.current.get(moved.id)
+    previousTimers?.forEach((timer) => window.clearTimeout(timer))
+    if (launchFrom) playLudoSound("unlock", audio)
+    setMovementPaths((paths) => ({ ...paths, [moved.id]: {
+      id: animationId,
+      points: moved.points,
+      step: initialStep,
+      ...(launchFrom ? { launchFrom } : {}),
+    } }))
+    const timers: number[] = []
+    for (let step = initialStep + 1; step <= steps; step += 1) {
+      timers.push(window.setTimeout(() => {
+        playLudoSound(step === steps && moved.progress === 57 && !state.winnerId ? "home" : "step", audio)
+        setMovementPaths((paths) => {
+          const active = paths[moved.id]
+          if (!active || active.id !== animationId) return paths
+          return { ...paths, [moved.id]: { id: active.id, points: active.points, step } }
+        })
+      }, (step - initialStep) * 250))
+    }
+    timers.push(window.setTimeout(() => {
+      setMovementPaths((paths) => {
+        if (paths[moved.id]?.id !== animationId) return paths
+        const next = { ...paths }
+        delete next[moved.id]
+        return next
+      })
+      movementTimers.current.delete(moved.id)
+    }, (steps - initialStep) * 250 + 270))
+    movementTimers.current.set(moved.id, timers)
+  }, [audio, state.players, state.updatedAt])
+
+  useEffect(() => () => {
+    for (const timers of movementTimers.current.values()) timers.forEach((timer) => window.clearTimeout(timer))
+    movementTimers.current.clear()
+  }, [])
+
+  const draggedPlayer = drag ? state.players.find((player) => player.userId === drag.playerId) : undefined
+  const draggedProgress = draggedPlayer?.tokens[drag?.tokenIndex ?? -1]
+  const dropProgress = draggedProgress === undefined ? null : draggedProgress < 0 ? 0 : draggedProgress + (state.dice ?? 0)
+  const dropCell = drag && dropProgress !== null && dropProgress >= 0 && dropProgress <= 57
+    ? getTokenCellAt(drag.color, drag.tokenIndex, dropProgress)
+    : null
+  const visibleTokens = state.players.flatMap((player) => player.tokens.flatMap((progress, tokenIndex) => {
+    if (progress < 0) return []
+    const id = `${player.userId}:${tokenIndex}`
+    const movementPath = movementPaths[id]
+    const cell = movementPath?.points[movementPath.step] ?? cellCenter(getTokenCell(player, tokenIndex))
+    return [{ id, player, tokenIndex, movementPath, cell }]
+  }))
+  const stacks = new Map<string, typeof visibleTokens>()
+  for (const token of visibleTokens) {
+    const key = `${token.cell[0]}:${token.cell[1]}`
+    const stack = stacks.get(key) ?? []
+    stack.push(token)
+    stacks.set(key, stack)
+  }
 
   return (
-    <svg viewBox="0 0 600 600" role="img" aria-label="Square Ludo board with all four colored houses" className="block aspect-square w-full">
+    <svg
+      ref={svgRef}
+      viewBox="0 0 600 600"
+      role="img"
+      aria-label="Square Ludo board with all four colored houses"
+      className="block aspect-square w-full touch-none"
+      onPointerMove={moveDrag}
+      onPointerUp={finishDrag}
+      onPointerCancel={cancelDrag}
+    >
       <defs>
         <filter id="boardGlow" x="-20%" y="-20%" width="140%" height="140%">
           <feDropShadow dx="0" dy="0" stdDeviation="5" floodColor="#24e9ff" floodOpacity=".28" />
@@ -157,7 +389,17 @@ function LudoBoard({ state, userId, onMove, rotation }: { state: LudoGameState; 
               if (progress >= 0) return null
               const [centerX, centerY] = cellCenter(HOME_YARDS[color][tokenIndex]!)
               const canMove = player.userId === userId && state.players[state.currentPlayerIndex]?.userId === userId && state.movableTokens.includes(tokenIndex)
-              return <LudoToken key={`yard-${player.userId}-${tokenIndex}`} x={centerX} y={centerY} color={color} rotation={rotation} label={`${player.name} piece ${tokenIndex + 1}`} movable={canMove} onClick={() => onMove(tokenIndex)} />
+              return <LudoToken
+                key={`yard-${player.userId}-${tokenIndex}`}
+                x={centerX}
+                y={centerY}
+                color={color}
+                rotation={rotation}
+                label={`${player.name} piece ${tokenIndex + 1}`}
+                movable={canMove}
+                onPointerDown={(event) => beginDrag(event, player, tokenIndex)}
+                onMove={() => onMove(tokenIndex)}
+              />
             })}
           </g>
         )
@@ -191,29 +433,62 @@ function LudoBoard({ state, userId, onMove, rotation }: { state: LudoGameState; 
         )
       })}
 
-      {state.players.flatMap((player) => player.tokens.map((progress, tokenIndex) => {
-        if (progress < 0) return null
-        const cell = getTokenCell(player, tokenIndex)
-        const [baseX, baseY] = cellCenter(cell)
-        const key = `${player.color}:${progress}`
-        const duplicateIndex = tokenOffsets.get(key) ?? 0
-        tokenOffsets.set(key, duplicateIndex + 1)
-        const nudge = duplicateIndex * 5
-        const [x, y] = [baseX + nudge, baseY - nudge]
+      {dropCell && drag && !busy && (
+        <rect
+          x={dropCell[0] * CELL + 2}
+          y={dropCell[1] * CELL + 2}
+          width={CELL - 4}
+          height={CELL - 4}
+          rx="3"
+          fill={COLORS[drag.color].main}
+          fillOpacity=".22"
+          stroke={COLORS[drag.color].main}
+          strokeWidth="2.5"
+          pointerEvents="none"
+        />
+      )}
+
+      {visibleTokens.map(({ id: tokenId, player, tokenIndex, movementPath, cell }) => {
+        const [baseX, baseY] = cell
+        const stack = stacks.get(`${cell[0]}:${cell[1]}`) ?? []
+        const stackIndex = stack.findIndex((token) => token.id === tokenId)
+        const columns = stack.length
+        const offsetX = stack.length > 1 ? (stackIndex - (columns - 1) / 2) * CELL / columns : 0
+        const offsetY = 0
+        const stackScale = stack.length > 1
+          ? 0.82 * Math.min(CELL / columns / 30, CELL / 36)
+          : 1
+        const x = baseX + offsetX
+        const y = baseY + offsetY
         const canMove = player.userId === userId && player.userId === activePlayer?.userId && state.movableTokens.includes(tokenIndex)
         return (
           <LudoToken
-            key={`piece-${player.userId}-${tokenIndex}`}
+            key={`piece-${tokenId}`}
             x={x}
             y={y}
+            movementPath={movementPath}
+            stackScale={stackScale}
             color={player.color}
             rotation={rotation}
             movable={canMove}
+            dragging={drag?.tokenId === tokenId}
             label={`Move ${player.name}'s piece ${tokenIndex + 1}`}
-            onClick={() => onMove(tokenIndex)}
+            onPointerDown={(event) => beginDrag(event, player, tokenIndex)}
+            onMove={() => onMove(tokenIndex)}
           />
         )
-      }))}
+      })}
+
+      {drag && (
+        <LudoToken
+          x={drag.x}
+          y={drag.y}
+          color={drag.color}
+          rotation={rotation}
+          dragPreview
+          label={`Dragging ${draggedPlayer?.name ?? "player"}'s piece ${drag.tokenIndex + 1}`}
+        />
+      )}
       </g>
     </svg>
   )
@@ -310,7 +585,6 @@ export default function Ludo({ room, userId }: GameComponentProps) {
       if (lastSoundState.current !== null && next.updatedAt !== lastSoundState.current) {
         if (next.winnerId) playLudoSound("win", audio)
         else if (next.lastAction.includes("sent a rival")) playLudoSound("capture", audio)
-        else if (next.lastAction.includes("moved a piece")) playLudoSound("move", audio)
         else if (next.lastAction.includes("rolled a")) playLudoSound("roll", audio)
       }
       lastSoundState.current = next.updatedAt
@@ -372,7 +646,7 @@ export default function Ludo({ room, userId }: GameComponentProps) {
           <div className="lg:hidden">{playerPanel(0)}</div>
           <div className="lg:hidden">{playerPanel(1)}</div>
           <div className="col-span-2 mx-auto aspect-square w-full max-w-[680px] overflow-hidden rounded-[1.1rem] bg-gradient-to-br from-[#e9fbff] via-white to-[#dff2ff] p-1 shadow-[0_0_32px_#00dfff30] sm:p-2 lg:col-span-1 lg:max-w-[min(680px,calc(100vh-300px))]">
-          <LudoBoard state={state} userId={userId} rotation={rotation} onMove={(tokenIndex) => void act(() => request("ludo:move", { tokenIndex }))} />
+          <LudoBoard state={state} userId={userId} rotation={rotation} busy={busy} audio={audio} onMove={(tokenIndex) => void act(() => request("ludo:move", { tokenIndex }))} />
           </div>
           <div className="lg:hidden">{playerPanel(3)}</div>
           <div className="lg:hidden">{playerPanel(2)}</div>
