@@ -1,5 +1,5 @@
 import type { LudoColor, LudoGameState, LudoPlayerState } from "@kridora/shared"
-import { getLudoTrackSquare } from "@kridora/shared"
+import { getLudoTrackSquare, LUDO_COLOR_STARTS, LUDO_STAR_SQUARES, LUDO_TRACK_COORDINATES } from "@kridora/shared"
 import { UserRound, Volume2, VolumeX } from "lucide-react"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useAudioSettings, updateAudioSettings } from "@/lib/audio-settings"
@@ -18,12 +18,7 @@ const COLORS: Record<LudoColor, { main: string; pale: string; deep: string; labe
 
 const COLOR_SEATS: LudoColor[] = ["coral", "mint", "sunshine", "sky"]
 const CELL = 40
-const BOARD_TRACK: Array<[number, number]> = [
-  [0, 7], [1, 7], [2, 7], [3, 7], [4, 7], [5, 7], [5, 6], [6, 5], [6, 4], [6, 3], [6, 2], [6, 1], [7, 1],
-  [7, 0], [8, 0], [8, 1], [8, 2], [8, 3], [8, 4], [8, 5], [9, 6], [10, 6], [11, 6], [12, 6], [13, 6], [14, 6],
-  [14, 7], [14, 8], [13, 8], [12, 8], [11, 8], [10, 8], [9, 8], [8, 9], [8, 10], [8, 11], [8, 12], [8, 13], [8, 14],
-  [7, 14], [6, 14], [6, 13], [6, 12], [6, 11], [6, 10], [6, 9], [5, 8], [4, 8], [3, 8], [2, 8], [1, 8], [0, 8],
-]
+const BOARD_TRACK = LUDO_TRACK_COORDINATES
 
 const HOME_YARDS: Record<LudoColor, Array<[number, number]>> = {
   coral: [[1.5, 1.5], [3.5, 1.5], [1.5, 3.5], [3.5, 3.5]],
@@ -39,7 +34,10 @@ const HOME_LANES: Record<LudoColor, Array<[number, number]>> = {
   sky: [[7, 13], [7, 12], [7, 11], [7, 10], [7, 9], [7, 8]],
 }
 
-const SAFE_INDICES = [10, 24, 36, 49]
+const START_SQUARES = Object.fromEntries(
+  COLOR_SEATS.map((color) => [color, BOARD_TRACK[LUDO_COLOR_STARTS[color]]]),
+) as Record<LudoColor, readonly [number, number]>
+const SAFE_INDICES = LUDO_STAR_SQUARES
 const STAR = "M0 -11 L2.8 -3.5 L10.5 -3.5 L4.2 1.2 L6.5 9 L0 4.5 L-6.5 9 L-4.2 1.2 L-10.5 -3.5 L-2.8 -3.5 Z"
 const START_ARROWS: Array<{ column: number; row: number; rotation: number }> = [
   { column: 0, row: 7, rotation: 0 },
@@ -47,11 +45,11 @@ const START_ARROWS: Array<{ column: number; row: number; rotation: number }> = [
   { column: 14, row: 7, rotation: 180 },
   { column: 7, row: 14, rotation: 270 },
 ]
-function cellCenter([column, row]: [number, number]): [number, number] {
+function cellCenter([column, row]: readonly [number, number]): [number, number] {
   return [column * CELL + CELL / 2, row * CELL + CELL / 2]
 }
 
-function getTokenCell(player: LudoPlayerState, tokenIndex: number): [number, number] {
+function getTokenCell(player: LudoPlayerState, tokenIndex: number): readonly [number, number] {
   const progress = player.tokens[tokenIndex]
   if (progress < 0) return HOME_YARDS[player.color][tokenIndex]
   if (progress <= 51) return BOARD_TRACK[getLudoTrackSquare(player.color, progress) ?? 0]!
@@ -87,13 +85,15 @@ function LudoToken({ x, y, color, rotation, movable = false, onClick, label }: {
       onKeyDown={movable ? (event) => { if (event.key === "Enter" || event.key === " ") onClick?.() } : undefined}
     >
       {movable && <circle cx={x} cy={y} r="19" fill={fill.main} opacity=".2" className="animate-pulse" />}
-      <ellipse cx={x} cy={y + 11} rx="12" ry="4.5" fill="#000" opacity=".3" />
-      <ellipse cx={x} cy={y + 8} rx="12" ry="4.5" fill={fill.deep} stroke="#20242a" strokeWidth="1.8" />
-      <path d={`M ${x - 8} ${y + 7} Q ${x - 8} ${y + 3} ${x - 5} ${y} L ${x - 5} ${y - 4} L ${x + 5} ${y - 4} L ${x + 5} ${y} Q ${x + 8} ${y + 3} ${x + 8} ${y + 7} Q ${x} ${y + 12} ${x - 8} ${y + 7} Z`} fill={fill.main} stroke="#20242a" strokeWidth="1.8" />
-      <circle cx={x} cy={y - 6} r="11" fill={fill.main} stroke="#20242a" strokeWidth="1.8" />
-      <circle cx={x} cy={y - 6} r="6.5" fill={fill.pale} stroke="#fff" strokeWidth="1.6" />
-      <circle cx={x} cy={y - 6} r="3.4" fill={fill.main} />
-      <ellipse cx={x - 4} cy={y - 10} rx="2.4" ry="1.4" fill="#fff" opacity=".65" />
+      <g transform={`translate(${x} ${y}) scale(1.2) translate(${-x} ${-y})`}>
+        <ellipse cx={x} cy={y + 11} rx="12" ry="4.5" fill="#000" opacity=".3" />
+        <ellipse cx={x} cy={y + 8} rx="12" ry="4.5" fill={fill.deep} stroke="#20242a" strokeWidth="1.8" />
+        <path d={`M ${x - 8} ${y + 7} Q ${x - 8} ${y + 3} ${x - 5} ${y} L ${x - 5} ${y - 4} L ${x + 5} ${y - 4} L ${x + 5} ${y} Q ${x + 8} ${y + 3} ${x + 8} ${y + 7} Q ${x} ${y + 12} ${x - 8} ${y + 7} Z`} fill={fill.main} stroke="#20242a" strokeWidth="1.8" />
+        <circle cx={x} cy={y - 6} r="11" fill={fill.main} stroke="#20242a" strokeWidth="1.8" />
+        <circle cx={x} cy={y - 6} r="6.5" fill={fill.pale} stroke="#fff" strokeWidth="1.6" />
+        <circle cx={x} cy={y - 6} r="3.4" fill={fill.main} />
+        <ellipse cx={x - 4} cy={y - 10} rx="2.4" ry="1.4" fill="#fff" opacity=".65" />
+      </g>
     </g>
   )
 }
@@ -117,6 +117,7 @@ function LudoBoard({ state, userId, onMove, rotation }: { state: LudoGameState; 
       {Array.from({ length: 15 }, (_, row) => Array.from({ length: 15 }, (_, column) => {
         const house = houseAt(column, row)
         const road = !house && (column >= 6 && column <= 8 || row >= 6 && row <= 8)
+        const startColor = COLOR_SEATS.find((color) => START_SQUARES[color][0] === column && START_SQUARES[color][1] === row)
         const lane = row === 7 && column <= 5 ? "coral"
           : column === 7 && row <= 5 ? "mint"
             : row === 7 && column >= 9 ? "sunshine"
@@ -131,7 +132,7 @@ function LudoBoard({ state, userId, onMove, rotation }: { state: LudoGameState; 
             y={y}
             width={CELL}
             height={CELL}
-            fill={house ? COLORS[house].main : color ? color.main : road ? "#fff" : "#fff"}
+            fill={house ? COLORS[house].main : startColor ? COLORS[startColor].main : color ? color.main : road ? "#fff" : "#fff"}
             stroke="#111820"
             strokeWidth="1.25"
           />
@@ -145,7 +146,7 @@ function LudoBoard({ state, userId, onMove, rotation }: { state: LudoGameState; 
         const house = COLORS[color]
         return (
           <g key={`house-${color}`}>
-            <rect x={x + 40} y={y + 40} width="160" height="160" fill="#fbfcfe" stroke="#111820" strokeWidth="1.4" />
+            <rect x={x + 40} y={y + 40} width="160" height="160" rx="14" fill={house.pale} stroke="#111820" strokeWidth="1.4" />
             {HOME_YARDS[color].map((cell, tokenIndex) => {
               const progress = player?.tokens[tokenIndex]
               if (progress !== undefined && progress < 0) return null
@@ -182,11 +183,10 @@ function LudoBoard({ state, userId, onMove, rotation }: { state: LudoGameState; 
 
       {START_ARROWS.map(({ column, row, rotation: arrowRotation }) => {
         const [x, y] = cellCenter([column, row])
-        const arrowPath = "M -10 0 H 10 M 3 -7 L 10 0 L 3 7"
+        const arrowPath = "M -14 -3 H 3 V -9 L 15 0 L 3 9 V 3 H -14 Z"
         return (
           <g key={`arrow-${column}-${row}`} transform={`translate(${x} ${y}) rotate(${arrowRotation})`}>
-            <path d={arrowPath} fill="none" stroke="#101c28" strokeOpacity=".55" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
-            <path d={arrowPath} fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+            <path d={arrowPath} fill="#fff" stroke="#101c28" strokeOpacity=".6" strokeWidth="1.5" strokeLinejoin="round" />
           </g>
         )
       })}
@@ -352,7 +352,7 @@ export default function Ludo({ room, userId }: GameComponentProps) {
   }
 
   return (
-    <div className="mx-auto max-w-[1180px] rounded-[1.8rem] border border-cyan-300/25 bg-[radial-gradient(ellipse_at_center,_#123250_0%,_#081a2b_58%,_#06111d_100%)] p-2 shadow-[0_0_48px_#04d9ff20] sm:p-4">
+    <div className="mx-auto max-w-[1500px] rounded-[1.8rem] border border-cyan-300/25 bg-[radial-gradient(ellipse_at_center,_#123250_0%,_#081a2b_58%,_#06111d_100%)] p-2 shadow-[0_0_48px_#04d9ff20] sm:p-4">
       <div className="mb-2 flex items-center justify-between px-1 sm:mb-3">
         <span className="text-xs font-semibold tracking-[0.22em] text-cyan-100/55">{room.code}</span>
         <button
@@ -366,18 +366,18 @@ export default function Ludo({ room, userId }: GameComponentProps) {
         </button>
       </div>
 
-      <div className="mx-auto flex w-full max-w-[1120px] flex-col items-center justify-center gap-2 lg:flex-row lg:gap-3">
-        <div className="hidden shrink lg:flex lg:h-[min(54vw,660px)] lg:min-w-[150px] lg:max-w-[220px] lg:flex-1 lg:flex-col lg:justify-between">{playerPanel(0)}{playerPanel(3)}</div>
-        <div className="grid w-full max-w-[680px] grid-cols-2 gap-x-2 gap-y-2 lg:grid-cols-1 lg:min-w-0 lg:flex-1">
+      <div className="mx-auto flex w-full max-w-[1440px] flex-col items-center justify-center gap-2 lg:flex-row lg:gap-4">
+        <div className="hidden shrink-0 lg:flex lg:h-[min(54vw,660px,calc(100vh-300px))] lg:w-[210px] lg:flex-col lg:justify-between">{playerPanel(0)}{playerPanel(3)}</div>
+        <div className="grid w-full max-w-[680px] grid-cols-2 gap-x-2 gap-y-2 lg:grid-cols-1 lg:min-w-0 lg:flex-1 lg:max-w-[min(680px,calc(100vh-300px))]">
           <div className="lg:hidden">{playerPanel(0)}</div>
           <div className="lg:hidden">{playerPanel(1)}</div>
-          <div className="col-span-2 mx-auto aspect-square w-full max-w-[680px] overflow-hidden rounded-[1.1rem] bg-gradient-to-br from-[#e9fbff] via-white to-[#dff2ff] p-1 shadow-[0_0_32px_#00dfff30] sm:p-2 lg:col-span-1">
+          <div className="col-span-2 mx-auto aspect-square w-full max-w-[680px] overflow-hidden rounded-[1.1rem] bg-gradient-to-br from-[#e9fbff] via-white to-[#dff2ff] p-1 shadow-[0_0_32px_#00dfff30] sm:p-2 lg:col-span-1 lg:max-w-[min(680px,calc(100vh-300px))]">
           <LudoBoard state={state} userId={userId} rotation={rotation} onMove={(tokenIndex) => void act(() => request("ludo:move", { tokenIndex }))} />
           </div>
           <div className="lg:hidden">{playerPanel(3)}</div>
           <div className="lg:hidden">{playerPanel(2)}</div>
         </div>
-        <div className="hidden shrink lg:flex lg:h-[min(54vw,660px)] lg:min-w-[150px] lg:max-w-[220px] lg:flex-1 lg:flex-col lg:justify-between">{playerPanel(1)}{playerPanel(2)}</div>
+        <div className="hidden shrink-0 lg:flex lg:h-[min(54vw,660px,calc(100vh-300px))] lg:w-[210px] lg:flex-col lg:justify-between">{playerPanel(1)}{playerPanel(2)}</div>
       </div>
       {(error || winner) && <div className="mx-auto mt-3 max-w-[680px]">{error && <p role="alert" className="rounded-xl border border-rose-400/30 bg-rose-400/10 px-3 py-2 text-sm text-rose-200">{error}</p>}{winner && <p className="mt-2 rounded-xl border border-lime-300/35 bg-lime-300/10 px-4 py-3 text-center font-bold text-lime-200">{winner.name} wins</p>}</div>}
     </div>

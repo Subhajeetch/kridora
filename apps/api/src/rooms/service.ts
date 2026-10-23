@@ -4,11 +4,11 @@ import {
   EMPTY_ROOM_CLOSE_DELAY_MS,
   evaluateStartRequirements,
   createLudoGameState,
+  getLudoCaptureTargets,
   getGameDefinition,
   getLudoMovableTokens,
   getLudoTrackSquare,
   isGameEnabled,
-  LUDO_SAFE_SQUARES,
   OWNER_TRANSFER_DELAY_MS,
   PLAYER_DISCONNECT_GRACE_MS,
   type AppEnvironment,
@@ -458,19 +458,15 @@ export function createRoomService({ redis, db, notifier, log, appEnv }: RoomServ
       if (previousProgress === undefined) throw new AppError("INVALID_TARGET", "That piece does not exist");
       const nextProgress = previousProgress < 0 ? 0 : previousProgress + roll;
       player.tokens[tokenIndex] = nextProgress;
-      let captured = false;
 
       const landingSquare = getLudoTrackSquare(player.color, nextProgress);
-      if (landingSquare !== null && !LUDO_SAFE_SQUARES.has(landingSquare)) {
-        state.players.forEach((opponent, opponentIndex) => {
-          if (opponentIndex === playerIndex) return;
-          opponent.tokens = opponent.tokens.map((progress) => {
-            if (getLudoTrackSquare(opponent.color, progress) !== landingSquare) return progress;
-            captured = true;
-            return -1;
-          });
-        });
+      const capturedTokens = landingSquare === null
+        ? []
+        : getLudoCaptureTargets(state.players, playerIndex, landingSquare);
+      for (const target of capturedTokens) {
+        state.players[target.playerIndex]!.tokens[target.tokenIndex] = -1;
       }
+      const captured = capturedTokens.length > 0;
 
       const reachedHome = nextProgress === 57;
       state.lastAction = `${player.name} moved a piece${captured ? " and sent a rival back to the yard" : ""}${reachedHome ? " home" : ""}.`;

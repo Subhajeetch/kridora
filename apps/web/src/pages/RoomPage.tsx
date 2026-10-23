@@ -238,14 +238,16 @@ function RoomView({ room, userId }: { room: RoomSnapshot; userId: string }) {
   if (room.status === "in_progress") {
     const GameComponent = gameComponents[room.gameSlug]
     return (
-      <section className="py-6">
-        {header}
-        {secondsLeft !== null && owner && (
-          <p role="status" className="mb-4 rounded-2xl bg-amber-400/10 px-4 py-2.5 text-sm text-amber-200">
-            The owner ({owner.name}) is offline.
-            {successor ? ` ${successor.name} becomes owner in ${secondsLeft}s.` : ""}
-          </p>
-        )}
+      <section className="py-6 lg:relative lg:left-1/2 lg:w-[calc(100vw-2rem)] lg:max-w-[1500px] lg:-translate-x-1/2">
+        <div className="mx-auto max-w-5xl px-4">
+          {header}
+          {secondsLeft !== null && owner && (
+            <p role="status" className="mb-4 rounded-2xl bg-amber-400/10 px-4 py-2.5 text-sm text-amber-200">
+              The owner ({owner.name}) is offline.
+              {successor ? ` ${successor.name} becomes owner in ${secondsLeft}s.` : ""}
+            </p>
+          )}
+        </div>
         <Suspense fallback={<p className="py-12 text-center text-muted-foreground">Loading game...</p>}>
           <GameComponent room={room} userId={userId} />
         </Suspense>
