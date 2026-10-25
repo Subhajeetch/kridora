@@ -22,8 +22,15 @@ export function buildApp() {
     bodyLimit: 100 * 1024,
   });
 
+  const allowedOrigins = [
+    env.APP_URL,
+    ...(env.APP_URL.startsWith("https://") && !env.APP_URL.includes("www.")
+      ? [env.APP_URL.replace("https://", "https://.")]
+      : []),
+  ];
+
   app.register(helmet);
-  app.register(cors, { origin: [env.APP_URL], credentials: true });
+  app.register(cors, { origin: allowedOrigins, credentials: true });
   app.register(rateLimit, {
     global: true,
     max: 300,

@@ -1,9 +1,13 @@
 import { createAuthClient } from "better-auth/react"
 import { anonymousClient } from "better-auth/client/plugins"
+import { API_URL } from "./api-url"
 
-/** Same origin as the page (Vite / the reverse proxy forwards /api to the API), so cookies are first-party. */
+/**
+ * In local dev (Vite proxy): same origin as the page.
+ * In production: points to the backend API origin (e.g. https://api.kridora.org).
+ */
 export const authClient = createAuthClient({
-  baseURL: window.location.origin,
+  baseURL: API_URL || window.location.origin,
   plugins: [anonymousClient()],
 })
 

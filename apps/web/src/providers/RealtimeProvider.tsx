@@ -14,7 +14,11 @@ interface RoomState {
  * The server pushes `room:state` after every change, so components just read `activeRoom`.
  */
 export function RealtimeProvider({ children }: { children: ReactNode }) {
-  const { data: session } = authClient.useSession()
+  const { data: rawSession } = authClient.useSession()
+  const session =
+    rawSession && typeof rawSession === "object" && "user" in rawSession && rawSession.user
+      ? rawSession
+      : null
   const userId = session?.user.id ?? null
 
   const [socketState, setSocketState] = useState<Exclude<ConnectionState, "idle">>("connecting")

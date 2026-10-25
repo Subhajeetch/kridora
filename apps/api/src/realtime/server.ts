@@ -18,17 +18,24 @@ const DEADLINE_SWEEP_MS = 1_000;
 export function createRealtime(app: FastifyInstance) {
   const log = app.log;
 
+  const allowedOrigins = [
+    env.APP_URL,
+    ...(env.APP_URL.startsWith("https://") && !env.APP_URL.includes("www.")
+      ? [env.APP_URL.replace("https://", "https://.")]
+      : []),
+  ];
+
   const io: AppServer = new Server(app.server, {
     path: "/socket.io",
     // Reconnecting quickly after a network blip matters more than idle-connection savings.
     pingInterval: 10_000,
     pingTimeout: 10_000,
     maxHttpBufferSize: 16 * 1024,
-    cors: { origin: [env.APP_URL], credentials: true },
+    cors: { origin: allowedOrigins, credentials: true },
     // Blocks cross-site WebSocket hijacking: browsers always send Origin, so a foreign site is rejected.
     allowRequest: (req, callback) => {
       const origin = req.headers.origin;
-      callback(null, origin === undefined || origin === env.APP_URL);
+      callback(null, origin === undefined || allowedOrigins.includes(origin));
     },
   });
 

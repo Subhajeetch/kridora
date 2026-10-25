@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react"
 import { authClient } from "@/lib/auth-client"
+import { API_URL } from "@/lib/api-url"
 
 export interface MeResponse {
   user: {
@@ -15,8 +16,11 @@ export interface MeResponse {
 
 async function fetchMe(signal?: AbortSignal): Promise<MeResponse | null> {
   try {
-    const res = await fetch("/api/me", { credentials: "include", signal: signal ?? null })
-    return res.ok ? ((await res.json()) as MeResponse) : null
+    const res = await fetch(`${API_URL}/api/me`, { credentials: "include", signal: signal ?? null })
+    if (!res.ok) return null
+    const contentType = res.headers.get("content-type") || ""
+    if (!contentType.includes("application/json")) return null
+    return (await res.json()) as MeResponse
   } catch {
     return null // network hiccup or aborted request: keep whatever we had
   }
@@ -24,7 +28,8 @@ async function fetchMe(signal?: AbortSignal): Promise<MeResponse | null> {
 
 /** Loads the signed-in player's game profile (Rings, XP, level) from the API. */
 export function useProfile() {
-  const { data: session } = authClient.useSession()
+  const { data: rawSession } = authClient.useSession()
+  const session = rawSession && typeof rawSession === "object" && "user" in rawSession && rawSession.user ? rawSession : null
   const userId = session?.user.id ?? null
   // Remember which user the data belongs to so a different account never sees stale numbers.
   const [state, setState] = useState<{ userId: string; me: MeResponse } | null>(null)

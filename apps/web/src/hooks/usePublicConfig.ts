@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import { API_URL } from "@/lib/api-url"
 
 interface PublicConfig {
   googleEnabled: boolean
@@ -10,8 +11,13 @@ export function usePublicConfig(): PublicConfig {
 
   useEffect(() => {
     const controller = new AbortController()
-    fetch("/api/config", { signal: controller.signal })
-      .then((res) => (res.ok ? (res.json() as Promise<PublicConfig>) : null))
+    fetch(`${API_URL}/api/config`, { signal: controller.signal })
+      .then(async (res) => {
+        if (!res.ok) return null
+        const contentType = res.headers.get("content-type") || ""
+        if (!contentType.includes("application/json")) return null
+        return (await res.json()) as PublicConfig
+      })
       .then((data) => {
         if (data) setConfig(data)
       })

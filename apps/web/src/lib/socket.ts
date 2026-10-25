@@ -1,10 +1,11 @@
 import type { Ack, ClientToServerEvents, ErrorCode, ServerToClientEvents } from "@kridora/shared"
 import { io, type Socket } from "socket.io-client"
+import { API_URL } from "./api-url"
 
 export type AppSocket = Socket<ServerToClientEvents, ClientToServerEvents>
 
 /** One socket for the whole app. RealtimeProvider connects it when someone is signed in. */
-export const socket: AppSocket = io({
+export const socket: AppSocket = io(API_URL || undefined, {
   path: "/socket.io",
   withCredentials: true,
   autoConnect: false,

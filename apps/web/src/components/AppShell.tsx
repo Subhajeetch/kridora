@@ -18,7 +18,11 @@ import { useRealtime } from "@/providers/realtime-context"
 
 /** Layout shared by every page: background, top bar (HUD, Rings, music, settings), toast area. */
 export function AppShell() {
-  const { data: session, isPending } = authClient.useSession()
+  const { data: rawSession, isPending } = authClient.useSession()
+  const session =
+    rawSession && typeof rawSession === "object" && "user" in rawSession && rawSession.user
+      ? rawSession
+      : null
   const { me } = useProfile()
   const audio = useAudioSettings()
   const { notice, dismissNotice, connection } = useRealtime()
@@ -37,7 +41,7 @@ export function AppShell() {
           <Logo />
         </Link>
 
-        {session ? (
+        {session?.user ? (
           <div className="flex items-center gap-2">
             <PlayerHud
               name={session.user.name}

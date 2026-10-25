@@ -19,10 +19,15 @@ export const CLIENT_IP_HEADER = "x-kridora-client-ip";
 
 export const auth = betterAuth({
   appName: "Kridora",
-  baseURL: env.APP_URL,
+  baseURL: isProduction ? "https://api.kridora.org" : env.APP_URL,
   basePath: "/api/auth",
   secret: env.BETTER_AUTH_SECRET,
-  trustedOrigins: [env.APP_URL],
+  trustedOrigins: [
+    env.APP_URL,
+    ...(env.APP_URL.startsWith("https://") && !env.APP_URL.includes("www.")
+      ? [env.APP_URL.replace("https://", "https://www.")]
+      : []),
+  ],
 
   database: drizzleAdapter(db, { provider: "pg", schema }),
 
@@ -101,6 +106,12 @@ export const auth = betterAuth({
     cookiePrefix: "kridora",
     useSecureCookies: isProduction,
     ipAddress: { ipAddressHeaders: [CLIENT_IP_HEADER] },
+    crossSubDomainCookies: isProduction
+      ? { enabled: true, domain: ".kridora.org" }
+      : { enabled: false },
+    defaultCookieAttributes: isProduction
+      ? { sameSite: "none", secure: true }
+      : undefined,
   },
 
   plugins: [
