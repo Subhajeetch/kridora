@@ -4,6 +4,7 @@ Add replacement MP3 clips in this folder, then set the matching path in `apps/we
 
 | Event | Suggested filename | When it plays |
 | --- | --- | --- |
+| Your turn | `your-turn.mp3` | Your turn begins, including an extra roll |
 | Dice roll | `dice-roll.mp3` | A player rolls |
 | Token step | `token-step.mp3` | A token lands on each square |
 | Token unlock | `token-unlock.mp3` | A token leaves its yard |
