@@ -648,7 +648,34 @@ export default function Ludo({ room, userId }: GameComponentProps) {
     }
   }, [busy])
 
-  if (!state) return <div className="rounded-2xl border border-white/10 bg-[#121925] p-8 text-center text-white/70">{error ?? ""}</div>
+  if (!state) {
+    if (error) {
+      return (
+        <div className="mx-auto my-8 max-w-md rounded-2xl border border-rose-500/30 bg-rose-500/10 p-6 text-center text-rose-200 backdrop-blur-md">
+          <p className="font-semibold">Unable to connect to Ludo match</p>
+          <p className="mt-1 text-xs text-rose-300/80">{error}</p>
+          <button
+            type="button"
+            onClick={() => {
+              setError(null)
+              void request("ludo:get-state", {}).then(setState).catch((err) => setError(describeError(err)))
+            }}
+            className="mt-4 rounded-xl border border-rose-400/40 bg-rose-500/20 px-4 py-2 text-xs font-semibold hover:bg-rose-500/30 cursor-pointer transition-all"
+          >
+            Retry Connection
+          </button>
+        </div>
+      )
+    }
+    return (
+      <div className="mx-auto my-12 flex flex-col items-center justify-center gap-3 text-center">
+        <div className="size-8 animate-spin rounded-full border-2 border-cyan-400 border-t-transparent" />
+        <p className="text-xs font-medium uppercase tracking-widest text-cyan-200/70">
+          Syncing Ludo Board State...
+        </p>
+      </div>
+    )
+  }
 
   const winner = state.players.find((player) => player.userId === state.winnerId)
   const activePlayer = state.players[state.currentPlayerIndex]
