@@ -1,6 +1,6 @@
 import type { LudoColor, LudoGameState, LudoPlayerState } from "@kridora/shared"
 import { getLudoTrackSquare, LUDO_COLOR_STARTS, LUDO_STAR_SQUARES, LUDO_TRACK_COORDINATES } from "@kridora/shared"
-import { motion } from "framer-motion"
+import { motion, useReducedMotion } from "framer-motion"
 import { UserRound, Volume2, VolumeX } from "lucide-react"
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react"
 import { useAudioSettings, updateAudioSettings } from "@/lib/audio-settings"
@@ -8,6 +8,7 @@ import { describeError, request } from "@/lib/socket"
 import { cn } from "@/lib/utils"
 import { useRealtime } from "@/providers/realtime-context"
 import type { GameComponentProps } from "../types"
+import styles from "./ludo.module.css"
 import { playLudoSound } from "./sounds"
 
 const COLORS: Record<LudoColor, { main: string; pale: string; deep: string; label: string }> = {
@@ -97,6 +98,7 @@ function LudoToken({ x, y, color, rotation, movable = false, dragging = false, d
   label: string
 }) {
   const fill = COLORS[color]
+  const reduceMotion = useReducedMotion()
   const center = 20
   const radians = rotation * Math.PI / 180
   const liftX = -13 * Math.sin(radians)
@@ -106,6 +108,7 @@ function LudoToken({ x, y, color, rotation, movable = false, dragging = false, d
   const launchX = movementPath?.launchFrom ? movementPath.launchFrom[0] - x : 0
   const launchY = movementPath?.launchFrom ? movementPath.launchFrom[1] - y : 0
   const isLaunching = Boolean(movementPath?.launchFrom)
+  const isHighlighted = movable && !dragging
   return (
     <svg
       x={x - center}
@@ -115,16 +118,24 @@ function LudoToken({ x, y, color, rotation, movable = false, dragging = false, d
       viewBox="0 0 40 40"
       style={{
         opacity: dragging && !dragPreview ? 0.28 : undefined,
-        filter: dragPreview ? "drop-shadow(0 4px 4px #0008)" : undefined,
+        filter: dragPreview ? "drop-shadow(0 4px 4px #0008)"
+          : movable ? `drop-shadow(0 0 5px ${fill.main}bb)` : undefined,
         touchAction: "none",
         overflow: "visible",
       }}
       role={movable ? "button" : undefined}
       tabIndex={movable ? 0 : undefined}
-      aria-label={label}
-      className={movable ? (dragging ? "cursor-grabbing" : "cursor-grab") : "pointer-events-none"}
+      aria-label={movable ? `${label}, available to move` : label}
+      className={movable
+        ? cn(dragging ? "cursor-grabbing" : "cursor-grab", "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white")
+        : "pointer-events-none"}
       onPointerDown={movable ? onPointerDown : undefined}
-      onKeyDown={movable ? (event) => { if (event.key === "Enter" || event.key === " ") onMove?.() } : undefined}
+      onKeyDown={movable ? (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault()
+          onMove?.()
+        }
+      } : undefined}
     >
       <motion.g
         key={movementPath ? `${movementPath.id}:${movementPath.step}` : "piece-rest"}
@@ -134,25 +145,28 @@ function LudoToken({ x, y, color, rotation, movable = false, dragging = false, d
           scaleX: isLaunching ? 0.82 : 0.9,
           scaleY: isLaunching ? 0.9 : 1.08,
         } : false}
-        animate={movementPath ? {
+        animate={movementPath && !reduceMotion ? {
           x: isLaunching ? [launchX, 0] : [0, liftX, landX, 0],
           y: isLaunching ? [launchY, 0] : [0, liftY, landY, 0],
           scaleX: isLaunching ? [0.82 * stackScale, stackScale] : [0.9 * stackScale, 1.08 * stackScale, 0.88 * stackScale, stackScale],
           scaleY: isLaunching ? [0.9 * stackScale, stackScale] : [1.08 * stackScale, 1.18 * stackScale, 0.84 * stackScale, stackScale],
         } : { x: 0, y: 0, scaleX: stackScale, scaleY: stackScale }}
-        transition={movementPath ? { duration: 0.25, ease: [0.2, 0.8, 0.25, 1] } : { duration: 0 }}
+        transition={movementPath && !reduceMotion
+          ? { duration: 0.25, ease: [0.2, 0.8, 0.25, 1] }
+          : { duration: 0 }}
         style={{ transformBox: "fill-box", transformOrigin: "center" }}
       >
         <g transform={`rotate(${-rotation} ${center} ${center})`}>
-          {movable && <circle cx={center} cy={center} r="19" fill={fill.main} opacity=".2" className="animate-pulse" />}
-          <g transform={`translate(${center} ${center}) scale(1.2) translate(${-center} ${-center})`}>
-            <ellipse cx={center} cy={center + 11} rx="12" ry="4.5" fill="#000" opacity=".3" />
-            <ellipse cx={center} cy={center + 8} rx="12" ry="4.5" fill={fill.deep} stroke="#20242a" strokeWidth="1.8" />
-            <path d={`M ${center - 8} ${center + 7} Q ${center - 8} ${center + 3} ${center - 5} ${center} L ${center - 5} ${center - 4} L ${center + 5} ${center - 4} L ${center + 5} ${center} Q ${center + 8} ${center + 3} ${center + 8} ${center + 7} Q ${center} ${center + 12} ${center - 8} ${center + 7} Z`} fill={fill.main} stroke="#20242a" strokeWidth="1.8" />
-            <circle cx={center} cy={center - 6} r="11" fill={fill.main} stroke="#20242a" strokeWidth="1.8" />
-            <circle cx={center} cy={center - 6} r="6.5" fill={fill.pale} stroke="#fff" strokeWidth="1.6" />
-            <circle cx={center} cy={center - 6} r="3.4" fill={fill.main} />
-            <ellipse cx={center - 4} cy={center - 10} rx="2.4" ry="1.4" fill="#fff" opacity=".65" />
+          <g className={isHighlighted ? styles.tokenPulse : undefined}>
+            <g transform={`translate(${center} ${center}) scale(1.2) translate(${-center} ${-center})`}>
+              <ellipse cx={center} cy={center + 11} rx="12" ry="4.5" fill="#000" opacity=".3" />
+              <ellipse cx={center} cy={center + 8} rx="12" ry="4.5" fill={fill.deep} stroke="#20242a" strokeWidth="1.8" />
+              <path d={`M ${center - 8} ${center + 7} Q ${center - 8} ${center + 3} ${center - 5} ${center} L ${center - 5} ${center - 4} L ${center + 5} ${center - 4} L ${center + 5} ${center} Q ${center + 8} ${center + 3} ${center + 8} ${center + 7} Q ${center} ${center + 12} ${center - 8} ${center + 7} Z`} fill={fill.main} stroke="#20242a" strokeWidth="1.8" />
+              <circle cx={center} cy={center - 6} r="11" fill={fill.main} stroke="#20242a" strokeWidth="1.8" />
+              <circle cx={center} cy={center - 6} r="6.5" fill={fill.pale} stroke="#fff" strokeWidth="1.6" />
+              <circle cx={center} cy={center - 6} r="3.4" fill={fill.main} />
+              <ellipse cx={center - 4} cy={center - 10} rx="2.4" ry="1.4" fill="#fff" opacity=".65" />
+            </g>
           </g>
         </g>
       </motion.g>
@@ -329,9 +343,9 @@ function LudoBoard({ state, userId, onMove, rotation, busy, audio }: { state: Lu
     <svg
       ref={svgRef}
       viewBox="0 0 600 600"
-      role="img"
-      aria-label="Square Ludo board with all four colored houses"
-      className="block aspect-square w-full touch-none"
+      role="group"
+      aria-label="Ludo board showing all four colored houses and every piece"
+      className="block aspect-square w-full touch-manipulation"
       onPointerMove={moveDrag}
       onPointerUp={finishDrag}
       onPointerCancel={cancelDrag}
@@ -494,13 +508,13 @@ function LudoBoard({ state, userId, onMove, rotation, busy, audio }: { state: Lu
   )
 }
 
-const DIE_PIPS: Record<number, number[]> = {
-  1: [4],
-  2: [0, 8],
-  3: [0, 4, 8],
-  4: [0, 2, 6, 8],
-  5: [0, 2, 4, 6, 8],
-  6: [0, 2, 3, 5, 6, 8],
+const DIE_PIPS: Record<number, Array<[number, number]>> = {
+  1: [[50, 50]],
+  2: [[25, 25], [75, 75]],
+  3: [[25, 25], [50, 50], [75, 75]],
+  4: [[25, 25], [75, 25], [25, 75], [75, 75]],
+  5: [[25, 25], [75, 25], [50, 50], [25, 75], [75, 75]],
+  6: [[25, 23], [75, 23], [25, 50], [75, 50], [25, 77], [75, 77]],
 }
 
 function DiceFace({ value, color, disabled, current, onClick, playerName }: {
@@ -511,60 +525,72 @@ function DiceFace({ value, color, disabled, current, onClick, playerName }: {
   onClick: () => void
   playerName: string
 }) {
+  const faceId = `ludo-die-${color}`
   return (
     <button
       type="button"
-      aria-label={`${playerName} dice${current && !disabled ? ", roll" : ""}`}
+      aria-label={current && !disabled ? `Roll the dice for ${playerName}` : `${playerName}'s die showing ${value}`}
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        "grid size-[52px] grid-cols-3 grid-rows-3 gap-0.5 rounded-xl border-[2px] border-[#d6b647] bg-gradient-to-br from-white to-[#e8e4e3] p-1.5 shadow-[0_3px_10px_#0008] transition-transform sm:size-[60px] sm:rounded-2xl sm:p-2",
-        current && !disabled && "cursor-pointer shadow-[0_0_18px_#e8ff00,0_3px_10px_#0008] hover:-translate-y-1",
-        disabled && "cursor-default opacity-65",
+        styles.dieButton,
+        "relative shrink-0 rounded-[22%] border-[3px] border-[#9e7726] bg-gradient-to-br from-[#fffef8] via-[#f8f5eb] to-[#ded7c7] p-0.5 shadow-[inset_0_2px_3px_#fff,0_4px_10px_#0007] focus-visible:outline focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-white",
+        current && "border-[#f5d35e] shadow-[inset_0_2px_3px_#fff,0_0_16px_#ffe60099,0_4px_10px_#0007]",
+        current && !disabled && "cursor-pointer",
+        disabled && !current && "cursor-default opacity-60",
       )}
     >
-      {Array.from({ length: 9 }, (_, index) => (
-        <span key={index} className="grid place-items-center">
-          {DIE_PIPS[value]?.includes(index) && <span className="size-2.5 rounded-full bg-[#20242a] shadow-inner" />}
-        </span>
-      ))}
+      <svg viewBox="0 0 100 100" className="block size-full" aria-hidden="true">
+        <defs>
+          <linearGradient id={faceId} x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#fffef8" />
+            <stop offset="55%" stopColor="#f7f3e8" />
+            <stop offset="100%" stopColor="#ded7c7" />
+          </linearGradient>
+        </defs>
+        <rect x="4" y="4" width="92" height="92" rx="20" fill={`url(#${faceId})`} stroke="#9e7726" strokeWidth="4" />
+        <rect x="9" y="9" width="82" height="82" rx="16" fill="none" stroke="#fff" strokeOpacity=".9" strokeWidth="3" />
+        <path d="M20 12 H80" fill="none" stroke="#fff" strokeOpacity=".78" strokeWidth="3" strokeLinecap="round" />
+        {DIE_PIPS[value]?.map(([cx, cy]) => (
+          <g key={`${cx}-${cy}`}>
+            <circle cx={cx} cy={cy + 1.5} r="8.5" fill="#000" opacity=".16" />
+            <circle cx={cx} cy={cy} r="8" fill="#242932" stroke="#12171e" strokeWidth="1.5" />
+            <circle cx={cx - 2.2} cy={cy - 2.4} r="2" fill="#fff" opacity=".24" />
+          </g>
+        ))}
+      </svg>
       <span className="sr-only">{COLORS[color].label}</span>
     </button>
   )
 }
 
-function PlayerPanel({ player, seatColor, seatIndex, state, userId, onRoll, busy }: {
+function PlayerPanel({ player, seatIndex, state, userId, onRoll, busy }: {
   player: LudoPlayerState | undefined
-  seatColor: LudoColor
   seatIndex: number
   state: LudoGameState
   userId: string
   onRoll: () => void
   busy: boolean
 }) {
-  const color = player?.color ?? seatColor
-  const playerIndex = player ? state.players.findIndex((candidate) => candidate.userId === player.userId) : -1
-  const active = playerIndex === state.currentPlayerIndex && !state.winnerId
-  const canRoll = active && player?.userId === userId && state.dice === null && !busy
-  const value = playerIndex >= 0 ? state.lastRolls[playerIndex] ?? 1 : 1
+  if (!player) return null
+  const color = player.color
+  const playerIndex = state.players.findIndex((candidate) => candidate.userId === player.userId)
+  const isActive = playerIndex === state.currentPlayerIndex && !state.winnerId
+  const canRoll = isActive && player.userId === userId && state.dice === null && !busy
+  const value = isActive && state.dice !== null ? state.dice : state.lastRolls[playerIndex] ?? 1
   const onLeft = seatIndex === 0 || seatIndex === 3
   return (
     <div className={cn(
-      "flex min-w-0 items-center gap-2 rounded-2xl border bg-[#102238]/95 p-2 shadow-[0_8px_22px_#0005] transition-all sm:gap-2.5 sm:p-2.5",
+      styles.playerPanel,
+      "flex min-w-0 items-center border bg-[#102238]/95 shadow-[0_8px_22px_#0007] transition-colors",
       onLeft ? "flex-row" : "flex-row-reverse",
-      active ? "border-[#ffe15a] shadow-[0_0_18px_#ffd83a55,0_8px_22px_#0005]" : "border-white/15",
-      !player && "opacity-70",
-    )}>
-      <span className="grid size-10 shrink-0 place-items-center rounded-xl border border-white/70 shadow-inner sm:size-11" style={{ background: `linear-gradient(145deg, ${COLORS[color].pale}, ${COLORS[color].main})`, color: COLORS[color].deep }}>
-        <UserRound className="size-6" strokeWidth={2.3} />
+      isActive ? "border-[#ffe15a] shadow-[0_0_22px_#ffd83a70,0_8px_22px_#0007]" : "border-white/20",
+    )} role="group" aria-label={`${player.name}${isActive ? ", current turn" : ""}`}>
+      <span className={cn(styles.playerAvatar, "grid shrink-0 place-items-center border border-white/80 shadow-inner")} style={{ background: `linear-gradient(145deg, ${COLORS[color].pale}, ${COLORS[color].main})`, color: COLORS[color].deep }} aria-hidden="true">
+        <UserRound strokeWidth={2.3} />
       </span>
-      <div className={cn("min-w-0 flex-1", onLeft ? "text-left" : "text-right")}>
-        <p className="truncate text-xs font-extrabold leading-tight text-white sm:text-sm">{player?.name ?? "Open"}</p>
-        <p className="mt-1 truncate text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-300/70 sm:text-[10px]">
-          {player?.userId === userId ? "You" : player ? `${player.tokens.filter((progress) => progress === 57).length}/4 home` : COLORS[color].label}
-        </p>
-      </div>
-      <DiceFace value={value} color={color} current={canRoll} disabled={!canRoll} onClick={onRoll} playerName={player?.name ?? "Open"} />
+      <span className={cn(styles.playerName, "min-w-0 flex-1 truncate font-extrabold text-white", onLeft ? "text-left" : "text-right")}>{player.name}</span>
+      <DiceFace value={value} color={color} current={isActive} disabled={!canRoll} onClick={onRoll} playerName={player.name} />
     </div>
   )
 }
@@ -576,18 +602,28 @@ export default function Ludo({ room, userId }: GameComponentProps) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const lastSoundState = useRef<number | null>(null)
+  const lastTurnUserId = useRef<string | null>(null)
 
   useEffect(() => {
     let alive = true
     const receive = (next: LudoGameState) => {
       if (!alive) return
       setState(next)
-      if (lastSoundState.current !== null && next.updatedAt !== lastSoundState.current) {
+      const nextTurnUserId = next.players[next.currentPlayerIndex]?.userId ?? null
+      const firstState = lastSoundState.current === null
+      const isNewState = next.updatedAt !== lastSoundState.current
+      if (firstState) {
+        if (!next.winnerId && nextTurnUserId === userId) playLudoSound("turn", audio)
+      } else if (isNewState) {
         if (next.winnerId) playLudoSound("win", audio)
         else if (next.lastAction.includes("sent a rival")) playLudoSound("capture", audio)
         else if (next.lastAction.includes("rolled a")) playLudoSound("roll", audio)
+        if (!next.winnerId && nextTurnUserId === userId && (lastTurnUserId.current !== userId || next.lastAction.includes("Roll again") || next.lastAction.includes("roll again"))) {
+          playLudoSound("turn", audio)
+        }
       }
       lastSoundState.current = next.updatedAt
+      lastTurnUserId.current = nextTurnUserId
     }
     socket.on("ludo:state", receive)
     request("ludo:get-state", {}).then(receive).catch((err: unknown) => {
@@ -597,7 +633,7 @@ export default function Ludo({ room, userId }: GameComponentProps) {
       alive = false
       socket.off("ludo:state", receive)
     }
-  }, [audio, room.matchId, socket])
+  }, [audio, room.matchId, socket, userId])
 
   const act = useCallback(async (action: () => Promise<LudoGameState>) => {
     if (busy) return
@@ -614,19 +650,25 @@ export default function Ludo({ room, userId }: GameComponentProps) {
 
   if (!state) return <div className="rounded-2xl border border-white/10 bg-[#121925] p-8 text-center text-white/70">{error ?? ""}</div>
 
-  const playersByColor = new Map(state.players.map((player) => [player.color, player]))
   const winner = state.players.find((player) => player.userId === state.winnerId)
+  const activePlayer = state.players[state.currentPlayerIndex]
+  const playersByColor = new Map(state.players.map((player) => [player.color, player]))
   const myColor = state.players.find((player) => player.userId === userId)?.color ?? "sky"
   const rotation = ({ coral: 270, mint: 180, sunshine: 90, sky: 0 } as const)[myColor]
   const visualSeats: LudoColor[] = ["coral", "coral", "coral", "coral"]
   COLOR_SEATS.forEach((color, sourceIndex) => { visualSeats[(sourceIndex + rotation / 90) % 4] = color })
-  const playerPanel = (seatIndex: number) => {
-    const color = visualSeats[seatIndex]!
-    return <PlayerPanel key={`${seatIndex}-${color}`} player={playersByColor.get(color)} seatColor={color} seatIndex={seatIndex} state={state} userId={userId} busy={busy} onRoll={() => void act(() => request("ludo:roll", {}))} />
-  }
+  const playerPanels = visualSeats.map((color, seatIndex) => {
+    const player = playersByColor.get(color)
+    if (!player) return null
+    return (
+      <div key={player.userId} className={cn(styles.playerSeat, [styles.seat0, styles.seat1, styles.seat2, styles.seat3][seatIndex])}>
+        <PlayerPanel player={player} seatIndex={seatIndex} state={state} userId={userId} busy={busy} onRoll={() => void act(() => request("ludo:roll", {}))} />
+      </div>
+    )
+  })
 
   return (
-    <div className="mx-auto max-w-[1500px] rounded-[1.8rem] border border-cyan-300/25 bg-[radial-gradient(ellipse_at_center,_#123250_0%,_#081a2b_58%,_#06111d_100%)] p-2 shadow-[0_0_48px_#04d9ff20] sm:p-4">
+    <div className={cn(styles.shell, "mx-auto rounded-[1.8rem] border border-cyan-300/25 bg-[radial-gradient(ellipse_at_center,_#123250_0%,_#081a2b_58%,_#06111d_100%)] shadow-[0_0_48px_#04d9ff20]")}>
       <div className="mb-2 flex items-center justify-between px-1 sm:mb-3">
         <span className="text-xs font-semibold tracking-[0.22em] text-cyan-100/55">{room.code}</span>
         <button
@@ -634,26 +676,22 @@ export default function Ludo({ room, userId }: GameComponentProps) {
           onClick={() => updateAudioSettings({ muted: !audio.muted })}
           aria-label={audio.muted ? "Turn game sounds on" : "Turn game sounds off"}
           aria-pressed={audio.muted}
-          className="grid size-9 place-items-center rounded-full border border-white/10 bg-white/5 text-cyan-100/80 hover:bg-white/10"
+          className="grid size-11 place-items-center rounded-full border border-white/15 bg-white/5 text-cyan-100/90 hover:bg-white/10 focus-visible:outline focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-white"
         >
           {audio.muted ? <VolumeX className="size-4" /> : <Volume2 className="size-4" />}
         </button>
       </div>
 
-      <div className="mx-auto flex w-full max-w-[1440px] flex-col items-center justify-center gap-2 lg:flex-row lg:gap-4">
-        <div className="hidden shrink-0 lg:flex lg:h-[min(54vw,660px,calc(100vh-300px))] lg:w-[210px] lg:flex-col lg:justify-between">{playerPanel(0)}{playerPanel(3)}</div>
-        <div className="grid w-full max-w-[680px] grid-cols-2 gap-x-2 gap-y-2 lg:grid-cols-1 lg:min-w-0 lg:flex-1 lg:max-w-[min(680px,calc(100vh-300px))]">
-          <div className="lg:hidden">{playerPanel(0)}</div>
-          <div className="lg:hidden">{playerPanel(1)}</div>
-          <div className="col-span-2 mx-auto aspect-square w-full max-w-[680px] overflow-hidden rounded-[1.1rem] bg-gradient-to-br from-[#e9fbff] via-white to-[#dff2ff] p-1 shadow-[0_0_32px_#00dfff30] sm:p-2 lg:col-span-1 lg:max-w-[min(680px,calc(100vh-300px))]">
+      <div className={styles.layout}>
+        {playerPanels}
+        <div className={cn(styles.boardFrame, "overflow-hidden rounded-[1.1rem] bg-gradient-to-br from-[#e9fbff] via-white to-[#dff2ff] shadow-[0_0_32px_#00dfff30]")}>
           <LudoBoard state={state} userId={userId} rotation={rotation} busy={busy} audio={audio} onMove={(tokenIndex) => void act(() => request("ludo:move", { tokenIndex }))} />
-          </div>
-          <div className="lg:hidden">{playerPanel(3)}</div>
-          <div className="lg:hidden">{playerPanel(2)}</div>
         </div>
-        <div className="hidden shrink-0 lg:flex lg:h-[min(54vw,660px,calc(100vh-300px))] lg:w-[210px] lg:flex-col lg:justify-between">{playerPanel(1)}{playerPanel(2)}</div>
       </div>
-      {(error || winner) && <div className="mx-auto mt-3 max-w-[680px]">{error && <p role="alert" className="rounded-xl border border-rose-400/30 bg-rose-400/10 px-3 py-2 text-sm text-rose-200">{error}</p>}{winner && <p className="mt-2 rounded-xl border border-lime-300/35 bg-lime-300/10 px-4 py-3 text-center font-bold text-lime-200">{winner.name} wins</p>}</div>}
+      <span className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {winner ? `${winner.name} wins. ${state.lastAction}` : `${activePlayer?.name ?? "A player"}'s turn. ${state.lastAction}`}
+      </span>
+      {error && <div className="mx-auto mt-3 max-w-[680px]"><p role="alert" className="rounded-xl border border-rose-400/30 bg-rose-400/10 px-3 py-2 text-sm text-rose-200">{error}</p></div>}
     </div>
   )
 }

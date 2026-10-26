@@ -1,10 +1,11 @@
 import type { AudioSettings } from "@/lib/audio-settings"
 
-type Sound = "roll" | "step" | "unlock" | "capture" | "home" | "win"
+type Sound = "turn" | "roll" | "step" | "unlock" | "capture" | "home" | "win"
 
 // Drop replacement clips in public/audio/ludo and set that event's path here.
 // Keep null to use the synthesized fallback below.
 const LUDO_SOUND_FILES: Record<Sound, string | null> = {
+  turn: null, // your-turn.mp3
   roll: null, // dice-roll.mp3
   step: null, // token-step.mp3
   unlock: null, // token-unlock.mp3
@@ -51,7 +52,11 @@ function playSynthesizedLudoSound(sound: Sound, settings: AudioSettings) {
       oscillator.stop(context.currentTime + start + duration + 0.02)
     }
 
-    if (sound === "roll") {
+    if (sound === "turn") {
+      note(587, 0, 0.16, "sine", 0.62)
+      note(784, 0.09, 0.18, "sine", 0.68)
+      note(988, 0.18, 0.24, "triangle", 0.72)
+    } else if (sound === "roll") {
       note(480, 0, 0.08, "triangle", 0.75)
       note(720, 0.07, 0.1, "triangle", 0.9)
       note(610, 0.15, 0.16, "sine", 0.7)
