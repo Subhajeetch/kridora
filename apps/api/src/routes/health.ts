@@ -3,6 +3,11 @@ import { pool } from "../lib/db";
 import { redis } from "../lib/redis-client";
 
 const healthRoute: FastifyPluginAsync = async (fastify) => {
+  /** Root probe for platforms (e.g. Render default health check / uptime monitors). */
+  fastify.get("/", async () => {
+    return { name: "kridora-api", status: "ok" };
+  });
+
   /** Liveness: the process is up. */
   fastify.get("/health", async () => {
     return { status: "ok" };

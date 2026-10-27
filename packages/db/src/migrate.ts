@@ -1,6 +1,15 @@
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { createDb } from "./client";
+
+// In local development, load repo-root .env if present.
+// In production (Render/CI), environment variables in process.env are used directly.
+const rootEnv = resolve(process.cwd(), "../../.env");
+if (existsSync(rootEnv)) {
+  process.loadEnvFile(rootEnv);
+}
 
 const url = process.env.DATABASE_URL;
 if (!url) {

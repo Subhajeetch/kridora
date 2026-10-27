@@ -11,7 +11,7 @@
   "scripts": {
     "check-types": "tsc",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "tsx --env-file-if-exists=../../.env src/migrate.ts",
+    "db:migrate": "tsx src/migrate.ts",
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
