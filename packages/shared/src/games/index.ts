@@ -14,8 +14,18 @@ export function getEnabledGames(env: AppEnvironment): GameDefinition[] {
   return getEnabledGameSlugs(env).map((slug) => GAME_DEFINITIONS[slug]);
 }
 
-export function isGameEnabled(env: AppEnvironment, slug: string): slug is GameSlug {
+export function isGameEnabled(
+  env: AppEnvironment,
+  slug: string,
+): slug is GameSlug {
   return isKnownGameSlug(slug) && getEnabledGameSlugs(env).includes(slug);
+}
+
+export function isProductionGame(slug: string): boolean {
+  return (
+    isKnownGameSlug(slug) &&
+    (productionGames as readonly string[]).includes(slug)
+  );
 }
 
 export function getGameDefinition(slug: GameSlug): GameDefinition {
@@ -26,5 +36,11 @@ export { GAME_DEFINITIONS, isKnownGameSlug } from "./registry";
 export type { GameSlug } from "./registry";
 export type { GameDefinition, StartContext } from "./types";
 export { evaluateStartRequirements } from "./requirements";
-export type { StartCheck, UnmetRequirement, UnmetRequirementCode } from "./requirements";
+export type {
+  StartCheck,
+  UnmetRequirement,
+  UnmetRequirementCode,
+} from "./requirements";
 export * from "./ludo";
+export { developmentGames } from "./config.development";
+export { productionGames } from "./config.production";

@@ -1,15 +1,15 @@
-import type { RoomSnapshot } from "@kridora/shared"
-import { motion, useReducedMotion } from "framer-motion"
-import { AlertCircle, ArrowLeft, Gamepad2, Users, Wifi } from "lucide-react"
-import { useEffect, useState } from "react"
-import { GameThumbnail } from "@/components/games/GameThumbnail"
-import { Button } from "@/components/ui/button"
+import type { RoomSnapshot } from "@kridora/shared";
+import { motion, useReducedMotion } from "framer-motion";
+import { AlertCircle, ArrowLeft, Gamepad2, Users, Wifi } from "lucide-react";
+import { useEffect, useState } from "react";
+import { GameThumbnail } from "@/components/games/GameThumbnail";
+import { Button } from "@/components/ui/button";
 
 interface GameLaunchScreenProps {
-  room: RoomSnapshot
-  gameName: string
-  onBackToRoom?: () => void
-  statusMessage?: string
+  room: RoomSnapshot;
+  gameName: string;
+  onBackToRoom?: () => void;
+  statusMessage?: string;
 }
 
 const STAGES = [
@@ -17,7 +17,7 @@ const STAGES = [
   "Loading game assets & scripts...",
   "Synchronizing player states...",
   "Preparing the game arena...",
-]
+];
 
 export function GameLaunchScreen({
   room,
@@ -25,26 +25,26 @@ export function GameLaunchScreen({
   onBackToRoom,
   statusMessage,
 }: GameLaunchScreenProps) {
-  const reduce = useReducedMotion()
-  const [stageIndex, setStageIndex] = useState(0)
-  const [slowLoading, setSlowLoading] = useState(false)
+  const reduce = useReducedMotion();
+  const [stageIndex, setStageIndex] = useState(0);
+  const [slowLoading, setSlowLoading] = useState(false);
 
   // Cycle through loading steps to give the player real feedback
   useEffect(() => {
     const stageTimer = setInterval(() => {
-      setStageIndex((prev) => (prev < STAGES.length - 1 ? prev + 1 : prev))
-    }, 450)
+      setStageIndex((prev) => (prev < STAGES.length - 1 ? prev + 1 : prev));
+    }, 450);
 
     // In case loading takes unusually long (e.g., poor connection)
     const slowTimer = setTimeout(() => {
-      setSlowLoading(true)
-    }, 7000)
+      setSlowLoading(true);
+    }, 7000);
 
     return () => {
-      clearInterval(stageTimer)
-      clearTimeout(slowTimer)
-    }
-  }, [])
+      clearInterval(stageTimer);
+      clearTimeout(slowTimer);
+    };
+  }, []);
 
   return (
     <div className="relative mx-auto flex w-full max-w-xl flex-col items-center justify-center py-10 px-4 text-center">
@@ -63,7 +63,11 @@ export function GameLaunchScreen({
         {/* Game Icon & Name Header */}
         <div className="flex flex-col items-center gap-3">
           <div className="relative size-20 sm:size-24 overflow-hidden rounded-2xl border-2 border-neon-cyan/40 shadow-[0_0_24px_rgba(34,228,255,0.25)]">
-            <GameThumbnail slug={room.gameSlug} name={gameName} className="size-full object-cover" />
+            <GameThumbnail
+              slug={room.gameSlug}
+              name={gameName}
+              className="size-full object-cover"
+            />
             <div className="absolute inset-0 bg-linear-to-t from-panel/70 via-transparent to-transparent" />
           </div>
 
@@ -99,8 +103,16 @@ export function GameLaunchScreen({
                 key={player.userId}
                 className="flex items-center gap-1.5 rounded-full border border-white/10 bg-panel-2/70 px-2.5 py-1 text-xs"
               >
-                <span className="grid size-5 place-items-center rounded-full bg-neon-cyan/20 text-[10px] font-bold text-neon-cyan">
-                  {player.name.charAt(0).toUpperCase()}
+                <span className="grid size-5 place-items-center rounded-full bg-neon-cyan/20 text-[10px] font-bold text-neon-cyan overflow-hidden">
+                  {player.image ? (
+                    <img
+                      src={player.image}
+                      alt=""
+                      className="size-full object-cover"
+                    />
+                  ) : (
+                    player.name.charAt(0).toUpperCase()
+                  )}
                 </span>
                 <span className="max-w-[100px] truncate text-foreground font-medium">
                   {player.name}
@@ -135,7 +147,9 @@ export function GameLaunchScreen({
           >
             <div className="flex items-center gap-1.5">
               <AlertCircle className="size-4 shrink-0 text-amber-300" />
-              <span>Loading is taking longer than expected. Connection may be slow.</span>
+              <span>
+                Loading is taking longer than expected. Connection may be slow.
+              </span>
             </div>
             {onBackToRoom && (
               <Button
@@ -151,5 +165,5 @@ export function GameLaunchScreen({
         )}
       </motion.div>
     </div>
-  )
+  );
 }

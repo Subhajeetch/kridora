@@ -6,7 +6,11 @@ export class AppError extends Error {
   readonly code: ErrorCode;
   readonly details?: Record<string, unknown>;
 
-  constructor(code: ErrorCode, message: string, details?: Record<string, unknown>) {
+  constructor(
+    code: ErrorCode,
+    message: string,
+    details?: Record<string, unknown>,
+  ) {
     super(message);
     this.name = "AppError";
     this.code = code;
@@ -16,6 +20,7 @@ export class AppError extends Error {
 
 const HTTP_STATUS: Record<ErrorCode, number> = {
   UNAUTHENTICATED: 401,
+  FORBIDDEN: 403,
   VALIDATION_ERROR: 400,
   RATE_LIMITED: 429,
   NOT_FOUND: 404,
@@ -39,12 +44,27 @@ export function httpStatusFor(code: ErrorCode): number {
 }
 
 /** Converts anything thrown into a client-safe payload. Returns `unexpected` so callers can log it. */
-export function toErrorPayload(err: unknown): { payload: ErrorPayload; unexpected: boolean } {
+export function toErrorPayload(err: unknown): {
+  payload: ErrorPayload;
+  unexpected: boolean;
+} {
   if (err instanceof AppError) {
-    return { payload: { code: err.code, message: err.message, details: err.details }, unexpected: false };
+    return {
+      payload: { code: err.code, message: err.message, details: err.details },
+      unexpected: false,
+    };
   }
   if (err instanceof ZodError) {
-    return { payload: { code: "VALIDATION_ERROR", message: "Invalid request" }, unexpected: false };
+    return {
+      payload: { code: "VALIDATION_ERROR", message: "Invalid request" },
+      unexpected: false,
+    };
   }
-  return { payload: { code: "INTERNAL_ERROR", message: "Something went wrong. Please try again." }, unexpected: true };
+  return {
+    payload: {
+      code: "INTERNAL_ERROR",
+      message: "Something went wrong. Please try again.",
+    },
+    unexpected: true,
+  };
 }

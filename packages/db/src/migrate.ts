@@ -11,7 +11,9 @@ if (!url) {
 const { db, pool } = createDb(url, { max: 1 });
 
 try {
-  await migrate(db, { migrationsFolder: fileURLToPath(new URL("../drizzle", import.meta.url)) });
+  await migrate(db, {
+    migrationsFolder: fileURLToPath(new URL("../drizzle", import.meta.url)),
+  });
   console.log("Migrations applied");
 } catch (err) {
   console.error("Migration failed", err);

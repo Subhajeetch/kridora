@@ -12,7 +12,9 @@ export default defineConfig({
   out: "./drizzle",
   casing: "snake_case",
   dbCredentials: {
-    url: process.env.DATABASE_URL ?? "postgres://kridora:kridora@localhost:5432/kridora",
+    url:
+      process.env.DATABASE_URL ??
+      "postgres://kridora:kridora@localhost:5432/kridora",
   },
   strict: true,
   verbose: true,

@@ -5,40 +5,44 @@ import {
   useReducedMotion,
   useSpring,
   type Transition,
-} from "framer-motion"
-import { useRef, type PointerEvent, type ReactNode } from "react"
-import { ArcadeCanvas } from "@/components/home/ArcadeCanvas"
-import { FloatingSprites } from "@/components/home/FloatingSprites"
-import { HORIZON } from "@/components/home/scene-config"
+} from "framer-motion";
+import { useRef, type PointerEvent, type ReactNode } from "react";
+import { ArcadeCanvas } from "@/components/home/ArcadeCanvas";
+import { FloatingSprites } from "@/components/home/FloatingSprites";
+import { HORIZON } from "@/components/home/scene-config";
 
 interface HeroSceneProps {
-  children: ReactNode
+  children: ReactNode;
 }
 
-const fadeTransition: Transition = { duration: 0.6, ease: "easeOut" }
-const sunBobTransition: Transition = { duration: 8, repeat: Infinity, ease: "easeInOut" }
+const fadeTransition: Transition = { duration: 0.6, ease: "easeOut" };
+const sunBobTransition: Transition = {
+  duration: 8,
+  repeat: Infinity,
+  ease: "easeInOut",
+};
 
 export function HeroScene({ children }: HeroSceneProps) {
-  const sectionRef = useRef<HTMLElement | null>(null)
-  const inView = useInView(sectionRef, { amount: 0.05 })
-  const reduce = useReducedMotion()
+  const sectionRef = useRef<HTMLElement | null>(null);
+  const inView = useInView(sectionRef, { amount: 0.05 });
+  const reduce = useReducedMotion();
 
-  const mx = useMotionValue(0)
-  const my = useMotionValue(0)
-  const smoothX = useSpring(mx, { stiffness: 60, damping: 18 })
-  const smoothY = useSpring(my, { stiffness: 60, damping: 18 })
+  const mx = useMotionValue(0);
+  const my = useMotionValue(0);
+  const smoothX = useSpring(mx, { stiffness: 60, damping: 18 });
+  const smoothY = useSpring(my, { stiffness: 60, damping: 18 });
 
   function handlePointerMove(event: PointerEvent<HTMLElement>) {
-    if (reduce) return
-    const rect = event.currentTarget.getBoundingClientRect()
-    if (rect.width <= 0 || rect.height <= 0) return
-    mx.set((event.clientX - rect.left) / rect.width - 0.5)
-    my.set((event.clientY - rect.top) / rect.height - 0.5)
+    if (reduce) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return;
+    mx.set((event.clientX - rect.left) / rect.width - 0.5);
+    my.set((event.clientY - rect.top) / rect.height - 0.5);
   }
 
   function handlePointerLeave() {
-    mx.set(0)
-    my.set(0)
+    mx.set(0);
+    my.set(0);
   }
 
   return (
@@ -76,7 +80,10 @@ export function HeroScene({ children }: HeroSceneProps) {
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_60%_50%_at_50%_38%,rgba(7,5,15,0.7),transparent_70%)]"
       />
-      <div aria-hidden="true" className="scanlines pointer-events-none absolute inset-0 opacity-60" />
+      <div
+        aria-hidden="true"
+        className="scanlines pointer-events-none absolute inset-0 opacity-60"
+      />
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-linear-to-b from-transparent to-background"
@@ -90,5 +97,5 @@ export function HeroScene({ children }: HeroSceneProps) {
         {children}
       </div>
     </section>
-  )
+  );
 }

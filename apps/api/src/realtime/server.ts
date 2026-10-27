@@ -40,14 +40,27 @@ export function createRealtime(app: FastifyInstance) {
   });
 
   // Redis adapter: broadcasts and "fetchSockets" work across multiple API instances.
-  io.adapter(createAdapter(createRedis(env.REDIS_URL, "adapter-pub"), createRedis(env.REDIS_URL, "adapter-sub")));
+  io.adapter(
+    createAdapter(
+      createRedis(env.REDIS_URL, "adapter-pub"),
+      createRedis(env.REDIS_URL, "adapter-sub"),
+    ),
+  );
 
-  const rooms = createRoomService({ redis, db, notifier: createNotifier(io), log, appEnv: appEnvironment });
+  const rooms = createRoomService({
+    redis,
+    db,
+    notifier: createNotifier(io),
+    log,
+    appEnv: appEnvironment,
+  });
 
   // Authenticate every connection with the same Better Auth session cookie the REST API uses.
   io.use(async (socket, next) => {
     try {
-      const session = await auth.api.getSession({ headers: fromNodeHeaders(socket.request.headers) });
+      const session = await auth.api.getSession({
+        headers: fromNodeHeaders(socket.request.headers),
+      });
       if (!session) return next(new Error("UNAUTHENTICATED"));
       const data: SocketData = {
         user: {
@@ -84,15 +97,23 @@ export function createRealtime(app: FastifyInstance) {
     socket.on("disconnect", () => {
       const isOffline = async () => {
         try {
-          return (await io.in(userChannel(user.id)).fetchSockets()).length === 0;
+          return (
+            (await io.in(userChannel(user.id)).fetchSockets()).length === 0
+          );
         } catch (err) {
           // If we cannot tell, assume the user is still around rather than punishing them.
-          log.warn({ err, userId: user.id }, "could not check remaining sockets");
+          log.warn(
+            { err, userId: user.id },
+            "could not check remaining sockets",
+          );
           return false;
         }
       };
       rooms.handleDisconnect(user.id, isOffline).catch((err) => {
-        log.error({ err, userId: user.id }, "socket disconnect handling failed");
+        log.error(
+          { err, userId: user.id },
+          "socket disconnect handling failed",
+        );
       });
     });
   });

@@ -15,7 +15,11 @@ export function buildApp() {
     logger: {
       level: env.LOG_LEVEL,
       // Never write credentials or cookies to logs.
-      redact: ["req.headers.authorization", "req.headers.cookie", "res.headers['set-cookie']"],
+      redact: [
+        "req.headers.authorization",
+        "req.headers.cookie",
+        "res.headers['set-cookie']",
+      ],
     },
     // Only trust X-Forwarded-* headers when we are really behind our own proxy.
     trustProxy: env.TRUST_PROXY,
@@ -41,18 +45,26 @@ export function buildApp() {
   app.register(sessionPlugin);
 
   app.setNotFoundHandler((_request, reply) => {
-    reply.code(404).send({ error: { code: "NOT_FOUND", message: "Route not found" } });
+    reply
+      .code(404)
+      .send({ error: { code: "NOT_FOUND", message: "Route not found" } });
   });
 
   app.setErrorHandler((err, request, reply) => {
     const error = err as { statusCode?: number; validation?: unknown };
     // Fastify's own 4xx errors (bad JSON, payload too large, rate limit...) keep their status.
-    if (typeof error.statusCode === "number" && error.statusCode >= 400 && error.statusCode < 500) {
+    if (
+      typeof error.statusCode === "number" &&
+      error.statusCode >= 400 &&
+      error.statusCode < 500
+    ) {
       const rateLimited = error.statusCode === 429;
       return reply.code(error.statusCode).send({
         error: {
           code: rateLimited ? "RATE_LIMITED" : "VALIDATION_ERROR",
-          message: rateLimited ? "Too many requests. Slow down." : "Invalid request",
+          message: rateLimited
+            ? "Too many requests. Slow down."
+            : "Invalid request",
         },
       });
     }

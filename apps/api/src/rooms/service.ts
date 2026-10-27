@@ -1,5 +1,5 @@
 import { randomInt } from "node:crypto";
-import { createMatch, type Database } from "@kridora/db";
+import { createMatch, findUserByNumericId, type Database } from "@kridora/db";
 import {
   EMPTY_ROOM_CLOSE_DELAY_MS,
   evaluateStartRequirements,
@@ -47,7 +47,13 @@ const SKIPPABLE_PUBLIC_ERRORS = new Set<ErrorCode>([
   "BANNED_FROM_ROOM",
 ]);
 
-export function createRoomService({ redis, db, notifier, log, appEnv }: RoomServiceDeps) {
+export function createRoomService({
+  redis,
+  db,
+  notifier,
+  log,
+  appEnv,
+}: RoomServiceDeps) {
   const store = createRoomStore(redis);
   const withRoomLock = createRoomLock(redis);
 
@@ -73,18 +79,25 @@ export function createRoomService({ redis, db, notifier, log, appEnv }: RoomServ
   }
 
   function assertGameEnabled(slug: string): GameSlug {
-    if (!isGameEnabled(appEnv, slug)) throw new AppError("GAME_NOT_FOUND", "That game is not available");
+    if (!isGameEnabled(appEnv, slug))
+      throw new AppError("GAME_NOT_FOUND", "That game is not available");
     return slug;
   }
 
   function assertOwner(room: StoredRoom, userId: string): void {
-    if (room.ownerId !== userId) throw new AppError("NOT_ROOM_OWNER", "Only the room owner can do that");
+    if (room.ownerId !== userId)
+      throw new AppError("NOT_ROOM_OWNER", "Only the room owner can do that");
   }
 
   /** Next owner = earliest-joined player (after the current owner), preferring players who are online. */
-  function pickSuccessor(room: StoredRoom, connectedOnly: boolean): RoomPlayer | undefined {
+  function pickSuccessor(
+    room: StoredRoom,
+    connectedOnly: boolean,
+  ): RoomPlayer | undefined {
     const others = room.players.filter((p) => p.userId !== room.ownerId);
-    return others.find((p) => p.connected) ?? (connectedOnly ? undefined : others[0]);
+    return (
+      others.find((p) => p.connected) ?? (connectedOnly ? undefined : others[0])
+    );
   }
 
   /**
@@ -103,8 +116,16 @@ export function createRoomService({ redis, db, notifier, log, appEnv }: RoomServ
 
     for (const p of room.players) {
       const member = deadline.player(room.code, p.userId);
-      if (!p.connected && p.userId !== room.ownerId && room.status === "lobby") {
-        await store.schedule(member, Date.now() + PLAYER_DISCONNECT_GRACE_MS, true);
+      if (
+        !p.connected &&
+        p.userId !== room.ownerId &&
+        room.status === "lobby"
+      ) {
+        await store.schedule(
+          member,
+          Date.now() + PLAYER_DISCONNECT_GRACE_MS,
+          true,
+        );
       } else {
         await store.unschedule(member);
       }
@@ -113,7 +134,11 @@ export function createRoomService({ redis, db, notifier, log, appEnv }: RoomServ
     if (room.players.some((p) => p.connected)) {
       await store.unschedule(deadline.idle(room.code));
     } else {
-      await store.schedule(deadline.idle(room.code), Date.now() + EMPTY_ROOM_CLOSE_DELAY_MS, true);
+      await store.schedule(
+        deadline.idle(room.code),
+        Date.now() + EMPTY_ROOM_CLOSE_DELAY_MS,
+        true,
+      );
     }
   }
 
@@ -121,7 +146,10 @@ export function createRoomService({ redis, db, notifier, log, appEnv }: RoomServ
   async function commit(room: StoredRoom): Promise<void> {
     await reconcileTimers(room);
     const def = getGameDefinition(room.gameSlug);
-    const listed = room.visibility === "public" && room.status === "lobby" && room.players.length < def.maxPlayers;
+    const listed =
+      room.visibility === "public" &&
+      room.status === "lobby" &&
+      room.players.length < def.maxPlayers;
     await store.setPublic(room, listed);
     await store.save(room);
     notifier.state(toSnapshot(room));
@@ -137,16 +165,28 @@ export function createRoomService({ redis, db, notifier, log, appEnv }: RoomServ
   }
 
   /** Removes a player; moves ownership if they owned the room; destroys the room if it is now empty. */
-  async function removePlayerLocked(room: StoredRoom, userId: string): Promise<void> {
+  async function removePlayerLocked(
+    room: StoredRoom,
+    userId: string,
+  ): Promise<void> {
     if (room.ludoState) {
-      const removedIndex = room.ludoState.players.findIndex((player) => player.userId === userId);
+      const removedIndex = room.ludoState.players.findIndex(
+        (player) => player.userId === userId,
+      );
       if (removedIndex >= 0) {
-        const wasTakingTurn = room.ludoState.currentPlayerIndex === removedIndex;
+        const wasTakingTurn =
+          room.ludoState.currentPlayerIndex === removedIndex;
         const removedName = room.ludoState.players[removedIndex]!.name;
-        room.ludoState.players = room.ludoState.players.filter((player) => player.userId !== userId);
+        room.ludoState.players = room.ludoState.players.filter(
+          (player) => player.userId !== userId,
+        );
         room.ludoState.lastRolls.splice(removedIndex, 1);
         room.ludoState.currentPlayerIndex = room.ludoState.players.length
-          ? (wasTakingTurn ? removedIndex : room.ludoState.currentPlayerIndex - Number(removedIndex < room.ludoState.currentPlayerIndex)) % room.ludoState.players.length
+          ? (wasTakingTurn
+              ? removedIndex
+              : room.ludoState.currentPlayerIndex -
+                Number(removedIndex < room.ludoState.currentPlayerIndex)) %
+            room.ludoState.players.length
           : 0;
         if (wasTakingTurn) {
           room.ludoState.dice = null;
@@ -172,7 +212,9 @@ export function createRoomService({ redis, db, notifier, log, appEnv }: RoomServ
       return;
     }
     if (room.ownerId === userId) {
-      room.ownerId = (pickSuccessor({ ...room, ownerId: userId }, false) ?? first).userId;
+      room.ownerId = (
+        pickSuccessor({ ...room, ownerId: userId }, false) ?? first
+      ).userId;
       room.ownerTransferAt = null;
     }
     await commit(room);
@@ -180,7 +222,10 @@ export function createRoomService({ redis, db, notifier, log, appEnv }: RoomServ
   }
 
   /** Runs `fn` with the room the user is currently in, locked. */
-  async function withUserRoom<T>(userId: string, fn: (room: StoredRoom) => Promise<T>): Promise<T> {
+  async function withUserRoom<T>(
+    userId: string,
+    fn: (room: StoredRoom) => Promise<T>,
+  ): Promise<T> {
     const code = await store.getUserRoomCode(userId);
     if (!code) throw new AppError("NOT_IN_ROOM", "You are not in a room");
     return withRoomLock(code, async () => {
@@ -213,7 +258,10 @@ export function createRoomService({ redis, db, notifier, log, appEnv }: RoomServ
     const count = await redis.incr(key);
     if (count === 1) await redis.expire(key, 60);
     if (count > MAX_JOIN_ATTEMPTS_PER_MINUTE) {
-      throw new AppError("RATE_LIMITED", "Too many attempts. Wait a minute and try again.");
+      throw new AppError(
+        "RATE_LIMITED",
+        "Too many attempts. Wait a minute and try again.",
+      );
     }
   }
 
@@ -248,7 +296,10 @@ export function createRoomService({ redis, db, notifier, log, appEnv }: RoomServ
       notifier.attach(user.id, room.code);
       return toSnapshot(room);
     }
-    throw new AppError("INTERNAL_ERROR", "Could not create a room. Please try again.");
+    throw new AppError(
+      "INTERNAL_ERROR",
+      "Could not create a room. Please try again.",
+    );
   }
 
   async function joinRoom(
@@ -277,10 +328,15 @@ export function createRoomService({ redis, db, notifier, log, appEnv }: RoomServ
       }
 
       if (room.bannedUserIds.includes(user.id)) {
-        throw new AppError("BANNED_FROM_ROOM", "You were removed from this room");
+        throw new AppError(
+          "BANNED_FROM_ROOM",
+          "You were removed from this room",
+        );
       }
-      if (room.status !== "lobby") throw new AppError("ROOM_IN_PROGRESS", "That game has already started");
-      if (room.players.length >= def.maxPlayers) throw new AppError("ROOM_FULL", "That room is full");
+      if (room.status !== "lobby")
+        throw new AppError("ROOM_IN_PROGRESS", "That game has already started");
+      if (room.players.length >= def.maxPlayers)
+        throw new AppError("ROOM_FULL", "That room is full");
 
       await store.claimUserSlot(user.id, code);
       try {
@@ -295,7 +351,10 @@ export function createRoomService({ redis, db, notifier, log, appEnv }: RoomServ
     });
   }
 
-  async function joinPublicRoom(user: SessionUser, slug: string): Promise<RoomSnapshot> {
+  async function joinPublicRoom(
+    user: SessionUser,
+    slug: string,
+  ): Promise<RoomSnapshot> {
     const gameSlug = assertGameEnabled(slug);
     const codes = await store.listPublic(gameSlug, 50);
 
@@ -304,7 +363,8 @@ export function createRoomService({ redis, db, notifier, log, appEnv }: RoomServ
         return await joinRoom(user, code, { publicOnly: true });
       } catch (err) {
         if (err instanceof AppError && SKIPPABLE_PUBLIC_ERRORS.has(err.code)) {
-          if (err.code === "ROOM_NOT_FOUND") await store.setPublic({ code, gameSlug, createdAt: 0 }, false);
+          if (err.code === "ROOM_NOT_FOUND")
+            await store.setPublic({ code, gameSlug, createdAt: 0 }, false);
           continue;
         }
         throw err;
@@ -327,10 +387,14 @@ export function createRoomService({ redis, db, notifier, log, appEnv }: RoomServ
     });
   }
 
-  function setVisibility(userId: string, visibility: RoomVisibility): Promise<RoomSnapshot> {
+  function setVisibility(
+    userId: string,
+    visibility: RoomVisibility,
+  ): Promise<RoomSnapshot> {
     return withUserRoom(userId, async (room) => {
       assertOwner(room, userId);
-      if (room.status !== "lobby") throw new AppError("ROOM_IN_PROGRESS", "The game has already started");
+      if (room.status !== "lobby")
+        throw new AppError("ROOM_IN_PROGRESS", "The game has already started");
       room.visibility = visibility;
       await commit(room);
       return toSnapshot(room);
@@ -339,7 +403,8 @@ export function createRoomService({ redis, db, notifier, log, appEnv }: RoomServ
 
   function setReady(userId: string, ready: boolean): Promise<RoomSnapshot> {
     return withUserRoom(userId, async (room) => {
-      if (room.status !== "lobby") throw new AppError("ROOM_IN_PROGRESS", "The game has already started");
+      if (room.status !== "lobby")
+        throw new AppError("ROOM_IN_PROGRESS", "The game has already started");
       const me = room.players.find((p) => p.userId === userId);
       if (me) me.isReady = ready;
       await commit(room);
@@ -347,11 +412,20 @@ export function createRoomService({ redis, db, notifier, log, appEnv }: RoomServ
     });
   }
 
-  function transferOwner(userId: string, targetId: string): Promise<RoomSnapshot> {
+  function transferOwner(
+    userId: string,
+    targetId: string,
+  ): Promise<RoomSnapshot> {
     return withUserRoom(userId, async (room) => {
       assertOwner(room, userId);
-      if (targetId === userId || !room.players.some((p) => p.userId === targetId)) {
-        throw new AppError("INVALID_TARGET", "Pick another player in this room");
+      if (
+        targetId === userId ||
+        !room.players.some((p) => p.userId === targetId)
+      ) {
+        throw new AppError(
+          "INVALID_TARGET",
+          "Pick another player in this room",
+        );
       }
       room.ownerId = targetId;
       room.ownerTransferAt = null;
@@ -363,13 +437,73 @@ export function createRoomService({ redis, db, notifier, log, appEnv }: RoomServ
   function kickPlayer(userId: string, targetId: string): Promise<RoomSnapshot> {
     return withUserRoom(userId, async (room) => {
       assertOwner(room, userId);
-      if (room.status !== "lobby") throw new AppError("ROOM_IN_PROGRESS", "The game has already started");
-      if (targetId === userId || !room.players.some((p) => p.userId === targetId)) {
-        throw new AppError("INVALID_TARGET", "Pick another player in this room");
+      if (room.status !== "lobby")
+        throw new AppError("ROOM_IN_PROGRESS", "The game has already started");
+      if (
+        targetId === userId ||
+        !room.players.some((p) => p.userId === targetId)
+      ) {
+        throw new AppError(
+          "INVALID_TARGET",
+          "Pick another player in this room",
+        );
       }
-      room.bannedUserIds = [...room.bannedUserIds, targetId].slice(-MAX_BANS_PER_ROOM);
+      room.bannedUserIds = [...room.bannedUserIds, targetId].slice(
+        -MAX_BANS_PER_ROOM,
+      );
       notifier.kicked(targetId, room.code);
       await removePlayerLocked(room, targetId);
+      return toSnapshot(room);
+    });
+  }
+
+  function changeGame(
+    userId: string,
+    newGameSlug: string,
+  ): Promise<RoomSnapshot> {
+    return withUserRoom(userId, async (room) => {
+      assertOwner(room, userId);
+      if (room.status !== "lobby") {
+        throw new AppError(
+          "ROOM_IN_PROGRESS",
+          "Cannot change game while a match is in progress",
+        );
+      }
+      const gameSlug = assertGameEnabled(newGameSlug);
+      if (room.gameSlug === gameSlug) {
+        return toSnapshot(room);
+      }
+
+      const nextDef = getGameDefinition(gameSlug);
+      if (room.players.length > nextDef.maxPlayers) {
+        throw new AppError(
+          "ROOM_FULL",
+          `Cannot switch to ${nextDef.name}: this game supports up to ${nextDef.maxPlayers} players, but there are currently ${room.players.length} players in the room. Please remove players before switching.`,
+          {
+            currentPlayers: room.players.length,
+            maxPlayers: nextDef.maxPlayers,
+            gameName: nextDef.name,
+          },
+        );
+      }
+
+      // Remove the room from the old game's public listings if it was public
+      await store.setPublic(room, false);
+
+      // Clean up previous game-specific state
+      delete room.ludoState;
+
+      // Reset ready state for all players for the new game
+      for (const player of room.players) {
+        player.isReady = false;
+      }
+
+      // Update game slug and update invite token cache
+      room.gameSlug = gameSlug;
+      await store.updateInviteGameSlug(room.code, gameSlug);
+
+      // Re-index public room under new game if applicable, persist, and broadcast state
+      await commit(room);
       return toSnapshot(room);
     });
   }
@@ -377,13 +511,21 @@ export function createRoomService({ redis, db, notifier, log, appEnv }: RoomServ
   function startGame(userId: string): Promise<RoomSnapshot> {
     return withUserRoom(userId, async (room) => {
       assertOwner(room, userId);
-      if (room.status !== "lobby") throw new AppError("ROOM_IN_PROGRESS", "The game has already started");
+      if (room.status !== "lobby")
+        throw new AppError("ROOM_IN_PROGRESS", "The game has already started");
 
-      const check = evaluateStartRequirements(getGameDefinition(room.gameSlug), room);
+      const check = evaluateStartRequirements(
+        getGameDefinition(room.gameSlug),
+        room,
+      );
       if (!check.canStart) {
-        throw new AppError("START_REQUIREMENTS_NOT_MET", check.unmet[0]?.message ?? "Requirements not met", {
-          unmet: check.unmet,
-        });
+        throw new AppError(
+          "START_REQUIREMENTS_NOT_MET",
+          check.unmet[0]?.message ?? "Requirements not met",
+          {
+            unmet: check.unmet,
+          },
+        );
       }
 
       room.matchId = await createMatch(db, {
@@ -399,9 +541,18 @@ export function createRoomService({ redis, db, notifier, log, appEnv }: RoomServ
 
   function assertLudoGame(room: StoredRoom): LudoGameState {
     if (room.gameSlug !== "ludo" || room.status !== "in_progress") {
-      throw new AppError("ROOM_IN_PROGRESS", "Ludo has not started in this room");
+      throw new AppError(
+        "ROOM_IN_PROGRESS",
+        "Ludo has not started in this room",
+      );
     }
-    room.ludoState ??= createLudoGameState(room.players.map(({ userId, name }) => ({ userId, name })));
+    room.ludoState ??= createLudoGameState(
+      room.players.map(({ userId, name, image }) => ({
+        userId,
+        name,
+        image,
+      })),
+    );
     return room.ludoState;
   }
 
@@ -416,11 +567,21 @@ export function createRoomService({ redis, db, notifier, log, appEnv }: RoomServ
   async function rollLudoDice(userId: string): Promise<LudoGameState> {
     return withUserRoom(userId, async (room) => {
       const state = assertLudoGame(room);
-      if (state.winnerId) throw new AppError("ROOM_IN_PROGRESS", "This Ludo game is already over");
+      if (state.winnerId)
+        throw new AppError(
+          "ROOM_IN_PROGRESS",
+          "This Ludo game is already over",
+        );
       const player = state.players[state.currentPlayerIndex];
-      if (!player) throw new AppError("INTERNAL_ERROR", "Ludo turn state is invalid");
-      if (player.userId !== userId) throw new AppError("INVALID_TARGET", "Wait for your turn");
-      if (state.dice !== null) throw new AppError("INVALID_TARGET", "Choose one of your highlighted pieces first");
+      if (!player)
+        throw new AppError("INTERNAL_ERROR", "Ludo turn state is invalid");
+      if (player.userId !== userId)
+        throw new AppError("INVALID_TARGET", "Wait for your turn");
+      if (state.dice !== null)
+        throw new AppError(
+          "INVALID_TARGET",
+          "Choose one of your highlighted pieces first",
+        );
 
       const roll = randomInt(1, 7);
       const movable = getLudoMovableTokens(player, roll);
@@ -429,8 +590,10 @@ export function createRoomService({ redis, db, notifier, log, appEnv }: RoomServ
       state.movableTokens = movable;
       state.lastAction = `${player.name} rolled a ${roll}.`;
       if (movable.length === 0) {
-        state.lastAction += roll === 6 ? " No piece can move." : " No move this turn.";
-        state.currentPlayerIndex = (state.currentPlayerIndex + 1) % state.players.length;
+        state.lastAction +=
+          roll === 6 ? " No piece can move." : " No move this turn.";
+        state.currentPlayerIndex =
+          (state.currentPlayerIndex + 1) % state.players.length;
         state.dice = null;
         state.movableTokens = [];
       }
@@ -441,28 +604,39 @@ export function createRoomService({ redis, db, notifier, log, appEnv }: RoomServ
     });
   }
 
-  async function moveLudoToken(userId: string, tokenIndex: number): Promise<LudoGameState> {
+  async function moveLudoToken(
+    userId: string,
+    tokenIndex: number,
+  ): Promise<LudoGameState> {
     return withUserRoom(userId, async (room) => {
       const state = assertLudoGame(room);
-      if (state.winnerId) throw new AppError("ROOM_IN_PROGRESS", "This Ludo game is already over");
+      if (state.winnerId)
+        throw new AppError(
+          "ROOM_IN_PROGRESS",
+          "This Ludo game is already over",
+        );
       const playerIndex = state.currentPlayerIndex;
       const player = state.players[playerIndex];
-      if (!player) throw new AppError("INTERNAL_ERROR", "Ludo turn state is invalid");
-      if (player.userId !== userId) throw new AppError("INVALID_TARGET", "Wait for your turn");
+      if (!player)
+        throw new AppError("INTERNAL_ERROR", "Ludo turn state is invalid");
+      if (player.userId !== userId)
+        throw new AppError("INVALID_TARGET", "Wait for your turn");
       if (state.dice === null || !state.movableTokens.includes(tokenIndex)) {
         throw new AppError("INVALID_TARGET", "That piece cannot move");
       }
 
       const roll = state.dice;
       const previousProgress = player.tokens[tokenIndex];
-      if (previousProgress === undefined) throw new AppError("INVALID_TARGET", "That piece does not exist");
+      if (previousProgress === undefined)
+        throw new AppError("INVALID_TARGET", "That piece does not exist");
       const nextProgress = previousProgress < 0 ? 0 : previousProgress + roll;
       player.tokens[tokenIndex] = nextProgress;
 
       const landingSquare = getLudoTrackSquare(player.color, nextProgress);
-      const capturedTokens = landingSquare === null
-        ? []
-        : getLudoCaptureTargets(state.players, playerIndex, landingSquare);
+      const capturedTokens =
+        landingSquare === null
+          ? []
+          : getLudoCaptureTargets(state.players, playerIndex, landingSquare);
       for (const target of capturedTokens) {
         state.players[target.playerIndex]!.tokens[target.tokenIndex] = -1;
       }
@@ -478,7 +652,8 @@ export function createRoomService({ redis, db, notifier, log, appEnv }: RoomServ
       } else if (roll === 6 || captured) {
         state.dice = null;
         state.movableTokens = [];
-        state.lastAction += roll === 6 ? " Roll again!" : " Capture bonus: roll again!";
+        state.lastAction +=
+          roll === 6 ? " Roll again!" : " Capture bonus: roll again!";
       } else {
         state.currentPlayerIndex = (playerIndex + 1) % state.players.length;
         state.dice = null;
@@ -495,7 +670,9 @@ export function createRoomService({ redis, db, notifier, log, appEnv }: RoomServ
   /* ------------------------------------------------------------------ connection lifecycle */
 
   /** Called for every new socket. Reattaches the user to their room and marks them online. */
-  async function handleConnect(user: SessionUser): Promise<RoomSnapshot | null> {
+  async function handleConnect(
+    user: SessionUser,
+  ): Promise<RoomSnapshot | null> {
     const code = await store.getUserRoomCode(user.id);
     if (!code) return null;
     return withRoomLock(code, async () => {
@@ -518,7 +695,10 @@ export function createRoomService({ redis, db, notifier, log, appEnv }: RoomServ
    * Called when a socket closes. `isOffline` is re-checked inside the lock so a quick page refresh
    * (new socket connects while the old one is closing) never marks the player offline.
    */
-  async function handleDisconnect(userId: string, isOffline: () => Promise<boolean>): Promise<void> {
+  async function handleDisconnect(
+    userId: string,
+    isOffline: () => Promise<boolean>,
+  ): Promise<void> {
     const code = await store.getUserRoomCode(userId);
     if (!code) return;
     await withRoomLock(code, async () => {
@@ -547,14 +727,23 @@ export function createRoomService({ redis, db, notifier, log, appEnv }: RoomServ
         const successor = pickSuccessor(room, true);
         room.ownerTransferAt = null;
         if (successor) {
-          log.info({ code, from: room.ownerId, to: successor.userId }, "owner offline: transferring ownership");
+          log.info(
+            { code, from: room.ownerId, to: successor.userId },
+            "owner offline: transferring ownership",
+          );
           room.ownerId = successor.userId;
         }
         await commit(room);
       } else if (kind === "player") {
         const userId = rest.join(":");
         const player = room.players.find((p) => p.userId === userId);
-        if (!player || player.connected || room.status !== "lobby" || userId === room.ownerId) return;
+        if (
+          !player ||
+          player.connected ||
+          room.status !== "lobby" ||
+          userId === room.ownerId
+        )
+          return;
         log.info({ code, userId }, "offline player removed from lobby");
         await removePlayerLocked(room, userId);
       } else if (kind === "idle") {
@@ -573,10 +762,61 @@ export function createRoomService({ redis, db, notifier, log, appEnv }: RoomServ
       try {
         await processDeadline(member);
       } catch (err) {
-        log.error({ err, member }, "deadline processing failed; retrying shortly");
+        log.error(
+          { err, member },
+          "deadline processing failed; retrying shortly",
+        );
         await store.schedule(member, Date.now() + 5_000);
       }
     }
+  }
+
+  async function getInviteToken(
+    userId: string,
+  ): Promise<{ token: string; inviteUrl: string }> {
+    return withUserRoom(userId, async (room) => {
+      const token = await store.getOrCreateInviteToken(
+        room.code,
+        room.gameSlug,
+      );
+      return { token, inviteUrl: `/join/${token}` };
+    });
+  }
+
+  async function inviteUserByNumericId(
+    userId: string,
+    targetNumericId: string,
+  ): Promise<{ ok: boolean; targetName: string }> {
+    return withUserRoom(userId, async (room) => {
+      const sender = room.players.find((p) => p.userId === userId);
+      const targetUser = await findUserByNumericId(db, targetNumericId);
+      if (!targetUser) {
+        throw new AppError(
+          "NOT_FOUND",
+          `No player found with User ID ${targetNumericId}`,
+        );
+      }
+      if (room.players.some((p) => p.userId === targetUser.userId)) {
+        throw new AppError(
+          "ALREADY_IN_ROOM",
+          `${targetUser.name} is already in this room`,
+        );
+      }
+      const token = await store.getOrCreateInviteToken(
+        room.code,
+        room.gameSlug,
+      );
+      const gameDef = getGameDefinition(room.gameSlug);
+
+      notifier.invitationReceived(targetUser.userId, {
+        senderName: sender?.name ?? "A friend",
+        gameSlug: room.gameSlug,
+        gameName: gameDef.name,
+        inviteToken: token,
+      });
+
+      return { ok: true, targetName: targetUser.name };
+    });
   }
 
   return {
@@ -589,7 +829,10 @@ export function createRoomService({ redis, db, notifier, log, appEnv }: RoomServ
     setReady,
     transferOwner,
     kickPlayer,
+    changeGame,
     startGame,
+    getInviteToken,
+    inviteUserByNumericId,
     getLudoState,
     rollLudoDice,
     moveLudoToken,

@@ -1,12 +1,12 @@
-import type { GameDefinition } from "@kridora/shared"
-import { motion, type Variants } from "framer-motion"
-import { Clock, Users } from "lucide-react"
-import type { CSSProperties } from "react"
-import { Link } from "react-router"
-import { GameThumbnail } from "@/components/games/GameThumbnail"
+import type { GameDefinition } from "@kridora/shared";
+import { motion, type Variants } from "framer-motion";
+import { Clock, Users } from "lucide-react";
+import type { CSSProperties } from "react";
+import { Link } from "react-router";
+import { GameThumbnail } from "@/components/games/GameThumbnail";
 
 interface GameCardProps {
-  game: GameDefinition
+  game: GameDefinition;
 }
 
 const itemVariants: Variants = {
@@ -17,7 +17,7 @@ const itemVariants: Variants = {
     scale: 1,
     transition: { type: "spring", stiffness: 260, damping: 24 },
   },
-}
+};
 
 export function GameCard({ game }: GameCardProps) {
   return (
@@ -29,7 +29,11 @@ export function GameCard({ game }: GameCardProps) {
       >
         {/* 1. Thumbnail zone */}
         <div className="relative overflow-hidden">
-          <GameThumbnail slug={game.slug} name={game.name} className="aspect-[16/10]" />
+          <GameThumbnail
+            slug={game.slug}
+            name={game.name}
+            className="aspect-[16/10]"
+          />
           <div
             aria-hidden="true"
             className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-linear-to-t from-[#120d2b] via-transparent to-transparent"
@@ -47,11 +51,17 @@ export function GameCard({ game }: GameCardProps) {
 
         {/* 2. Body */}
         <div className="flex flex-1 flex-col p-5">
-          <h3 className="font-display text-2xl uppercase tracking-tight">{game.name}</h3>
-          <p className="game-card__tagline mt-0.5 text-sm font-semibold">{game.tagline}</p>
-          <p className="mt-2 line-clamp-3 text-sm text-muted-foreground">{game.description}</p>
+          <h3 className="font-display text-2xl uppercase tracking-tight">
+            {game.name}
+          </h3>
+          <p className="game-card__tagline mt-0.5 text-sm font-semibold">
+            {game.tagline}
+          </p>
+          <p className="mt-2 line-clamp-3 text-sm text-muted-foreground">
+            {game.description}
+          </p>
         </div>
       </Link>
     </motion.li>
-  )
+  );
 }

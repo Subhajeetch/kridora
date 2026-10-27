@@ -1,11 +1,11 @@
-import { motion, useReducedMotion, type Transition } from "framer-motion"
+import { motion, useReducedMotion, type Transition } from "framer-motion";
 
 interface OrbConfig {
-  id: string
-  className: string
-  x: number[]
-  y: number[]
-  transition: Transition
+  id: string;
+  className: string;
+  x: number[];
+  y: number[];
+  transition: Transition;
 }
 
 const ORBS: readonly OrbConfig[] = [
@@ -23,13 +23,16 @@ const ORBS: readonly OrbConfig[] = [
     y: [0, -42, 0],
     transition: { duration: 34, repeat: Infinity, ease: "easeInOut" },
   },
-]
+];
 
 /** Fixed, slow-moving colour glow behind every page. Static when the player prefers reduced motion. */
 export function Background() {
-  const reduce = useReducedMotion()
+  const reduce = useReducedMotion();
   return (
-    <div aria-hidden="true" className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-void">
+    <div
+      aria-hidden="true"
+      className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-void"
+    >
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_-10%,#2a0f5c_0%,#120a2e_38%,#07050f_75%)]" />
       {ORBS.map((orb) => (
         <motion.div
@@ -42,5 +45,5 @@ export function Background() {
       <div className="bg-stars absolute inset-0 opacity-50" />
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_45%,#07050f_100%)]" />
     </div>
-  )
+  );
 }

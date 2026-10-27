@@ -1,4 +1,11 @@
-import { boolean, index, pgEnum, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import {
+  boolean,
+  index,
+  pgEnum,
+  pgTable,
+  text,
+  timestamp,
+} from "drizzle-orm/pg-core";
 
 /**
  * Tables in this file are owned by Better Auth (user, session, account, verification).
@@ -42,7 +49,10 @@ export const session = pgTable(
       .defaultNow()
       .$onUpdate(() => new Date()),
   },
-  (t) => [index("session_user_id_idx").on(t.userId), index("session_expires_at_idx").on(t.expiresAt)],
+  (t) => [
+    index("session_user_id_idx").on(t.userId),
+    index("session_expires_at_idx").on(t.expiresAt),
+  ],
 );
 
 export const account = pgTable(
