@@ -1,25 +1,37 @@
-import { GAME_DEFINITIONS } from "@kridora/shared"
-import { motion, useReducedMotion, type Transition } from "framer-motion"
-import { ArrowRight, DoorOpen, Gamepad2 } from "lucide-react"
-import { useState } from "react"
-import { Link } from "react-router"
-import { JoinRoomDialog } from "@/components/JoinRoomDialog"
-import { Logo } from "@/components/Logo"
-import { FeaturedGames } from "@/components/home/FeaturedGames"
-import { HeroScene } from "@/components/home/HeroScene"
-import { HeroTitle } from "@/components/home/HeroTitle"
-import { HowItWorks } from "@/components/home/HowItWorks"
-import { Marquee } from "@/components/home/Marquee"
-import { ArcadeButton, arcadeButtonVariants } from "@/components/ui/arcade-button"
-import { useRealtime } from "@/providers/realtime-context"
+import { GAME_DEFINITIONS } from "@kridora/shared";
+import { motion, useReducedMotion, type Transition } from "framer-motion";
+import { ArrowRight, DoorOpen, Gamepad2 } from "lucide-react";
+import { useState } from "react";
+import { Link } from "react-router";
+import { JoinRoomDialog } from "@/components/JoinRoomDialog";
+import { Logo } from "@/components/Logo";
+import { FeaturedGames } from "@/components/home/FeaturedGames";
+import { HeroScene } from "@/components/home/HeroScene";
+import { HeroTitle } from "@/components/home/HeroTitle";
+import { HowItWorks } from "@/components/home/HowItWorks";
+import { Marquee } from "@/components/home/Marquee";
+import {
+  ArcadeButton,
+  arcadeButtonVariants,
+} from "@/components/ui/arcade-button";
+import { useRealtime } from "@/providers/realtime-context";
 
-const subTransition: Transition = { duration: 0.4, delay: 0.8, ease: "easeOut" }
-const ctaPopTransition: Transition = { type: "spring", stiffness: 360, damping: 20, delay: 0.95 }
+const subTransition: Transition = {
+  duration: 0.4,
+  delay: 0.8,
+  ease: "easeOut",
+};
+const ctaPopTransition: Transition = {
+  type: "spring",
+  stiffness: 360,
+  damping: 20,
+  delay: 0.95,
+};
 
 export default function HomePage() {
-  const { activeRoom } = useRealtime()
-  const [joinOpen, setJoinOpen] = useState(false)
-  const reduce = useReducedMotion()
+  const { activeRoom } = useRealtime();
+  const [joinOpen, setJoinOpen] = useState(false);
+  const reduce = useReducedMotion();
 
   return (
     <div>
@@ -32,7 +44,8 @@ export default function HomePage() {
           transition={subTransition}
           className="mt-6 max-w-xl text-balance text-lg text-muted-foreground"
         >
-          Create a room, share the code and start playing in seconds. No download needed.
+          Create a room, share the code and start playing in seconds. No
+          download needed.
         </motion.p>
 
         <motion.div
@@ -42,27 +55,43 @@ export default function HomePage() {
           className="mt-10 flex flex-col items-center gap-4 sm:flex-row"
         >
           <span className="cta-ping">
-            <Link to="/games" className={arcadeButtonVariants({ variant: "primary", size: "lg" })}>
+            <Link
+              to="/games"
+              className={arcadeButtonVariants({
+                variant: "primary",
+                size: "lg",
+              })}
+            >
               <Gamepad2 /> BROWSE GAMES
             </Link>
           </span>
-          <ArcadeButton variant="secondary" size="lg" onClick={() => setJoinOpen(true)}>
+          <ArcadeButton
+            variant="secondary"
+            size="lg"
+            onClick={() => setJoinOpen(true)}
+          >
             <DoorOpen /> JOIN A ROOM
           </ArcadeButton>
         </motion.div>
 
         {activeRoom && (
           <Link
-            to={`/${activeRoom.gameSlug}/room/${activeRoom.code}`}
+            to={`/${activeRoom.gameSlug}/room`}
             className="mt-8 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-ok/30 bg-ok/5 px-5 py-3 text-sm transition-colors hover:bg-ok/10"
           >
             <span className="inline-flex items-center gap-2 font-semibold uppercase tracking-wider text-ok">
-              <span className="size-2.5 animate-pulse rounded-full bg-ok" aria-hidden="true" />
+              <span
+                className="size-2.5 animate-pulse rounded-full bg-ok"
+                aria-hidden="true"
+              />
               IN PROGRESS
             </span>
             <span className="text-foreground">
-              Room <strong className="font-display tracking-widest">{activeRoom.code}</strong> ·{" "}
-              {GAME_DEFINITIONS[activeRoom.gameSlug].name}
+              Room{" "}
+              <strong className="font-display tracking-widest">
+                {activeRoom.code}
+              </strong>{" "}
+              · {GAME_DEFINITIONS[activeRoom.gameSlug].name}
             </span>
             <span className="inline-flex items-center gap-1 font-display text-xs uppercase tracking-wider text-ok">
               RETURN <ArrowRight className="size-4" aria-hidden="true" />
@@ -99,15 +128,27 @@ export default function HomePage() {
           />
 
           <div className="relative z-10 flex flex-col items-center">
-            <h2 className="font-display text-3xl uppercase tracking-tight sm:text-5xl">READY, PLAYER ONE?</h2>
+            <h2 className="font-display text-3xl uppercase tracking-tight sm:text-5xl">
+              READY, PLAYER ONE?
+            </h2>
             <p className="mt-3 max-w-md text-balance text-muted-foreground">
               Grab a friend, open a room and let the match begin.
             </p>
             <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row">
-              <Link to="/games" className={arcadeButtonVariants({ variant: "primary", size: "lg" })}>
+              <Link
+                to="/games"
+                className={arcadeButtonVariants({
+                  variant: "primary",
+                  size: "lg",
+                })}
+              >
                 <Gamepad2 /> BROWSE GAMES
               </Link>
-              <ArcadeButton variant="secondary" size="lg" onClick={() => setJoinOpen(true)}>
+              <ArcadeButton
+                variant="secondary"
+                size="lg"
+                onClick={() => setJoinOpen(true)}
+              >
                 <DoorOpen /> JOIN A ROOM
               </ArcadeButton>
             </div>
@@ -124,5 +165,5 @@ export default function HomePage() {
 
       <JoinRoomDialog open={joinOpen} onOpenChange={setJoinOpen} />
     </div>
-  )
+  );
 }

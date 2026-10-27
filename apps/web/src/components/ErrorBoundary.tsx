@@ -1,38 +1,38 @@
-import { Component, type ErrorInfo, type ReactNode } from "react"
-import { Background } from "@/components/Background"
-import { LogoMark } from "@/components/Logo"
-import { Button } from "@/components/ui/button"
+import { Component, type ErrorInfo, type ReactNode } from "react";
+import { Background } from "@/components/Background";
+import { LogoMark } from "@/components/Logo";
+import { Button } from "@/components/ui/button";
 
 interface Props {
-  children: ReactNode
+  children: ReactNode;
 }
 
 interface State {
-  hasError: boolean
-  error: Error | null
+  hasError: boolean;
+  error: Error | null;
 }
 
 export class ErrorBoundary extends Component<Props, State> {
   override state: State = {
     hasError: false,
     error: null,
-  }
+  };
 
   static getDerivedStateFromError(error: Error): State {
-    return { hasError: true, error }
+    return { hasError: true, error };
   }
 
   override componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error("ErrorBoundary caught an unhandled error:", error, errorInfo)
+    console.error("ErrorBoundary caught an unhandled error:", error, errorInfo);
   }
 
   handleReload = () => {
-    window.location.reload()
-  }
+    window.location.reload();
+  };
 
   handleGoHome = () => {
-    window.location.href = "/"
-  }
+    window.location.href = "/";
+  };
 
   override render() {
     if (this.state.hasError) {
@@ -70,9 +70,9 @@ export class ErrorBoundary extends Component<Props, State> {
             </div>
           </div>
         </div>
-      )
+      );
     }
 
-    return this.props.children
+    return this.props.children;
   }
 }

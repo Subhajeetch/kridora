@@ -1,5 +1,7 @@
+import { eq, mergeGuestProfileIntoUser, schema } from "@kridora/db";
 import type { FastifyPluginAsync } from "fastify";
 import { auth, CLIENT_IP_HEADER } from "../../lib/auth";
+import { db } from "../../lib/db";
 
 /**
  * Hands every /api/auth/* request to Better Auth (sign-up, sign-in, Google OAuth, sessions, ...).
@@ -10,7 +12,10 @@ const authRoutes: FastifyPluginAsync = async (app) => {
     method: ["GET", "POST"],
     url: "/auth/*",
     async handler(request, reply) {
-      const url = new URL(request.url, `${request.protocol}://${request.headers.host ?? "localhost"}`);
+      const url = new URL(
+        request.url,
+        `${request.protocol}://${request.headers.host ?? "localhost"}`,
+      );
 
       const headers = new Headers();
       for (const [key, value] of Object.entries(request.headers)) {
@@ -20,7 +25,26 @@ const authRoutes: FastifyPluginAsync = async (app) => {
       }
       headers.set(CLIENT_IP_HEADER, request.ip);
 
-      const hasBody = request.method !== "GET" && request.method !== "HEAD" && request.body !== undefined;
+      // Check if this request is creating an account while having an anonymous guest session
+      let guestUserId: string | null = null;
+      if (
+        url.pathname.endsWith("/sign-up/email") &&
+        request.method === "POST"
+      ) {
+        try {
+          const session = await auth.api.getSession({ headers });
+          if (session?.user?.isAnonymous) {
+            guestUserId = session.user.id;
+          }
+        } catch {
+          // Session lookup failure should not block request
+        }
+      }
+
+      const hasBody =
+        request.method !== "GET" &&
+        request.method !== "HEAD" &&
+        request.body !== undefined;
       const response = await auth.handler(
         new Request(url, {
           method: request.method,
@@ -28,6 +52,35 @@ const authRoutes: FastifyPluginAsync = async (app) => {
           body: hasBody ? JSON.stringify(request.body) : undefined,
         }),
       );
+
+      // If email sign-up succeeded for a guest, merge stats and User ID into the new user
+      if (
+        guestUserId &&
+        response.status === 200 &&
+        url.pathname.endsWith("/sign-up/email") &&
+        request.body &&
+        typeof request.body === "object" &&
+        "email" in request.body &&
+        typeof request.body.email === "string"
+      ) {
+        try {
+          const targetEmail = request.body.email.toLowerCase();
+          const [createdUser] = await db
+            .select({ id: schema.user.id })
+            .from(schema.user)
+            .where(eq(schema.user.email, targetEmail))
+            .limit(1);
+
+          if (createdUser) {
+            await mergeGuestProfileIntoUser(db, guestUserId, createdUser.id);
+          }
+        } catch (err) {
+          request.log.error(
+            { err, guestUserId },
+            "Failed to merge guest profile during email sign-up",
+          );
+        }
+      }
 
       reply.status(response.status);
       response.headers.forEach((value, key) => {

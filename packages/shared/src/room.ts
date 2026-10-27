@@ -16,6 +16,30 @@ export interface RoomPlayer {
   connected: boolean;
 }
 
+export interface RoomPreviewPlayer {
+  name: string;
+  image: string | null;
+  isOwner: boolean;
+}
+
+export interface RoomPreview {
+  code: string;
+  inviteToken?: string;
+  gameSlug: GameSlug;
+  gameName: string;
+  owner: {
+    name: string;
+    image: string | null;
+  };
+  status: RoomStatus;
+  visibility: RoomVisibility;
+  playerCount: number;
+  minPlayers: number;
+  maxPlayers: number;
+  isFull: boolean;
+  players: RoomPreviewPlayer[];
+}
+
 /** What every client receives. Never contains secrets (no email addresses, no ban lists). */
 export interface RoomSnapshot {
   code: string;

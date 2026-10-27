@@ -1,7 +1,13 @@
-import { motion, useReducedMotion, type TargetAndTransition, type Transition, type Variants } from "framer-motion"
+import {
+  motion,
+  useReducedMotion,
+  type TargetAndTransition,
+  type Transition,
+  type Variants,
+} from "framer-motion";
 
-const LINE_1_WORDS = ["PLAY", "GAMES"] as const
-const LINE_2_WORDS = ["WITH", "FRIENDS"] as const
+const LINE_1_WORDS = ["PLAY", "GAMES"] as const;
+const LINE_2_WORDS = ["WITH", "FRIENDS"] as const;
 
 const line1ContainerVariants: Variants = {
   hidden: {},
@@ -11,7 +17,7 @@ const line1ContainerVariants: Variants = {
       delayChildren: 0.25,
     },
   },
-}
+};
 
 const line2ContainerVariants: Variants = {
   hidden: {},
@@ -21,7 +27,7 @@ const line2ContainerVariants: Variants = {
       delayChildren: 0.56,
     },
   },
-}
+};
 
 const wordVariants: Variants = {
   hidden: {},
@@ -30,7 +36,7 @@ const wordVariants: Variants = {
       staggerChildren: 0.028,
     },
   },
-}
+};
 
 const letterVariants: Variants = {
   hidden: { opacity: 0, y: 36, rotateX: -70 },
@@ -40,13 +46,17 @@ const letterVariants: Variants = {
     rotateX: 0,
     transition: { type: "spring", stiffness: 420, damping: 22 },
   },
-}
+};
 
-const letterHover: TargetAndTransition = { y: -6, rotate: -3 }
-const letterHoverSpring: Transition = { type: "spring", stiffness: 420, damping: 18 }
+const letterHover: TargetAndTransition = { y: -6, rotate: -3 };
+const letterHoverSpring: Transition = {
+  type: "spring",
+  stiffness: 420,
+  damping: 18,
+};
 
 export function HeroTitle() {
-  const reduce = useReducedMotion()
+  const reduce = useReducedMotion();
 
   return (
     <h1
@@ -59,7 +69,9 @@ export function HeroTitle() {
         initial={reduce ? false : "hidden"}
         animate="show"
         className="block text-foreground"
-        style={{ textShadow: "0 4px 0 rgba(0,0,0,0.45), 0 0 30px rgba(0,0,0,0.6)" }}
+        style={{
+          textShadow: "0 4px 0 rgba(0,0,0,0.45), 0 0 30px rgba(0,0,0,0.6)",
+        }}
       >
         {LINE_1_WORDS.map((word, wIdx) => (
           <motion.span
@@ -113,5 +125,5 @@ export function HeroTitle() {
         ))}
       </motion.span>
     </h1>
-  )
+  );
 }

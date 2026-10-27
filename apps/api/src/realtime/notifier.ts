@@ -22,5 +22,11 @@ export function createNotifier(io: AppServer): RoomNotifier {
       io.to(roomChannel(code)).emit("room:closed", { code });
       io.in(roomChannel(code)).socketsLeave(roomChannel(code));
     },
+    invitationReceived(targetUserId, payload) {
+      io.to(userChannel(targetUserId)).emit(
+        "room:invitation-received",
+        payload,
+      );
+    },
   };
 }

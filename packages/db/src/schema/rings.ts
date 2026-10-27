@@ -1,5 +1,15 @@
 import { sql } from "drizzle-orm";
-import { bigint, check, index, jsonb, pgEnum, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import {
+  bigint,
+  check,
+  index,
+  jsonb,
+  pgEnum,
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+} from "drizzle-orm/pg-core";
 import { user } from "./auth";
 
 export const ringTransactionType = pgEnum("ring_transaction_type", [
@@ -40,9 +50,13 @@ export const ringTransactions = pgTable(
   (t) => [
     index("ring_transactions_user_created_idx").on(t.userId, t.createdAt),
     check("ring_transactions_amount_non_zero", sql`${t.amount} <> 0`),
-    check("ring_transactions_balance_after_non_negative", sql`${t.balanceAfter} >= 0`),
+    check(
+      "ring_transactions_balance_after_non_negative",
+      sql`${t.balanceAfter} >= 0`,
+    ),
   ],
 );
 
 export type RingTransaction = typeof ringTransactions.$inferSelect;
-export type RingTransactionType = (typeof ringTransactionType.enumValues)[number];
+export type RingTransactionType =
+  (typeof ringTransactionType.enumValues)[number];

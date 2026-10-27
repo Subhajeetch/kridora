@@ -1,4 +1,9 @@
-import { ensureProfile, schema } from "@kridora/db";
+import {
+  discardGuestAccount,
+  ensureProfile,
+  mergeGuestProfileIntoUser,
+  schema,
+} from "@kridora/db";
 import { normalizeDisplayName } from "@kridora/shared";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
@@ -16,6 +21,31 @@ if value == 1 then redis.call('EXPIRE', KEYS[1], ARGV[1]) end
 return value`;
 /** Header our own bridge sets (after stripping any client-supplied copy) so rate limits see the real IP. */
 export const CLIENT_IP_HEADER = "x-kridora-client-ip";
+
+const newlyCreatedUserIds = new Set<string>();
+
+export async function isNewlyCreatedUser(
+  userId: string,
+  createdAt?: Date | string | null,
+): Promise<boolean> {
+  if (newlyCreatedUserIds.has(userId)) {
+    newlyCreatedUserIds.delete(userId);
+    return true;
+  }
+  try {
+    const fromRedis = await redis.getdel(`kridora:new_user:${userId}`);
+    if (fromRedis) return true;
+  } catch {
+    // Redis optional
+  }
+  if (createdAt) {
+    const createdMs = new Date(createdAt).getTime();
+    if (Date.now() - createdMs < 20_000) {
+      return true;
+    }
+  }
+  return false;
+}
 
 export const auth = betterAuth({
   appName: "Kridora",
@@ -36,7 +66,10 @@ export const auth = betterAuth({
     get: async (key) => redis.get(`${AUTH_PREFIX}${key}`),
     getAndDelete: async (key) => redis.getdel(`${AUTH_PREFIX}${key}`),
     // Atomic counter whose TTL is only set on creation (fixed rate-limit window).
-    increment: async (key, ttl) => Number(await redis.eval(INCREMENT_WITH_TTL, 1, `${AUTH_PREFIX}${key}`, ttl)),
+    increment: async (key, ttl) =>
+      Number(
+        await redis.eval(INCREMENT_WITH_TTL, 1, `${AUTH_PREFIX}${key}`, ttl),
+      ),
     set: async (key, value, ttl) => {
       if (ttl) await redis.set(`${AUTH_PREFIX}${key}`, value, "EX", ttl);
       else await redis.set(`${AUTH_PREFIX}${key}`, value);
@@ -56,7 +89,12 @@ export const auth = betterAuth({
     revokeSessionsOnPasswordReset: true,
     // Not awaited on purpose: response timing must not reveal whether an email exists.
     sendResetPassword: async ({ user, url, token }) => {
-      void mailer.sendPasswordResetEmail({ to: user.email, name: user.name, url, token });
+      void mailer.sendPasswordResetEmail({
+        to: user.email,
+        name: user.name,
+        url,
+        token,
+      });
     },
   },
 
@@ -67,13 +105,23 @@ export const auth = betterAuth({
     autoSignInAfterVerification: true,
     expiresIn: 60 * 60,
     sendVerificationEmail: async ({ user, url, token }) => {
-      void mailer.sendVerificationEmail({ to: user.email, name: user.name, url, token });
+      void mailer.sendVerificationEmail({
+        to: user.email,
+        name: user.name,
+        url,
+        token,
+      });
     },
   },
 
   socialProviders:
     env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET
-      ? { google: { clientId: env.GOOGLE_CLIENT_ID, clientSecret: env.GOOGLE_CLIENT_SECRET } }
+      ? {
+          google: {
+            clientId: env.GOOGLE_CLIENT_ID,
+            clientSecret: env.GOOGLE_CLIENT_SECRET,
+          },
+        }
       : {},
 
   account: {
@@ -115,8 +163,27 @@ export const auth = betterAuth({
   },
 
   plugins: [
-    // Name-only guest accounts. If a guest later signs in to a real account, the guest user is deleted.
-    anonymous({ emailDomainName: "guest.kridora.invalid" }),
+    // Name-only guest accounts. If a guest later signs in or creates an account:
+    // - If brand new account (e.g. Google signup): merge stats & User ID into the new account.
+    // - If existing account (e.g. logging into previous account): do NOT merge! Just log into existing.
+    anonymous({
+      emailDomainName: "guest.kridora.invalid",
+      onLinkAccount: async ({ anonymousUser, newUser }) => {
+        const isNew = await isNewlyCreatedUser(
+          newUser.user.id,
+          newUser.user.createdAt,
+        );
+        if (isNew) {
+          await mergeGuestProfileIntoUser(
+            db,
+            anonymousUser.user.id,
+            newUser.user.id,
+          );
+        } else {
+          await discardGuestAccount(db, anonymousUser.user.id);
+        }
+      },
+    }),
   ],
 
   databaseHooks: {
@@ -125,11 +192,22 @@ export const auth = betterAuth({
         before: async (user) => {
           // Names can come from Google profiles, so clean them instead of rejecting the sign-in.
           const cleaned = normalizeDisplayName(user.name ?? "");
-          return { data: { ...user, name: cleaned.length >= 2 ? cleaned : "Player" } };
+          return {
+            data: { ...user, name: cleaned.length >= 2 ? cleaned : "Player" },
+          };
         },
         after: async (user) => {
           // Every account gets a game profile (Rings wallet, XP).
           await ensureProfile(db, user.id);
+          if (!user.isAnonymous) {
+            newlyCreatedUserIds.add(user.id);
+            setTimeout(() => newlyCreatedUserIds.delete(user.id), 60_000);
+            try {
+              await redis.set(`kridora:new_user:${user.id}`, "1", "EX", 120);
+            } catch {
+              // Redis optional
+            }
+          }
         },
       },
       update: {
@@ -137,7 +215,9 @@ export const auth = betterAuth({
           if (typeof data.name !== "string") return { data };
           const cleaned = normalizeDisplayName(data.name);
           if (cleaned.length < 2) {
-            throw new APIError("BAD_REQUEST", { message: "Pick a name with at least 2 letters or numbers" });
+            throw new APIError("BAD_REQUEST", {
+              message: "Pick a name with at least 2 letters or numbers",
+            });
           }
           return { data: { ...data, name: cleaned } };
         },

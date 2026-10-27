@@ -1,7 +1,22 @@
-import { bigint, index, integer, jsonb, pgEnum, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+import {
+  bigint,
+  index,
+  integer,
+  jsonb,
+  pgEnum,
+  pgTable,
+  text,
+  timestamp,
+  unique,
+  uuid,
+} from "drizzle-orm/pg-core";
 import { user } from "./auth";
 
-export const matchStatus = pgEnum("match_status", ["in_progress", "completed", "abandoned"]);
+export const matchStatus = pgEnum("match_status", [
+  "in_progress",
+  "completed",
+  "abandoned",
+]);
 
 /** One row per game that was actually started from a room. Live room state lives in Redis, not here. */
 export const matches = pgTable(

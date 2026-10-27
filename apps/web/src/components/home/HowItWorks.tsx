@@ -1,13 +1,13 @@
-import { ROOM_CODE_LENGTH } from "@kridora/shared"
-import { motion, useReducedMotion, type Variants } from "framer-motion"
-import { Play, Plus, Users } from "lucide-react"
-import type { ComponentType } from "react"
+import { ROOM_CODE_LENGTH } from "@kridora/shared";
+import { motion, useReducedMotion, type Variants } from "framer-motion";
+import { Play, Plus, Users } from "lucide-react";
+import type { ComponentType } from "react";
 
 interface StepItem {
-  number: string
-  title: string
-  body: string
-  Icon: ComponentType<{ className?: string }>
+  number: string;
+  title: string;
+  body: string;
+  Icon: ComponentType<{ className?: string }>;
 }
 
 const STEPS: readonly StepItem[] = [
@@ -29,7 +29,7 @@ const STEPS: readonly StepItem[] = [
     body: "Everyone gets ready, the owner hits start and the match begins.",
     Icon: Play,
   },
-]
+];
 
 const gridVariants: Variants = {
   hidden: {},
@@ -38,7 +38,7 @@ const gridVariants: Variants = {
       staggerChildren: 0.12,
     },
   },
-}
+};
 
 const cardVariants: Variants = {
   hidden: { opacity: 0, y: 24 },
@@ -47,16 +47,20 @@ const cardVariants: Variants = {
     y: 0,
     transition: { duration: 0.45, ease: "easeOut" },
   },
-}
+};
 
 export function HowItWorks() {
-  const reduce = useReducedMotion()
+  const reduce = useReducedMotion();
 
   return (
     <section className="mx-auto max-w-5xl px-4 py-20 sm:py-28">
       <div className="text-center">
-        <p className="text-xs font-semibold uppercase tracking-[0.28em] text-primary">3 STEPS TO PLAY</p>
-        <h2 className="mt-2 font-display text-3xl uppercase tracking-tight sm:text-4xl">HOW IT WORKS</h2>
+        <p className="text-xs font-semibold uppercase tracking-[0.28em] text-primary">
+          3 STEPS TO PLAY
+        </p>
+        <h2 className="mt-2 font-display text-3xl uppercase tracking-tight sm:text-4xl">
+          HOW IT WORKS
+        </h2>
       </div>
 
       <div className="relative mt-12">
@@ -88,17 +92,22 @@ export function HowItWorks() {
                 <span
                   aria-hidden="true"
                   className="font-display text-4xl leading-none select-none"
-                  style={{ color: "transparent", WebkitTextStroke: "1.5px rgba(255,255,255,0.22)" }}
+                  style={{
+                    color: "transparent",
+                    WebkitTextStroke: "1.5px rgba(255,255,255,0.22)",
+                  }}
                 >
                   {number}
                 </span>
               </div>
-              <h3 className="mt-6 font-display text-xl uppercase tracking-tight">{title}</h3>
+              <h3 className="mt-6 font-display text-xl uppercase tracking-tight">
+                {title}
+              </h3>
               <p className="mt-2 text-sm text-muted-foreground">{body}</p>
             </motion.article>
           ))}
         </motion.div>
       </div>
     </section>
-  )
+  );
 }

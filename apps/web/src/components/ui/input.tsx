@@ -1,7 +1,11 @@
-import type { ComponentProps, ReactNode } from "react"
-import { cn } from "@/lib/utils"
+import type { ComponentProps, ReactNode } from "react";
+import { cn } from "@/lib/utils";
 
-export function Input({ className, type = "text", ...props }: ComponentProps<"input">) {
+export function Input({
+  className,
+  type = "text",
+  ...props
+}: ComponentProps<"input">) {
   return (
     <input
       type={type}
@@ -11,13 +15,13 @@ export function Input({ className, type = "text", ...props }: ComponentProps<"in
       )}
       {...props}
     />
-  )
+  );
 }
 
 interface FieldProps {
-  label: string
-  error?: string | undefined
-  children: ReactNode
+  label: string;
+  error?: string | undefined;
+  children: ReactNode;
 }
 
 export function Field({ label, error, children }: FieldProps) {
@@ -25,7 +29,9 @@ export function Field({ label, error, children }: FieldProps) {
     <label className="block space-y-1.5">
       <span className="text-sm font-medium">{label}</span>
       {children}
-      {error ? <span className="block text-xs text-destructive">{error}</span> : null}
+      {error ? (
+        <span className="block text-xs text-destructive">{error}</span>
+      ) : null}
     </label>
-  )
+  );
 }

@@ -1,5 +1,13 @@
 import { sql } from "drizzle-orm";
-import { bigint, check, integer, jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import {
+  bigint,
+  check,
+  integer,
+  jsonb,
+  pgTable,
+  text,
+  timestamp,
+} from "drizzle-orm/pg-core";
 import { user } from "./auth";
 
 export interface PlayerSettings {
@@ -21,6 +29,7 @@ export const playerProfiles = pgTable(
     userId: text()
       .primaryKey()
       .references(() => user.id, { onDelete: "cascade" }),
+    numericId: text().unique(),
     ringsBalance: bigint({ mode: "number" }).notNull().default(0),
     lifetimeRingsEarned: bigint({ mode: "number" }).notNull().default(0),
     lifetimeRingsSpent: bigint({ mode: "number" }).notNull().default(0),
@@ -35,7 +44,10 @@ export const playerProfiles = pgTable(
       .$onUpdate(() => new Date()),
   },
   (t) => [
-    check("player_profiles_rings_balance_non_negative", sql`${t.ringsBalance} >= 0`),
+    check(
+      "player_profiles_rings_balance_non_negative",
+      sql`${t.ringsBalance} >= 0`,
+    ),
     check("player_profiles_xp_non_negative", sql`${t.xp} >= 0`),
   ],
 );

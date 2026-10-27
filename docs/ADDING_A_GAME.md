@@ -8,7 +8,7 @@ start validation, reconnects) is already handled by the platform.
 ```ts
 export const GAME_DEFINITIONS = {
   monopoly: {
-    slug: "monopoly",                 // URL: yourdomain.com/monopoly
+    slug: "monopoly", // URL: yourdomain.com/monopoly
     name: "Monopoly",
     tagline: "Buy, trade and bankrupt your friends.",
     description: "...",
@@ -17,12 +17,19 @@ export const GAME_DEFINITIONS = {
     minPlayers: 2,
     maxPlayers: 6,
     requirements: {
-      allPlayersReady: true,          // every non-owner must press "I am ready"
-      allPlayersConnected: true,      // nobody may be offline when the owner presses Start
+      allPlayersReady: true, // every non-owner must press "I am ready"
+      allPlayersConnected: true, // nobody may be offline when the owner presses Start
     },
     // optional game-specific rules; each unmet rule disables Start and is shown to the owner
     extraRequirements: ({ players }) =>
-      players.length % 2 === 0 ? [] : [{ code: "GAME_SPECIFIC", message: "Needs an even number of players" }],
+      players.length % 2 === 0
+        ? []
+        : [
+            {
+              code: "GAME_SPECIFIC",
+              message: "Needs an even number of players",
+            },
+          ],
   },
 } satisfies Record<string, GameDefinition>;
 ```
@@ -49,14 +56,14 @@ this step is a compile error.
 
 ## What the platform does for you
 
-| Step | Where it lives |
-| --- | --- |
-| `/monopoly` front door: "Join a public room" and "Create room" | `apps/web/src/pages/GameLobbyPage.tsx` |
-| Room code, private/public toggle, player list, ready-up, kick, make owner, Start | `apps/web/src/pages/RoomPage.tsx` |
-| Start button disabled until requirements are met, reasons listed | `evaluateStartRequirements` |
-| Owner offline 40s -> ownership goes to the earliest-joined online player | `apps/api/src/rooms/service.ts` (`processDeadline`) |
-| Game screen is shown once `room.status === "in_progress"` | `RoomPage.tsx` -> your component |
-| A `matches` row + `match_players` rows are created on start (`room.matchId`) | `createMatch` in `@kridora/db` |
+| Step                                                                             | Where it lives                                      |
+| -------------------------------------------------------------------------------- | --------------------------------------------------- |
+| `/monopoly` front door: "Join a public room" and "Create room"                   | `apps/web/src/pages/GameLobbyPage.tsx`              |
+| Room code, private/public toggle, player list, ready-up, kick, make owner, Start | `apps/web/src/pages/RoomPage.tsx`                   |
+| Start button disabled until requirements are met, reasons listed                 | `evaluateStartRequirements`                         |
+| Owner offline 40s -> ownership goes to the earliest-joined online player         | `apps/api/src/rooms/service.ts` (`processDeadline`) |
+| Game screen is shown once `room.status === "in_progress"`                        | `RoomPage.tsx` -> your component                    |
+| A `matches` row + `match_players` rows are created on start (`room.matchId`)     | `createMatch` in `@kridora/db`                      |
 
 ## Building the actual gameplay (next step)
 
@@ -69,7 +76,7 @@ The room only gets players to the start line. For in-game traffic, add events be
 4. Broadcast to `roomChannel(code)` (see `realtime/types.ts`) and read it in your component through `useRealtime().socket`.
 5. When the game ends, set `matches.status = "completed"`, fill `match_players.placement / xpEarned / ringsEarned`,
    and pay rings with `grantRings({ type: "game_reward", referenceType: "match", referenceId: matchId,
-   idempotencyKey: `match:${matchId}:${userId}` })`.
+idempotencyKey: `match:${matchId}:${userId}` })`.
 
 Players who leave mid-game are removed from the room; decide in your game logic how to treat their seat
 (bot, bankrupt, forfeit). Players who only lose connection stay in the room and are marked offline.

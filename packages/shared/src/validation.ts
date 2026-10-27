@@ -14,24 +14,42 @@ export const DISPLAY_NAME_PATTERN = /^[\p{L}\p{N}][\p{L}\p{N} ._-]*$/u;
 export const displayNameSchema = z
   .string()
   .trim()
-  .min(DISPLAY_NAME_MIN_LENGTH, `Use at least ${DISPLAY_NAME_MIN_LENGTH} characters`)
-  .max(DISPLAY_NAME_MAX_LENGTH, `Use at most ${DISPLAY_NAME_MAX_LENGTH} characters`)
-  .regex(DISPLAY_NAME_PATTERN, "Use letters, numbers, spaces, dots, dashes or underscores");
+  .min(
+    DISPLAY_NAME_MIN_LENGTH,
+    `Use at least ${DISPLAY_NAME_MIN_LENGTH} characters`,
+  )
+  .max(
+    DISPLAY_NAME_MAX_LENGTH,
+    `Use at most ${DISPLAY_NAME_MAX_LENGTH} characters`,
+  )
+  .regex(
+    DISPLAY_NAME_PATTERN,
+    "Use letters, numbers, spaces, dots, dashes or underscores",
+  );
 
-export const emailSchema = z.string().trim().toLowerCase().pipe(z.email("Enter a valid email address"));
+export const emailSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .pipe(z.email("Enter a valid email address"));
 
 export const passwordSchema = z
   .string()
   .min(PASSWORD_MIN_LENGTH, `Use at least ${PASSWORD_MIN_LENGTH} characters`)
   .max(PASSWORD_MAX_LENGTH, `Use at most ${PASSWORD_MAX_LENGTH} characters`);
 
-const roomCodePattern = new RegExp(`^[${ROOM_CODE_ALPHABET}]{${ROOM_CODE_LENGTH}}$`);
+const roomCodePattern = new RegExp(
+  `^[${ROOM_CODE_ALPHABET}]{${ROOM_CODE_LENGTH}}$`,
+);
 
 export const roomCodeSchema = z
   .string()
   .trim()
   .toUpperCase()
-  .regex(roomCodePattern, `Room codes are ${ROOM_CODE_LENGTH} letters or numbers`);
+  .regex(
+    roomCodePattern,
+    `Room codes are ${ROOM_CODE_LENGTH} letters or numbers`,
+  );
 
 /**
  * Best-effort cleanup for names we did not type ourselves (e.g. a Google profile name).

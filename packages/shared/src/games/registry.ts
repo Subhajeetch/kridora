@@ -52,7 +52,9 @@ export type GameSlug = keyof typeof GAME_DEFINITIONS;
 // Fail fast (at import time) on slugs that would collide with real routes or break URLs.
 for (const slug of Object.keys(GAME_DEFINITIONS)) {
   if (!/^[a-z0-9-]+$/.test(slug)) {
-    throw new Error(`Invalid game slug "${slug}": use lowercase letters, numbers and dashes only.`);
+    throw new Error(
+      `Invalid game slug "${slug}": use lowercase letters, numbers and dashes only.`,
+    );
   }
   if ((RESERVED_SLUGS as readonly string[]).includes(slug)) {
     throw new Error(`Game slug "${slug}" is reserved by the app router.`);

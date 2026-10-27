@@ -7,7 +7,10 @@ export interface CreateDbOptions {
   max?: number;
 }
 
-export function createDb(connectionString: string, options: CreateDbOptions = {}) {
+export function createDb(
+  connectionString: string,
+  options: CreateDbOptions = {},
+) {
   const pool = new Pool({
     connectionString,
     max: options.max ?? 10,

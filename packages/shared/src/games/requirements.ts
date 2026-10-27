@@ -1,10 +1,7 @@
 import type { GameDefinition, StartContext } from "./types";
 
 export type UnmetRequirementCode =
-  | "MIN_PLAYERS"
-  | "NOT_ALL_READY"
-  | "PLAYER_OFFLINE"
-  | "GAME_SPECIFIC";
+  "MIN_PLAYERS" | "NOT_ALL_READY" | "PLAYER_OFFLINE" | "GAME_SPECIFIC";
 
 export interface UnmetRequirement {
   code: UnmetRequirementCode;
@@ -26,7 +23,10 @@ function listNames(names: string[]): string {
  * Single source of truth for "can this room start?".
  * The web app uses it to disable the Start button; the API runs it again before starting.
  */
-export function evaluateStartRequirements(def: GameDefinition, ctx: StartContext): StartCheck {
+export function evaluateStartRequirements(
+  def: GameDefinition,
+  ctx: StartContext,
+): StartCheck {
   const unmet: UnmetRequirement[] = [];
   const total = ctx.players.length;
 
@@ -38,7 +38,9 @@ export function evaluateStartRequirements(def: GameDefinition, ctx: StartContext
   }
 
   if (def.requirements.allPlayersReady) {
-    const waiting = ctx.players.filter((p) => p.userId !== ctx.ownerId && !p.isReady);
+    const waiting = ctx.players.filter(
+      (p) => p.userId !== ctx.ownerId && !p.isReady,
+    );
     if (waiting.length > 0) {
       unmet.push({
         code: "NOT_ALL_READY",

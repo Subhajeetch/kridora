@@ -1,8 +1,14 @@
 import { eq } from "drizzle-orm";
 import type { Database } from "../client";
-import { playerProfiles, ringTransactions, type RingTransaction, type RingTransactionType } from "../schema";
+import {
+  playerProfiles,
+  ringTransactions,
+  type RingTransaction,
+  type RingTransactionType,
+} from "../schema";
 
-export type RingsErrorCode = "INVALID_AMOUNT" | "PROFILE_NOT_FOUND" | "INSUFFICIENT_RINGS";
+export type RingsErrorCode =
+  "INVALID_AMOUNT" | "PROFILE_NOT_FOUND" | "INSUFFICIENT_RINGS";
 
 export class RingsError extends Error {
   readonly code: RingsErrorCode;
@@ -39,8 +45,15 @@ function isUniqueViolation(err: unknown): boolean {
   return anyErr?.code === "23505" || anyErr?.cause?.code === "23505";
 }
 
-async function findByIdempotencyKey(db: Database, key: string): Promise<RingTransaction | undefined> {
-  const [row] = await db.select().from(ringTransactions).where(eq(ringTransactions.idempotencyKey, key)).limit(1);
+async function findByIdempotencyKey(
+  db: Database,
+  key: string,
+): Promise<RingTransaction | undefined> {
+  const [row] = await db
+    .select()
+    .from(ringTransactions)
+    .where(eq(ringTransactions.idempotencyKey, key))
+    .limit(1);
   return row;
 }
 
@@ -53,12 +66,20 @@ export async function applyRingTransaction(
   input: RingTransactionInput,
 ): Promise<RingTransactionResult> {
   if (!Number.isSafeInteger(input.amount) || input.amount === 0) {
-    throw new RingsError("INVALID_AMOUNT", "Amount must be a non-zero whole number");
+    throw new RingsError(
+      "INVALID_AMOUNT",
+      "Amount must be a non-zero whole number",
+    );
   }
 
   if (input.idempotencyKey) {
     const existing = await findByIdempotencyKey(db, input.idempotencyKey);
-    if (existing) return { transaction: existing, balance: existing.balanceAfter, duplicate: true };
+    if (existing)
+      return {
+        transaction: existing,
+        balance: existing.balanceAfter,
+        duplicate: true,
+      };
   }
 
   try {
@@ -68,11 +89,14 @@ export async function applyRingTransaction(
         .from(playerProfiles)
         .where(eq(playerProfiles.userId, input.userId))
         .for("update");
-      if (!profile) throw new RingsError("PROFILE_NOT_FOUND", "Player profile not found");
+      if (!profile)
+        throw new RingsError("PROFILE_NOT_FOUND", "Player profile not found");
 
       const newBalance = profile.ringsBalance + input.amount;
-      if (newBalance < 0) throw new RingsError("INSUFFICIENT_RINGS", "Not enough Rings");
-      if (!Number.isSafeInteger(newBalance)) throw new RingsError("INVALID_AMOUNT", "Balance out of range");
+      if (newBalance < 0)
+        throw new RingsError("INSUFFICIENT_RINGS", "Not enough Rings");
+      if (!Number.isSafeInteger(newBalance))
+        throw new RingsError("INVALID_AMOUNT", "Balance out of range");
 
       const [transaction] = await tx
         .insert(ringTransactions)
@@ -95,9 +119,13 @@ export async function applyRingTransaction(
         .set({
           ringsBalance: newBalance,
           lifetimeRingsEarned:
-            input.amount > 0 ? profile.lifetimeRingsEarned + input.amount : profile.lifetimeRingsEarned,
+            input.amount > 0
+              ? profile.lifetimeRingsEarned + input.amount
+              : profile.lifetimeRingsEarned,
           lifetimeRingsSpent:
-            input.amount < 0 ? profile.lifetimeRingsSpent - input.amount : profile.lifetimeRingsSpent,
+            input.amount < 0
+              ? profile.lifetimeRingsSpent - input.amount
+              : profile.lifetimeRingsSpent,
         })
         .where(eq(playerProfiles.userId, input.userId));
 
@@ -107,7 +135,12 @@ export async function applyRingTransaction(
     // Two requests with the same idempotency key raced: the loser reads the winner's result.
     if (input.idempotencyKey && isUniqueViolation(err)) {
       const existing = await findByIdempotencyKey(db, input.idempotencyKey);
-      if (existing) return { transaction: existing, balance: existing.balanceAfter, duplicate: true };
+      if (existing)
+        return {
+          transaction: existing,
+          balance: existing.balanceAfter,
+          duplicate: true,
+        };
     }
     throw err;
   }
@@ -119,9 +152,18 @@ export type GrantRingsInput = Omit<RingTransactionInput, "amount" | "type"> & {
   type?: Exclude<RingTransactionType, "spend">;
 };
 
-export function grantRings(db: Database, input: GrantRingsInput): Promise<RingTransactionResult> {
-  if (!(input.amount > 0)) return Promise.reject(new RingsError("INVALID_AMOUNT", "Grant amount must be positive"));
-  return applyRingTransaction(db, { ...input, type: input.type ?? "game_reward" });
+export function grantRings(
+  db: Database,
+  input: GrantRingsInput,
+): Promise<RingTransactionResult> {
+  if (!(input.amount > 0))
+    return Promise.reject(
+      new RingsError("INVALID_AMOUNT", "Grant amount must be positive"),
+    );
+  return applyRingTransaction(db, {
+    ...input,
+    type: input.type ?? "game_reward",
+  });
 }
 
 export type SpendRingsInput = Omit<RingTransactionInput, "amount" | "type"> & {
@@ -129,7 +171,17 @@ export type SpendRingsInput = Omit<RingTransactionInput, "amount" | "type"> & {
   amount: number;
 };
 
-export function spendRings(db: Database, input: SpendRingsInput): Promise<RingTransactionResult> {
-  if (!(input.amount > 0)) return Promise.reject(new RingsError("INVALID_AMOUNT", "Spend amount must be positive"));
-  return applyRingTransaction(db, { ...input, amount: -input.amount, type: "spend" });
+export function spendRings(
+  db: Database,
+  input: SpendRingsInput,
+): Promise<RingTransactionResult> {
+  if (!(input.amount > 0))
+    return Promise.reject(
+      new RingsError("INVALID_AMOUNT", "Spend amount must be positive"),
+    );
+  return applyRingTransaction(db, {
+    ...input,
+    amount: -input.amount,
+    type: "spend",
+  });
 }

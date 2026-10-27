@@ -1,4 +1,4 @@
-import { randomInt } from "node:crypto";
+import { randomBytes, randomInt } from "node:crypto";
 import { ROOM_CODE_ALPHABET, ROOM_CODE_LENGTH } from "@kridora/shared";
 import type { Redis } from "ioredis";
 import { AppError } from "../lib/errors";
@@ -15,6 +15,8 @@ export const keys = {
   deadlines: `${PREFIX}room-deadlines`,
   lock: (code: string) => `${PREFIX}lock:room:${code}`,
   joinAttempts: (userId: string) => `${PREFIX}join-attempts:${userId}`,
+  inviteToken: (token: string) => `${PREFIX}invite:${token}`,
+  roomInvite: (code: string) => `${PREFIX}room-invite:${code}`,
 };
 
 /** Members of the `room-deadlines` sorted set. The score is the epoch-ms time the deadline fires. */
@@ -49,24 +51,84 @@ export function createRoomStore(redis: Redis) {
   async function save(room: StoredRoom): Promise<void> {
     const tx = redis.multi();
     tx.set(keys.room(room.code), JSON.stringify(room), "EX", ROOM_TTL_SECONDS);
-    for (const p of room.players) tx.expire(keys.userRoom(p.userId), ROOM_TTL_SECONDS);
+    for (const p of room.players)
+      tx.expire(keys.userRoom(p.userId), ROOM_TTL_SECONDS);
     const results = await tx.exec();
-    if (!results || results.some(([err]) => err)) throw new Error("Failed to save room");
+    if (!results || results.some(([err]) => err))
+      throw new Error("Failed to save room");
   }
 
   /** Returns false when the code is already taken. */
   async function create(room: StoredRoom): Promise<boolean> {
-    const result = await redis.set(keys.room(room.code), JSON.stringify(room), "EX", ROOM_TTL_SECONDS, "NX");
+    const result = await redis.set(
+      keys.room(room.code),
+      JSON.stringify(room),
+      "EX",
+      ROOM_TTL_SECONDS,
+      "NX",
+    );
     return result === "OK";
   }
 
-  async function remove(room: Pick<StoredRoom, "code" | "gameSlug" | "players">): Promise<void> {
+  async function remove(
+    room: Pick<StoredRoom, "code" | "gameSlug" | "players">,
+  ): Promise<void> {
+    const token = await redis.get(keys.roomInvite(room.code));
     const tx = redis.multi();
     tx.del(keys.room(room.code));
+    tx.del(keys.roomInvite(room.code));
+    if (token) tx.del(keys.inviteToken(token));
     tx.zrem(keys.publicIndex(room.gameSlug), room.code);
-    tx.zrem(keys.deadlines, deadline.owner(room.code), deadline.idle(room.code));
-    for (const p of room.players) tx.zrem(keys.deadlines, deadline.player(room.code, p.userId));
+    tx.zrem(
+      keys.deadlines,
+      deadline.owner(room.code),
+      deadline.idle(room.code),
+    );
+    for (const p of room.players)
+      tx.zrem(keys.deadlines, deadline.player(room.code, p.userId));
     await tx.exec();
+  }
+
+  async function getOrCreateInviteToken(
+    code: string,
+    gameSlug: string,
+  ): Promise<string> {
+    const existing = await redis.get(keys.roomInvite(code));
+    if (existing) return existing;
+
+    const token = randomBytes(24).toString("base64url");
+    const payload = JSON.stringify({ code, gameSlug });
+
+    const tx = redis.multi();
+    tx.set(keys.inviteToken(token), payload, "EX", ROOM_TTL_SECONDS);
+    tx.set(keys.roomInvite(code), token, "EX", ROOM_TTL_SECONDS);
+    await tx.exec();
+    return token;
+  }
+
+  async function getInvite(
+    token: string,
+  ): Promise<{ code: string; gameSlug: string } | null> {
+    const raw = await redis.get(keys.inviteToken(token));
+    return raw ? (JSON.parse(raw) as { code: string; gameSlug: string }) : null;
+  }
+
+  async function deleteInvite(code: string): Promise<void> {
+    const token = await redis.get(keys.roomInvite(code));
+    const tx = redis.multi();
+    tx.del(keys.roomInvite(code));
+    if (token) tx.del(keys.inviteToken(token));
+    await tx.exec();
+  }
+
+  async function updateInviteGameSlug(
+    code: string,
+    gameSlug: string,
+  ): Promise<void> {
+    const token = await redis.get(keys.roomInvite(code));
+    if (!token) return;
+    const payload = JSON.stringify({ code, gameSlug });
+    await redis.set(keys.inviteToken(token), payload, "EX", ROOM_TTL_SECONDS);
   }
 
   /* ---- "one room per user" pointer ---- */
@@ -81,7 +143,10 @@ export function createRoomStore(redis: Redis) {
    * Atomically reserves the user's single room slot for `code`.
    * Heals a stale pointer (room expired or user no longer a member) once before giving up.
    */
-  async function claimUserSlot(userId: string, code: string): Promise<"claimed" | "already"> {
+  async function claimUserSlot(
+    userId: string,
+    code: string,
+  ): Promise<"claimed" | "already"> {
     const key = keys.userRoom(userId);
     for (let attempt = 0; attempt < 2; attempt++) {
       const set = await redis.set(key, code, "EX", ROOM_TTL_SECONDS, "NX");
@@ -93,10 +158,14 @@ export function createRoomStore(redis: Redis) {
 
       const other = await get(current);
       if (other?.players.some((p) => p.userId === userId)) {
-        throw new AppError("ALREADY_IN_ROOM", "You are already in another room", {
-          roomCode: current,
-          gameSlug: other.gameSlug,
-        });
+        throw new AppError(
+          "ALREADY_IN_ROOM",
+          "You are already in another room",
+          {
+            roomCode: current,
+            gameSlug: other.gameSlug,
+          },
+        );
       }
       await clearUserSlot(userId, current); // stale
     }
@@ -105,16 +174,29 @@ export function createRoomStore(redis: Redis) {
 
   /* ---- public room index (oldest room first) ---- */
 
-  async function setPublic(room: Pick<StoredRoom, "code" | "gameSlug" | "createdAt">, listed: boolean): Promise<void> {
-    if (listed) await redis.zadd(keys.publicIndex(room.gameSlug), room.createdAt, room.code);
+  async function setPublic(
+    room: Pick<StoredRoom, "code" | "gameSlug" | "createdAt">,
+    listed: boolean,
+  ): Promise<void> {
+    if (listed)
+      await redis.zadd(
+        keys.publicIndex(room.gameSlug),
+        room.createdAt,
+        room.code,
+      );
     else await redis.zrem(keys.publicIndex(room.gameSlug), room.code);
   }
 
-  const listPublic = (slug: string, limit: number) => redis.zrange(keys.publicIndex(slug), "0", String(limit - 1));
+  const listPublic = (slug: string, limit: number) =>
+    redis.zrange(keys.publicIndex(slug), "0", String(limit - 1));
 
   /* ---- deadlines (owner transfer, lobby disconnect grace, idle room close) ---- */
 
-  async function schedule(member: string, at: number, onlyIfAbsent = false): Promise<void> {
+  async function schedule(
+    member: string,
+    at: number,
+    onlyIfAbsent = false,
+  ): Promise<void> {
     if (onlyIfAbsent) await redis.zadd(keys.deadlines, "NX", at, member);
     else await redis.zadd(keys.deadlines, at, member);
   }
@@ -123,7 +205,8 @@ export function createRoomStore(redis: Redis) {
     await redis.zrem(keys.deadlines, member);
   }
 
-  const due = (now: number, limit: number) => redis.zrangebyscore(keys.deadlines, 0, now, "LIMIT", 0, limit);
+  const due = (now: number, limit: number) =>
+    redis.zrangebyscore(keys.deadlines, 0, now, "LIMIT", 0, limit);
 
   /** Removes a due deadline; true for exactly one caller even with many API instances running. */
   async function claimDeadline(member: string): Promise<boolean> {
@@ -144,5 +227,9 @@ export function createRoomStore(redis: Redis) {
     unschedule,
     due,
     claimDeadline,
+    getOrCreateInviteToken,
+    getInvite,
+    deleteInvite,
+    updateInviteGameSlug,
   };
 }

@@ -46,5 +46,7 @@ export const consoleMailer: Mailer = {
 export const mailer: Mailer = consoleMailer;
 
 if (isProduction) {
-  console.warn("[mailer] The console mailer is active in production: no real emails are being sent.");
+  console.warn(
+    "[mailer] The console mailer is active in production: no real emails are being sent.",
+  );
 }

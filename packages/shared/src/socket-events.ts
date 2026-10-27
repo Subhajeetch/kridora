@@ -21,7 +21,18 @@ export const setReadySchema = z.object({ ready: z.boolean() });
 export const targetPlayerSchema = z.object({
   userId: z.string().min(1).max(128),
 });
-export const ludoMoveSchema = z.object({ tokenIndex: z.number().int().min(0).max(3) });
+export const ludoMoveSchema = z.object({
+  tokenIndex: z.number().int().min(0).max(3),
+});
+export const inviteUserSchema = z.object({
+  targetNumericId: z
+    .string()
+    .trim()
+    .regex(/^[0-9]{4,10}$/, "Invalid User ID. Must be 4-10 digits."),
+});
+export const changeGameSchema = z.object({
+  gameSlug: z.string().min(1).max(40),
+});
 
 export type CreateRoomPayload = z.input<typeof createRoomSchema>;
 export type JoinRoomPayload = z.input<typeof joinRoomSchema>;
@@ -30,6 +41,8 @@ export type SetVisibilityPayload = z.input<typeof setVisibilitySchema>;
 export type SetReadyPayload = z.input<typeof setReadySchema>;
 export type TargetPlayerPayload = z.input<typeof targetPlayerSchema>;
 export type LudoMovePayload = z.input<typeof ludoMoveSchema>;
+export type InviteUserPayload = z.input<typeof inviteUserSchema>;
+export type ChangeGamePayload = z.input<typeof changeGameSchema>;
 export type EmptyPayload = z.input<typeof emptySchema>;
 
 export interface ClientToServerEvents {
@@ -54,6 +67,18 @@ export interface ClientToServerEvents {
   ) => void;
   "room:kick": (payload: TargetPlayerPayload, ack: AckFn<RoomSnapshot>) => void;
   "room:start": (payload: EmptyPayload, ack: AckFn<RoomSnapshot>) => void;
+  "room:get-invite-token": (
+    payload: EmptyPayload,
+    ack: AckFn<{ token: string; inviteUrl: string }>,
+  ) => void;
+  "room:invite-user": (
+    payload: InviteUserPayload,
+    ack: AckFn<{ ok: boolean; targetName: string }>,
+  ) => void;
+  "room:change-game": (
+    payload: ChangeGamePayload,
+    ack: AckFn<RoomSnapshot>,
+  ) => void;
   "ludo:get-state": (payload: EmptyPayload, ack: AckFn<LudoGameState>) => void;
   "ludo:roll": (payload: EmptyPayload, ack: AckFn<LudoGameState>) => void;
   "ludo:move": (payload: LudoMovePayload, ack: AckFn<LudoGameState>) => void;
@@ -68,6 +93,13 @@ export interface ServerToClientEvents {
   "room:closed": (payload: { code: string }) => void;
   /** The owner removed you from the room. */
   "room:kicked": (payload: { code: string }) => void;
+  /** Direct real-time invitation from another player. */
+  "room:invitation-received": (payload: {
+    senderName: string;
+    gameSlug: string;
+    gameName: string;
+    inviteToken: string;
+  }) => void;
   "ludo:state": (state: LudoGameState) => void;
 }
 

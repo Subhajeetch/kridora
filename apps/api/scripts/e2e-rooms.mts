@@ -79,6 +79,22 @@ check("all ready => canStart", r.ok && r.data.start.canStart === true, r.data?.s
 await sleep(200);
 check("broadcast reached other player", lastB?.players?.find((p: any) => p.userId === C.id)?.isReady === true, lastB);
 
+// change game checks
+r = await call(sb, "room:change-game", { gameSlug: "ludo" });
+check("non-owner cannot change game", !r.ok && r.error.code === "NOT_ROOM_OWNER", r);
+r = await call(sa, "room:change-game", { gameSlug: "nonexistent" });
+check("cannot change to invalid game", !r.ok && r.error.code === "GAME_NOT_FOUND", r);
+r = await call(sa, "room:change-game", { gameSlug: "ludo" });
+check("owner changes game to ludo", r.ok && r.data.gameSlug === "ludo" && r.data.maxPlayers === 4, r);
+await sleep(200);
+check("change game broadcast reached guest", lastB?.gameSlug === "ludo", lastB);
+check("ready status was reset on game change", lastB?.players?.every((p: any) => !p.isReady), lastB);
+// change back to monopoly for the rest of tests
+r = await call(sa, "room:change-game", { gameSlug: "monopoly" });
+check("owner changes game back to monopoly", r.ok && r.data.gameSlug === "monopoly", r);
+await call(sb, "room:set-ready", { ready: true });
+await call(sc, "room:set-ready", { ready: true });
+
 // kick + ban
 r = await call(sa, "room:kick", { userId: C.id });
 check("kick player", r.ok && r.data.players.length === 2, r);

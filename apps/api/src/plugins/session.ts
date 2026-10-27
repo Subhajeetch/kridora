@@ -10,26 +10,35 @@ declare module "fastify" {
     session: AuthSession | null;
   }
   interface FastifyInstance {
-    requireAuth: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
+    requireAuth: (
+      request: FastifyRequest,
+      reply: FastifyReply,
+    ) => Promise<void>;
   }
 }
 
 /** Use inside a handler guarded by `preHandler: app.requireAuth`. */
 export function requireSession(request: FastifyRequest): AuthSession {
-  if (!request.session) throw new Error("requireSession called on a route without requireAuth");
+  if (!request.session)
+    throw new Error("requireSession called on a route without requireAuth");
   return request.session;
 }
 
 export default fp(async (app) => {
   app.decorateRequest("session", null);
 
-  app.decorate("requireAuth", async (request: FastifyRequest, reply: FastifyReply) => {
-    const session = await auth.api.getSession({ headers: fromNodeHeaders(request.headers) });
-    if (!session) {
-      return reply
-        .code(httpStatusFor("UNAUTHENTICATED"))
-        .send({ error: { code: "UNAUTHENTICATED", message: "Please sign in first" } });
-    }
-    request.session = session;
-  });
+  app.decorate(
+    "requireAuth",
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const session = await auth.api.getSession({
+        headers: fromNodeHeaders(request.headers),
+      });
+      if (!session) {
+        return reply.code(httpStatusFor("UNAUTHENTICATED")).send({
+          error: { code: "UNAUTHENTICATED", message: "Please sign in first" },
+        });
+      }
+      request.session = session;
+    },
+  );
 });

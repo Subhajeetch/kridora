@@ -1,6 +1,6 @@
-import { cva, type VariantProps } from "class-variance-authority"
-import type { ComponentProps } from "react"
-import { cn } from "@/lib/utils"
+import { cva, type VariantProps } from "class-variance-authority";
+import type { ComponentProps } from "react";
+import { cn } from "@/lib/utils";
 
 const arcadeButtonVariants = cva(
   "relative inline-flex shrink-0 select-none items-center justify-center gap-2 whitespace-nowrap font-display uppercase tracking-wide transition-[transform,box-shadow,filter,background-color] duration-150 outline-none focus-visible:ring-4 focus-visible:ring-primary/50 active:translate-y-[3px] disabled:pointer-events-none disabled:opacity-50 disabled:grayscale [&_svg]:size-5 [&_svg]:shrink-0",
@@ -23,12 +23,25 @@ const arcadeButtonVariants = cva(
       size: "md",
     },
   },
-)
+);
 
-type ArcadeButtonProps = ComponentProps<"button"> & VariantProps<typeof arcadeButtonVariants>
+type ArcadeButtonProps = ComponentProps<"button"> &
+  VariantProps<typeof arcadeButtonVariants>;
 
-function ArcadeButton({ className, variant = "primary", size = "md", type = "button", ...props }: ArcadeButtonProps) {
-  return <button type={type} className={cn(arcadeButtonVariants({ variant, size, className }))} {...props} />
+function ArcadeButton({
+  className,
+  variant = "primary",
+  size = "md",
+  type = "button",
+  ...props
+}: ArcadeButtonProps) {
+  return (
+    <button
+      type={type}
+      className={cn(arcadeButtonVariants({ variant, size, className }))}
+      {...props}
+    />
+  );
 }
 
-export { ArcadeButton, arcadeButtonVariants }
+export { ArcadeButton, arcadeButtonVariants };

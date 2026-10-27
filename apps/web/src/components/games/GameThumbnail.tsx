@@ -1,22 +1,25 @@
-import { useState } from "react"
-import { getGameThumbnailSrc } from "@/lib/game-art"
-import { cn } from "@/lib/utils"
+import { useState } from "react";
+import { getGameThumbnailSrc } from "@/lib/game-art";
+import { cn } from "@/lib/utils";
 
 interface GameThumbnailProps {
-  slug: string
-  name: string
-  className?: string
+  slug: string;
+  name: string;
+  className?: string;
 }
 
-type ImageState = { src: string; status: "loaded" | "error" } | null
+type ImageState = { src: string; status: "loaded" | "error" } | null;
 
 export function GameThumbnail({ slug, name, className }: GameThumbnailProps) {
-  const src = getGameThumbnailSrc(slug)
-  const [state, setState] = useState<ImageState>(null)
-  const status = state && state.src === src ? state.status : "loading"
+  const src = getGameThumbnailSrc(slug);
+  const [state, setState] = useState<ImageState>(null);
+  const status = state && state.src === src ? state.status : "loading";
 
   return (
-    <div data-game={name} className={cn("thumb-frame relative overflow-hidden", className)}>
+    <div
+      data-game={name}
+      className={cn("thumb-frame relative overflow-hidden", className)}
+    >
       {status !== "loaded" && (
         <div className="absolute inset-0 grid place-items-center text-white/30">
           <svg
@@ -29,7 +32,14 @@ export function GameThumbnail({ slug, name, className }: GameThumbnailProps) {
             strokeLinejoin="round"
             aria-hidden="true"
           >
-            <rect x="6" y="10" width="52" height="44" rx="9" strokeDasharray="5 5" />
+            <rect
+              x="6"
+              y="10"
+              width="52"
+              height="44"
+              rx="9"
+              strokeDasharray="5 5"
+            />
             <circle cx="32" cy="32" r="11" />
             <path d="M24.2 39.8 39.8 24.2" />
           </svg>
@@ -51,5 +61,5 @@ export function GameThumbnail({ slug, name, className }: GameThumbnailProps) {
         />
       )}
     </div>
-  )
+  );
 }
