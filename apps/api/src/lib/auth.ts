@@ -1,230 +1,111 @@
 import {
-  discardGuestAccount,
   ensureProfile,
   mergeGuestProfileIntoUser,
   schema,
+  type Database,
 } from "@kridora/db";
-import { normalizeDisplayName } from "@kridora/shared";
+import { displayNameSchema, normalizeDisplayName } from "@kridora/shared";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { APIError } from "better-auth/api";
 import { anonymous } from "better-auth/plugins";
-import { env, isProduction } from "../env";
-import { db } from "./db";
-import { mailer } from "./mailer";
-import { redis } from "./redis-client";
+import type { Env } from "../types";
 
-const AUTH_PREFIX = "kridora:auth:";
-const INCREMENT_WITH_TTL = `
-local value = redis.call('INCR', KEYS[1])
-if value == 1 then redis.call('EXPIRE', KEYS[1], ARGV[1]) end
-return value`;
-/** Header our own bridge sets (after stripping any client-supplied copy) so rate limits see the real IP. */
-export const CLIENT_IP_HEADER = "x-kridora-client-ip";
+export function getAllowedOrigins(env: Env): string[] {
+  const raw = [env.WEB_URL, env.CORS_ORIGIN, env.BETTER_AUTH_URL]
+    .filter((v): v is string => Boolean(v))
+    .flatMap((item) => item.split(","))
+    .map((s) => s.trim().replace(/\/+$/, ""))
+    .filter(Boolean);
 
-const newlyCreatedUserIds = new Set<string>();
-
-export async function isNewlyCreatedUser(
-  userId: string,
-  createdAt?: Date | string | null,
-): Promise<boolean> {
-  if (newlyCreatedUserIds.has(userId)) {
-    newlyCreatedUserIds.delete(userId);
-    return true;
+  if (env.NODE_ENV !== "production") {
+    raw.push("http://localhost:5173", "http://localhost:2020");
   }
-  try {
-    const fromRedis = await redis.getdel(`kridora:new_user:${userId}`);
-    if (fromRedis) return true;
-  } catch {
-    // Redis optional
-  }
-  if (createdAt) {
-    const createdMs = new Date(createdAt).getTime();
-    if (Date.now() - createdMs < 20_000) {
-      return true;
-    }
-  }
-  return false;
+  return Array.from(new Set(raw));
 }
 
-export const auth = betterAuth({
-  appName: "Kridora",
-  baseURL: isProduction ? "https://api.kridora.org" : env.APP_URL,
-  basePath: "/api/auth",
-  secret: env.BETTER_AUTH_SECRET,
-  trustedOrigins: [
-    env.APP_URL,
-    ...(env.APP_URL.startsWith("https://") && !env.APP_URL.includes("www.")
-      ? [env.APP_URL.replace("https://", "https://www.")]
-      : []),
-  ],
+export function createAuth(db: Database, env: Env) {
+  const isProd = env.NODE_ENV === "production";
+  const trustedOrigins = getAllowedOrigins(env);
+  const googleClientId = env.GOOGLE_CLIENT_ID;
+  const googleClientSecret = env.GOOGLE_CLIENT_SECRET;
 
-  database: drizzleAdapter(db, { provider: "pg", schema }),
-
-  // Redis backs rate limiting (shared across API instances). Sessions are still persisted in Postgres.
-  secondaryStorage: {
-    get: async (key) => redis.get(`${AUTH_PREFIX}${key}`),
-    getAndDelete: async (key) => redis.getdel(`${AUTH_PREFIX}${key}`),
-    // Atomic counter whose TTL is only set on creation (fixed rate-limit window).
-    increment: async (key, ttl) =>
-      Number(
-        await redis.eval(INCREMENT_WITH_TTL, 1, `${AUTH_PREFIX}${key}`, ttl),
-      ),
-    set: async (key, value, ttl) => {
-      if (ttl) await redis.set(`${AUTH_PREFIX}${key}`, value, "EX", ttl);
-      else await redis.set(`${AUTH_PREFIX}${key}`, value);
+  return betterAuth({
+    database: drizzleAdapter(db, {
+      provider: "pg",
+      schema: {
+        user: schema.user,
+        session: schema.session,
+        account: schema.account,
+        verification: schema.verification,
+      },
+    }),
+    secret: env.BETTER_AUTH_SECRET,
+    baseURL: env.BETTER_AUTH_URL,
+    trustedOrigins,
+    emailAndPassword: {
+      enabled: true,
+      minPasswordLength: 8,
+      maxPasswordLength: 128,
+      requireEmailVerification: false,
+      async sendResetPassword({ user, url }) {
+        if (!isProd) {
+          console.info(`[auth] Password reset link for ${user.email}: ${url}`);
+        }
+      },
     },
-    delete: async (key) => {
-      await redis.del(`${AUTH_PREFIX}${key}`);
-    },
-  },
-
-  emailAndPassword: {
-    enabled: true,
-    minPasswordLength: 8,
-    maxPasswordLength: 128,
-    requireEmailVerification: true,
-    autoSignIn: false,
-    resetPasswordTokenExpiresIn: 60 * 60,
-    revokeSessionsOnPasswordReset: true,
-    // Not awaited on purpose: response timing must not reveal whether an email exists.
-    sendResetPassword: async ({ user, url, token }) => {
-      void mailer.sendPasswordResetEmail({
-        to: user.email,
-        name: user.name,
-        url,
-        token,
-      });
-    },
-  },
-
-  emailVerification: {
-    sendOnSignUp: true,
-    // If someone tries to log in before verifying, send a fresh link automatically.
-    sendOnSignIn: true,
-    autoSignInAfterVerification: true,
-    expiresIn: 60 * 60,
-    sendVerificationEmail: async ({ user, url, token }) => {
-      void mailer.sendVerificationEmail({
-        to: user.email,
-        name: user.name,
-        url,
-        token,
-      });
-    },
-  },
-
-  socialProviders:
-    env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET
+    ...(googleClientId && googleClientSecret
       ? {
-          google: {
-            clientId: env.GOOGLE_CLIENT_ID,
-            clientSecret: env.GOOGLE_CLIENT_SECRET,
+          socialProviders: {
+            google: {
+              clientId: googleClientId,
+              clientSecret: googleClientSecret,
+            },
           },
         }
-      : {},
-
-  account: {
-    accountLinking: { enabled: true, trustedProviders: ["google"] },
-  },
-
-  session: {
-    expiresIn: 60 * 60 * 24 * 7,
-    updateAge: 60 * 60 * 24,
-    storeSessionInDatabase: true,
-    cookieCache: { enabled: true, maxAge: 5 * 60 },
-  },
-
-  rateLimit: {
-    enabled: true,
-    storage: "secondary-storage",
-    window: 60,
-    max: 100,
-    customRules: {
-      "/sign-in/email": { window: 60, max: 5 },
-      "/sign-up/email": { window: 60, max: 5 },
-      "/request-password-reset": { window: 60, max: 3 },
-      "/reset-password": { window: 60, max: 5 },
-      "/send-verification-email": { window: 60, max: 3 },
-      "/sign-in/anonymous": { window: 60, max: 10 },
-    },
-  },
-
-  advanced: {
-    cookiePrefix: "kridora",
-    useSecureCookies: isProduction,
-    ipAddress: { ipAddressHeaders: [CLIENT_IP_HEADER] },
-    crossSubDomainCookies: isProduction
-      ? { enabled: true, domain: ".kridora.org" }
-      : { enabled: false },
-    defaultCookieAttributes: isProduction
-      ? { sameSite: "none", secure: true }
-      : undefined,
-  },
-
-  plugins: [
-    // Name-only guest accounts. If a guest later signs in or creates an account:
-    // - If brand new account (e.g. Google signup): merge stats & User ID into the new account.
-    // - If existing account (e.g. logging into previous account): do NOT merge! Just log into existing.
-    anonymous({
-      emailDomainName: "guest.kridora.invalid",
-      onLinkAccount: async ({ anonymousUser, newUser }) => {
-        const isNew = await isNewlyCreatedUser(
-          newUser.user.id,
-          newUser.user.createdAt,
-        );
-        if (isNew) {
+      : {}),
+    plugins: [
+      anonymous({
+        emailDomainName: "guest.kridora.local",
+        onLinkAccount: async ({ anonymousUser, newUser }) => {
           await mergeGuestProfileIntoUser(
             db,
             anonymousUser.user.id,
             newUser.user.id,
           );
-        } else {
-          await discardGuestAccount(db, anonymousUser.user.id);
-        }
-      },
-    }),
-  ],
-
-  databaseHooks: {
-    user: {
-      create: {
-        before: async (user) => {
-          // Names can come from Google profiles, so clean them instead of rejecting the sign-in.
-          const cleaned = normalizeDisplayName(user.name ?? "");
-          return {
-            data: { ...user, name: cleaned.length >= 2 ? cleaned : "Player" },
-          };
         },
-        after: async (user) => {
-          // Every account gets a game profile (Rings wallet, XP).
-          await ensureProfile(db, user.id);
-          if (!user.isAnonymous) {
-            newlyCreatedUserIds.add(user.id);
-            setTimeout(() => newlyCreatedUserIds.delete(user.id), 60_000);
+      }),
+    ],
+    databaseHooks: {
+      user: {
+        create: {
+          before: async (user) => {
+            const cleanName =
+              normalizeDisplayName(user.name || "Player") || "Player";
+            const parsed = displayNameSchema.safeParse(cleanName);
+            return {
+              data: {
+                ...user,
+                name: parsed.success ? parsed.data : "Player",
+              },
+            };
+          },
+          after: async (user) => {
             try {
-              await redis.set(`kridora:new_user:${user.id}`, "1", "EX", 120);
-            } catch {
-              // Redis optional
+              await ensureProfile(db, user.id);
+            } catch (err) {
+              console.error("[auth] Failed to ensure profile on signup:", err);
             }
-          }
-        },
-      },
-      update: {
-        before: async (data) => {
-          if (typeof data.name !== "string") return { data };
-          const cleaned = normalizeDisplayName(data.name);
-          if (cleaned.length < 2) {
-            throw new APIError("BAD_REQUEST", {
-              message: "Pick a name with at least 2 letters or numbers",
-            });
-          }
-          return { data: { ...data, name: cleaned } };
+          },
         },
       },
     },
-  },
-});
-
-export type Auth = typeof auth;
-export type AuthSession = Awaited<ReturnType<typeof auth.api.getSession>> & {};
+    advanced: {
+      defaultCookieAttributes: {
+        sameSite: isProd ? "none" : "lax",
+        secure: isProd,
+        httpOnly: true,
+        path: "/",
+      },
+    },
+  });
+}

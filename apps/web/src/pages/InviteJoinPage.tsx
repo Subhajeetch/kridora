@@ -273,7 +273,6 @@ export default function InviteJoinPage() {
           borderTop: `4px solid ${activeGameDef?.accent || "var(--color-primary)"}`,
         }}
       >
-
         {/* Host Banner */}
         <div className="mt-4 flex items-center gap-4">
           <div className="relative shrink-0">

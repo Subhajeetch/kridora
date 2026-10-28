@@ -1,52 +1,62 @@
-// Must stay the first import: it validates the environment and exits early with a clear message.
-import { env } from "./env";
-import { buildApp } from "./app";
-import { deleteStaleGuests } from "./jobs/cleanup";
-import { pool } from "./lib/db";
-import { redis } from "./lib/redis-client";
-import { createRealtime } from "./realtime/server";
+import { Hono } from "hono";
+import { cors } from "hono/cors";
+import { secureHeaders } from "hono/secure-headers";
+import { getAllowedOrigins } from "./lib/auth";
+import { handleHttpError } from "./lib/errors";
+import {
+  contextMiddleware,
+  originGuardMiddleware,
+} from "./middleware/security";
+import { RealtimeHub } from "./realtime/RealtimeHub";
+import { routes } from "./routes";
+import type { AppContext } from "./types";
 
-const GUEST_CLEANUP_INTERVAL_MS = 60 * 60 * 1000;
+const app = new Hono<AppContext>();
 
-async function main() {
-  const app = buildApp();
-  await app.ready();
+app.use(
+  "*",
+  secureHeaders({
+    xFrameOptions: "DENY",
+    xContentTypeOptions: "nosniff",
+    referrerPolicy: "strict-origin-when-cross-origin",
+  }),
+);
 
-  const realtime = createRealtime(app);
-
-  const cleanupTimer = setInterval(() => {
-    deleteStaleGuests()
-      .then((count) => {
-        if (count > 0) app.log.info({ count }, "removed stale guest accounts");
-      })
-      .catch((err) => app.log.error({ err }, "guest cleanup failed"));
-  }, GUEST_CLEANUP_INTERVAL_MS);
-  cleanupTimer.unref();
-
-  let shuttingDown = false;
-  const shutdown = async (signal: string) => {
-    if (shuttingDown) return;
-    shuttingDown = true;
-    app.log.info({ signal }, "shutting down");
-    clearInterval(cleanupTimer);
-    try {
-      await realtime.close();
-      await app.close();
-      await redis.quit();
-      await pool.end();
-    } catch (err) {
-      app.log.error({ err }, "error during shutdown");
-      process.exitCode = 1;
-    }
-    process.exit();
-  };
-  process.on("SIGINT", () => void shutdown("SIGINT"));
-  process.on("SIGTERM", () => void shutdown("SIGTERM"));
-
-  await app.listen({ port: env.PORT, host: env.HOST });
-}
-
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
+app.use("*", async (c, next) => {
+  const allowedOrigins = getAllowedOrigins(c.env);
+  const corsMiddleware = cors({
+    origin: (origin) => {
+      if (!origin) return allowedOrigins[0] ?? "";
+      const clean = origin.replace(/\/+$/, "");
+      return allowedOrigins.includes(clean) ? origin : null;
+    },
+    allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+    exposeHeaders: ["X-Request-Id"],
+    credentials: true,
+    maxAge: 86400,
+  });
+  return corsMiddleware(c, next);
 });
+
+app.use("*", contextMiddleware);
+app.use("*", originGuardMiddleware);
+
+app.route("/", routes);
+
+app.notFound((c) => {
+  return c.json(
+    {
+      error: {
+        code: "NOT_FOUND",
+        message: `Route ${c.req.method} ${c.req.path} not found.`,
+      },
+    },
+    404,
+  );
+});
+
+app.onError((err, c) => handleHttpError(err, c));
+
+export { RealtimeHub };
+export default app;

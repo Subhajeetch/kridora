@@ -5,24 +5,51 @@ interface PublicConfig {
   googleEnabled: boolean;
 }
 
-/** Server-side feature flags that decide which buttons we show (e.g. Google sign-in). */
+let cachedConfig: PublicConfig | null = null;
+let pendingFetch: Promise<PublicConfig | null> | null = null;
+
+async function fetchPublicConfig(): Promise<PublicConfig | null> {
+  if (cachedConfig) return cachedConfig;
+  if (pendingFetch) return pendingFetch;
+
+  pendingFetch = (async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/config`);
+      if (!res.ok) return null;
+      const contentType = res.headers.get("content-type") || "";
+      if (!contentType.includes("application/json")) return null;
+      const data = (await res.json()) as PublicConfig;
+      cachedConfig = data;
+      return data;
+    } catch {
+      return null;
+    } finally {
+      pendingFetch = null;
+    }
+  })();
+
+  return pendingFetch;
+}
+
+/** Server-side feature flags that decide which buttons we show (e.g. Google sign-in). Cached globally. */
 export function usePublicConfig(): PublicConfig {
-  const [config, setConfig] = useState<PublicConfig>({ googleEnabled: false });
+  const [config, setConfig] = useState<PublicConfig>(
+    () => cachedConfig ?? { googleEnabled: false },
+  );
 
   useEffect(() => {
-    const controller = new AbortController();
-    fetch(`${API_URL}/api/config`, { signal: controller.signal })
-      .then(async (res) => {
-        if (!res.ok) return null;
-        const contentType = res.headers.get("content-type") || "";
-        if (!contentType.includes("application/json")) return null;
-        return (await res.json()) as PublicConfig;
-      })
-      .then((data) => {
-        if (data) setConfig(data);
-      })
-      .catch(() => undefined);
-    return () => controller.abort();
+    if (cachedConfig) return;
+
+    let active = true;
+    void fetchPublicConfig().then((data) => {
+      if (active && data) {
+        setConfig(data);
+      }
+    });
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   return config;

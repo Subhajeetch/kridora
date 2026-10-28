@@ -576,7 +576,7 @@ function LudoBoard({
       ),
     );
     movementTimers.current.set(moved.id, timers);
-  }, [audio, state.players, state.updatedAt]);
+  }, [audio, state.players, state.updatedAt, state.winnerId]);
 
   useEffect(
     () => () => {

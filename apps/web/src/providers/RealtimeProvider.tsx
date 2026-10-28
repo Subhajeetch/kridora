@@ -4,98 +4,100 @@ import {
   useEffect,
   useMemo,
   useState,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
 import { authClient } from "@/lib/auth-client";
-import { socket } from "@/lib/socket";
+import { getSocketStatus, socket, subscribeSocketStatus } from "@/lib/socket";
 import {
   RealtimeContext,
   type ConnectionState,
-  type RealtimeValue,
-} from "./realtime-context";
+} from "@/providers/realtime-context";
 
-interface RoomState {
-  room: RoomSnapshot;
-  offset: number;
-}
-
-/**
- * Owns the socket connection and the single source of truth for "which room am I in".
- * The server pushes `room:state` after every change, so components just read `activeRoom`.
- */
 export function RealtimeProvider({ children }: { children: ReactNode }) {
   const { data: rawSession } = authClient.useSession();
-  const session =
+  const userId =
     rawSession &&
     typeof rawSession === "object" &&
     "user" in rawSession &&
     rawSession.user
-      ? rawSession
+      ? rawSession.user.id
       : null;
-  const userId = session?.user.id ?? null;
 
-  const [socketState, setSocketState] =
-    useState<Exclude<ConnectionState, "idle">>("connecting");
-  const [roomState, setRoomState] = useState<RoomState | null>(null);
+  const rawSocketStatus = useSyncExternalStore(
+    subscribeSocketStatus,
+    getSocketStatus,
+    () => "idle" as const,
+  );
+
+  const connection: ConnectionState = userId ? rawSocketStatus : "idle";
+
+  const [roomState, setRoomState] = useState<RoomSnapshot | null>(null);
+  const [clockOffset, setClockOffset] = useState<number>(0);
   const [notice, setNotice] = useState<string | null>(null);
 
+  // When user is not authenticated, activeRoom is cleanly null during render without needing synchronous setState in effects
+  const activeRoom = userId ? roomState : null;
+
   const setActiveRoom = useCallback((room: RoomSnapshot | null) => {
-    setRoomState(room ? { room, offset: room.serverTime - Date.now() } : null);
+    setRoomState(room);
+    if (room) {
+      setClockOffset(room.serverTime - Date.now());
+    }
+  }, []);
+
+  const dismissNotice = useCallback(() => {
+    setNotice(null);
   }, []);
 
   useEffect(() => {
-    if (!userId) return;
+    if (!userId) {
+      socket.disconnect();
+      return;
+    }
 
-    const onConnect = () => setSocketState("connected");
-    const onDisconnect = () => setSocketState("disconnected");
-    const onState = (room: RoomSnapshot) => setActiveRoom(room);
-    const onClosed = () => {
-      setActiveRoom(null);
-      setNotice("The room was closed because everyone left.");
-    };
-    const onKicked = () => {
-      setActiveRoom(null);
-      setNotice("The room owner removed you from the room.");
-    };
+    function onRoomState(room: RoomSnapshot) {
+      setActiveRoom(room);
+    }
 
-    socket.on("connect", onConnect);
-    socket.on("disconnect", onDisconnect);
-    socket.on("connect_error", onDisconnect);
-    socket.on("room:state", onState);
-    socket.on("room:closed", onClosed);
-    socket.on("room:kicked", onKicked);
+    function onRoomClosed(payload: { code: string }) {
+      setActiveRoom(null);
+      setNotice(`Room ${payload.code} was closed because everyone left.`);
+    }
+
+    function onRoomKicked(payload: { code: string }) {
+      setActiveRoom(null);
+      setNotice(`You were removed from room ${payload.code} by the host.`);
+    }
+
+    socket.on("room:state", onRoomState);
+    socket.on("room:closed", onRoomClosed);
+    socket.on("room:kicked", onRoomKicked);
     socket.connect();
 
     return () => {
-      socket.off("connect", onConnect);
-      socket.off("disconnect", onDisconnect);
-      socket.off("connect_error", onDisconnect);
-      socket.off("room:state", onState);
-      socket.off("room:closed", onClosed);
-      socket.off("room:kicked", onKicked);
+      socket.off("room:state", onRoomState);
+      socket.off("room:closed", onRoomClosed);
+      socket.off("room:kicked", onRoomKicked);
       socket.disconnect();
-      setSocketState("connecting");
-      setRoomState(null);
     };
   }, [userId, setActiveRoom]);
 
-  const connection: ConnectionState = userId ? socketState : "idle";
-
-  const value = useMemo<RealtimeValue>(
+  const contextValue = useMemo(
     () => ({
       socket,
       connection,
-      activeRoom: userId ? (roomState?.room ?? null) : null,
-      clockOffset: roomState?.offset ?? 0,
+      activeRoom,
       setActiveRoom,
+      clockOffset,
       notice,
-      dismissNotice: () => setNotice(null),
+      dismissNotice,
     }),
-    [connection, userId, roomState, notice, setActiveRoom],
+    [connection, activeRoom, setActiveRoom, clockOffset, notice, dismissNotice],
   );
 
   return (
-    <RealtimeContext.Provider value={value}>
+    <RealtimeContext.Provider value={contextValue}>
       {children}
     </RealtimeContext.Provider>
   );

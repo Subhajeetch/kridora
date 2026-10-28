@@ -151,7 +151,10 @@ function GameEntrance({ slug }: { slug: GameSlug }) {
   function handleJoinOpenChange(open: boolean) {
     if (!open) {
       setUserOpenedJoin(false);
-      if (searchParams.has("room") || searchParams.has("join")) {
+      if (
+        (searchParams.has("room") || searchParams.has("join")) &&
+        window.location.pathname.endsWith(`/${slug}`)
+      ) {
         const next = new URLSearchParams(searchParams);
         next.delete("room");
         next.delete("join");

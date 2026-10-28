@@ -1,7 +1,4 @@
-import {
-  DISPLAY_NAME_MAX_LENGTH,
-  displayNameSchema,
-} from "@kridora/shared";
+import { DISPLAY_NAME_MAX_LENGTH, displayNameSchema } from "@kridora/shared";
 import {
   Check,
   Coins,

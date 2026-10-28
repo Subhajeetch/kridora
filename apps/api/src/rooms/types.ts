@@ -1,49 +1,24 @@
 import type {
   GameSlug,
-  LudoGameState,
   RoomPlayer,
-  RoomSnapshot,
   RoomStatus,
   RoomVisibility,
-  SocketUser,
 } from "@kridora/shared";
 
-/** What we persist in Redis for a room. Same as the public snapshot plus server-only fields. */
-export interface StoredRoom {
+export interface InternalRoom {
   code: string;
+  inviteToken: string;
   gameSlug: GameSlug;
   ownerId: string;
   visibility: RoomVisibility;
   status: RoomStatus;
-  /** Always in join order; the creator is first. Ownership succession follows this order. */
   players: RoomPlayer[];
-  /** Users removed by the owner. They cannot rejoin this room. */
   bannedUserIds: string[];
   createdAt: number;
   ownerTransferAt: number | null;
+  emptyCloseAt: number | null;
+  disconnectDeadlines: Record<string, number>;
   matchId: string | null;
-  ludoState?: LudoGameState;
-}
-
-export type SessionUser = SocketUser;
-
-/** How the room service talks to connected sockets without knowing about Socket.IO. */
-export interface RoomNotifier {
-  /** Subscribe every socket of this user to the room's broadcast channel. */
-  attach(userId: string, code: string): void;
-  detach(userId: string, code: string): void;
-  /** Push the full room state to everyone in the room. */
-  state(room: RoomSnapshot): void;
-  kicked(userId: string, code: string): void;
-  closed(code: string): void;
-  ludoState(code: string, state: LudoGameState): void;
-  invitationReceived(
-    targetUserId: string,
-    payload: {
-      senderName: string;
-      gameSlug: GameSlug;
-      gameName: string;
-      inviteToken: string;
-    },
-  ): void;
+  matchCompleted: boolean;
+  gameState: unknown;
 }
