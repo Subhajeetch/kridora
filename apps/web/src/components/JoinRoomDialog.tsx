@@ -83,8 +83,8 @@ export function JoinRoomDialog({
     const room = await request("room:join", { code: roomCode });
     setActiveRoom(room);
     onJoined?.(room);
-    onOpenChange(false);
     void navigate(`/${room.gameSlug}/room`);
+    onOpenChange(false);
   }
 
   async function onSubmit(event: FormEvent) {

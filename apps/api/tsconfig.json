@@ -1,7 +1,13 @@
 {
-  "extends": "@kridora/typescript-config/node.json",
+  "extends": "@kridora/typescript-config/base.json",
   "compilerOptions": {
-    "types": ["node"]
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "types": ["@cloudflare/workers-types"],
+    "noEmit": true,
+    "strict": true
   },
   "include": ["src"]
 }

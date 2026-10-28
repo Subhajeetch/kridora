@@ -60,7 +60,8 @@ export default function RoomPage() {
 function RoomEntrance({ gameSlug }: { gameSlug: GameSlug }) {
   const navigate = useNavigate();
   const { connection, activeRoom } = useRealtime();
-  const { data: session } = authClient.useSession();
+  const { data: session, isPending: isSessionPending } =
+    authClient.useSession();
   const hasEnteredRoom = useRef(false);
 
   const isInThisRoom = Boolean(
@@ -87,12 +88,20 @@ function RoomEntrance({ gameSlug }: { gameSlug: GameSlug }) {
     }
   }, [activeRoom, gameSlug, navigate]);
 
-  // If visitor has no session, or connection is connected and they are not in an active room, redirect to game lobby
+  // Redirect to game lobby only after session has resolved and user has no session,
+  // or after socket has connected and room state is confirmed empty.
   useEffect(() => {
-    if (!session || (connection === "connected" && !activeRoom)) {
+    if (isSessionPending) return;
+
+    if (!session) {
+      void navigate(`/${gameSlug}`, { replace: true });
+      return;
+    }
+
+    if (connection === "connected" && !activeRoom && !hasEnteredRoom.current) {
       void navigate(`/${gameSlug}`, { replace: true });
     }
-  }, [session, connection, activeRoom, gameSlug, navigate]);
+  }, [isSessionPending, session, connection, activeRoom, gameSlug, navigate]);
 
   if (activeRoom && activeRoom.gameSlug === gameSlug && session) {
     return <RoomView room={activeRoom} userId={session.user.id} />;

@@ -1,41 +1,26 @@
 {
   "name": "@kridora/api",
-  "version": "1.0.0",
-  "description": "This is the API for the Kridora project. It serves as the backend for the application, handling requests and responses.",
-  "main": "index.js",
-  "scripts": {
-    "dev": "tsx watch --env-file=../../.env src/index.ts",
-    "build": "tsc -p tsconfig.json",
-    "start": "tsx src/index.ts",
-    "typecheck": "tsc --noEmit",
-    "check-types": "tsc",
-    "test:e2e": "tsx scripts/e2e-rooms.mts",
-    "test:name": "tsx scripts/test-update-name.mts"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "version": "0.0.0",
+  "private": true,
   "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --port 2020",
+    "build": "wrangler deploy --dry-run --outdir dist",
+    "deploy": "pnpm --filter @kridora/db db:migrate && wrangler deploy",
+    "cf-typegen": "wrangler types",
+    "check-types": "tsc --noEmit"
+  },
   "dependencies": {
-    "@fastify/autoload": "^6.5.1",
-    "@fastify/cors": "^11.3.1",
-    "@fastify/helmet": "^13.2.0",
-    "@fastify/rate-limit": "^11.2.1",
     "@kridora/db": "workspace:*",
     "@kridora/shared": "workspace:*",
-    "@socket.io/redis-adapter": "^8.3.0",
-    "better-auth": "^1.7.10",
-    "fastify": "^5.12.7",
-    "fastify-plugin": "^6.0.1",
-    "ioredis": "^6.0.0",
-    "socket.io": "^4.8.4",
+    "better-auth": "^1.2.7",
+    "hono": "^4.10.0",
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260401.0",
     "@kridora/typescript-config": "workspace:*",
-    "@types/node": "^24.19.2",
-    "socket.io-client": "^4.8.4",
-    "tsx": "^4.23.15",
-    "typescript": "^7.0.2"
+    "typescript": "7.0.2",
+    "wrangler": "^4.122.0"
   }
 }

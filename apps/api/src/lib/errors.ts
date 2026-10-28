@@ -1,24 +1,11 @@
-import type { ErrorCode, ErrorPayload } from "@kridora/shared";
+import { RingsError } from "@kridora/db";
+import type { Ack, ErrorCode, ErrorPayload } from "@kridora/shared";
+import type { Context } from "hono";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { ZodError } from "zod";
+import type { AppContext } from "../types";
 
-/** An error that is safe to show to the client. Anything else is reported as INTERNAL_ERROR. */
-export class AppError extends Error {
-  readonly code: ErrorCode;
-  readonly details?: Record<string, unknown>;
-
-  constructor(
-    code: ErrorCode,
-    message: string,
-    details?: Record<string, unknown>,
-  ) {
-    super(message);
-    this.name = "AppError";
-    this.code = code;
-    this.details = details;
-  }
-}
-
-const HTTP_STATUS: Record<ErrorCode, number> = {
+export const ERROR_CODE_TO_STATUS: Record<ErrorCode, ContentfulStatusCode> = {
   UNAUTHENTICATED: 401,
   FORBIDDEN: 403,
   VALIDATION_ERROR: 400,
@@ -28,43 +15,102 @@ const HTTP_STATUS: Record<ErrorCode, number> = {
   ROOM_NOT_FOUND: 404,
   ROOM_FULL: 409,
   ROOM_IN_PROGRESS: 409,
-  ROOM_BUSY: 503,
+  ROOM_BUSY: 409,
   ALREADY_IN_ROOM: 409,
-  NOT_IN_ROOM: 409,
+  NOT_IN_ROOM: 400,
   NOT_ROOM_OWNER: 403,
   INVALID_TARGET: 400,
   BANNED_FROM_ROOM: 403,
   NO_PUBLIC_ROOM: 404,
-  START_REQUIREMENTS_NOT_MET: 409,
+  START_REQUIREMENTS_NOT_MET: 422,
   INTERNAL_ERROR: 500,
 };
 
-export function httpStatusFor(code: ErrorCode): number {
-  return HTTP_STATUS[code];
+export class ApiError extends Error {
+  readonly code: ErrorCode;
+  readonly status: ContentfulStatusCode;
+  readonly details: Record<string, unknown> | undefined;
+
+  constructor(
+    code: ErrorCode,
+    message: string,
+    details?: Record<string, unknown>,
+    statusOverride?: ContentfulStatusCode,
+  ) {
+    super(message);
+    this.name = "ApiError";
+    this.code = code;
+    this.status = statusOverride ?? ERROR_CODE_TO_STATUS[code] ?? 500;
+    this.details = details;
+  }
+
+  toPayload(): ErrorPayload {
+    return {
+      code: this.code,
+      message: this.message,
+      ...(this.details ? { details: this.details } : {}),
+    };
+  }
 }
 
-/** Converts anything thrown into a client-safe payload. Returns `unexpected` so callers can log it. */
-export function toErrorPayload(err: unknown): {
-  payload: ErrorPayload;
-  unexpected: boolean;
-} {
-  if (err instanceof AppError) {
-    return {
-      payload: { code: err.code, message: err.message, details: err.details },
-      unexpected: false,
-    };
+export function okAck<T>(data: T): Ack<T> {
+  return { ok: true, data };
+}
+
+export function errAck(
+  code: ErrorCode,
+  message: string,
+  details?: Record<string, unknown>,
+): Ack<never> {
+  return {
+    ok: false,
+    error: {
+      code,
+      message,
+      ...(details ? { details } : {}),
+    },
+  };
+}
+
+export function toErrorPayload(err: unknown): ErrorPayload {
+  if (err instanceof ApiError) {
+    return err.toPayload();
   }
   if (err instanceof ZodError) {
+    const firstIssue = err.issues[0];
     return {
-      payload: { code: "VALIDATION_ERROR", message: "Invalid request" },
-      unexpected: false,
+      code: "VALIDATION_ERROR",
+      message: firstIssue?.message ?? "Invalid request payload",
+      details: {
+        issues: err.issues.map((i) => ({
+          path: i.path.join("."),
+          message: i.message,
+        })),
+      },
     };
   }
+  if (err instanceof RingsError) {
+    const code: ErrorCode =
+      err.code === "PROFILE_NOT_FOUND" ? "NOT_FOUND" : "VALIDATION_ERROR";
+    return {
+      code,
+      message: err.message,
+      details: { ringsCode: err.code },
+    };
+  }
+  console.error("[unhandled-error]", err);
   return {
-    payload: {
-      code: "INTERNAL_ERROR",
-      message: "Something went wrong. Please try again.",
-    },
-    unexpected: true,
+    code: "INTERNAL_ERROR",
+    message: "An unexpected server error occurred. Please try again.",
   };
+}
+
+export function handleHttpError(err: unknown, c: Context<AppContext>) {
+  const payload = toErrorPayload(err);
+  const status =
+    err instanceof ApiError
+      ? err.status
+      : (ERROR_CODE_TO_STATUS[payload.code] ?? 500);
+
+  return c.json({ error: payload }, status);
 }

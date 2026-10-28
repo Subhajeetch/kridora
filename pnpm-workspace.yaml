@@ -6,7 +6,4 @@ packages:
 # postinstall to fetch the right native binary.
 allowBuilds:
   esbuild: true
-
-# Same thing for pnpm 10 (older key name); harmless on newer versions.
-onlyBuiltDependencies:
-  - esbuild
+  workerd: true

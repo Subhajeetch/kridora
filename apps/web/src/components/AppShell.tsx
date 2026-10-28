@@ -1,5 +1,5 @@
 import { Gamepad2, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { Link, useNavigate } from "react-router";
 import { AuthDialog } from "@/components/AuthDialog";
 import { Background } from "@/components/Background";
@@ -17,10 +17,43 @@ import { socket } from "@/lib/socket";
 import { useGameLayout } from "@/providers/game-layout-context";
 import { useRealtime } from "@/providers/realtime-context";
 
+const authStore = {
+  initialized: false,
+  listeners: new Set<() => void>(),
+  setInitialized() {
+    if (authStore.initialized) return;
+    authStore.initialized = true;
+    for (const listener of authStore.listeners) {
+      listener();
+    }
+  },
+  subscribe(listener: () => void) {
+    authStore.listeners.add(listener);
+    return () => {
+      authStore.listeners.delete(listener);
+    };
+  },
+  getSnapshot() {
+    return authStore.initialized;
+  },
+};
+
 /** Layout shared by every page: background, top bar (HUD, Rings, music, settings), toast area. */
 export function AppShell() {
   const navigate = useNavigate();
   const { data: rawSession, isPending } = authClient.useSession();
+  const isAuthInitialized = useSyncExternalStore(
+    authStore.subscribe,
+    authStore.getSnapshot,
+    () => false,
+  );
+
+  useEffect(() => {
+    if (!isPending) {
+      authStore.setInitialized();
+    }
+  }, [isPending]);
+
   const session =
     rawSession &&
     typeof rawSession === "object" &&
@@ -61,7 +94,7 @@ export function AppShell() {
     };
   }, []);
 
-  if (isPending) return <SplashScreen />;
+  if (isPending && !isAuthInitialized) return <SplashScreen />;
 
   return (
     <div className="min-h-dvh">

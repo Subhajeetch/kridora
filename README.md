@@ -1,91 +1,218 @@
 # Kridora
 
-Multiplayer game platform. pnpm + Turborepo monorepo.
+Modern real-time multiplayer gaming platform built for ultra-low latency, seamless room matchmaking, and edge-native scalability. Powered by **Cloudflare Workers**, **Hono**, **Cloudflare Durable Objects**, **React**, and **PostgreSQL (Drizzle ORM)**.
+
+---
+
+## Architecture Overview
+
+```mermaid
+graph TD
+    Client["React 19 Web App (Vite + Tailwind CSS v4)"]
+    API["API Gateway (Hono on Cloudflare Workers)"]
+    DO["RealtimeHub (Cloudflare Durable Object)"]
+    DB[("PostgreSQL Database (Drizzle ORM)")]
+    Auth["Better Auth (Sessions / OAuth / Guest)"]
+
+    Client -- "HTTP / REST (/api/*)" --> API
+    Client -- "WebSocket Ticket Handshake (/api/ws-ticket)" --> API
+    Client -- "Native WebSocket Connection (/ws)" --> DO
+    API -- "Authentication & Profile RPC" --> DB
+    API -- "Auth Validation" --> Auth
+    DO -- "Persistent Storage (Rooms, Alarms, Hibernation)" --> DO
+    DO -- "Match Completion & Economy Ledger" --> DB
+```
+
+### Highlights
+
+- **Edge-First Realtime Engine**: Native WebSockets managed by Cloudflare Durable Objects using the **WebSocket Hibernation API**, eliminating idle CPU costs while delivering sub-millisecond room coordination.
+- **HMAC WebSocket Upgrade Tickets**: Single-use, time-bound (30s) cryptographically signed upgrade tokens eliminate connection replay attacks and cross-origin authentication issues.
+- **Robust Session & Guest System**: Powered by [Better Auth](https://www.better-auth.com/) with instant, passwordless guest onboarding, email verification, password reset flows, and Google OAuth.
+- **Append-Only Economy Ledger**: Rings game currency is strictly managed through row-locked, atomic, idempotent transactions with cryptographic idempotency keys.
+- **State-Driven Matchmaking & Room Management**: Zero room code exposure in browser URLs. Instant rejoining upon reconnect, automatic host succession for disconnected room owners, and alarm-driven stale room garbage collection.
+- **Type-Safe Monorepo**: 100% end-to-end type safety across client events, server actions, database models, and shared game definitions via Turborepo and TypeScript.
+
+---
+
+## Monorepo Structure
 
 ```
-apps/web                 React + Vite + Tailwind (home, browse games, game lobby, room lobby)
-apps/api                 Fastify + Better Auth + Socket.IO (auth, rooms, realtime)
-packages/db              Drizzle ORM schema, migrations, Rings ledger service
-packages/shared          Types, validation, game registry + dev/prod game configs, socket contracts
-packages/typescript-config
+kridora/
+├── apps/
+│   ├── api/                 # Cloudflare Worker API (Hono + Durable Objects RealtimeHub)
+│   └── web/                 # Single-page application (React 19, Vite, Tailwind CSS v4)
+├── packages/
+│   ├── db/                  # Drizzle ORM schemas, SQL migrations, Rings ledger service
+│   ├── shared/              # Shared types, Zod schemas, socket contracts, game definitions
+│   └── typescript-config/   # Shared tsconfig bases for Node, DOM, and Workers
+└── docker-compose.yml       # Local development PostgreSQL infrastructure
 ```
 
-## First-time setup
+---
+
+## Quickstart
+
+### Prerequisites
+
+- **Node.js**: `v24` or later
+- **pnpm**: `v11` or later
+- **Docker**: For running the local PostgreSQL container
+- **Wrangler**: Cloudflare Workers CLI (bundled via devDependencies)
+
+### 1. Clone & Install Dependencies
 
 ```bash
-# 1. dependencies
+git clone https://github.com/your-username/kridora.git
+cd kridora
 pnpm install
+```
 
-# 2. environment
+### 2. Configure Environment
+
+Copy the environment templates:
+
+```bash
+# Root & database configuration
 cp .env.example .env
-#    then put a real secret in BETTER_AUTH_SECRET:   openssl rand -base64 32
 
-# 3. PostgreSQL + Redis
+# API Worker configuration (wrangler dev secrets)
+cp apps/api/.dev.vars.example apps/api/.dev.vars
+```
+
+Generate a secure 32-byte secret for `BETTER_AUTH_SECRET`:
+
+```bash
+openssl rand -base64 32
+```
+
+Paste this secret into both `.env` and `apps/api/.dev.vars`.
+
+### 3. Start Local Database Infrastructure
+
+Launch the PostgreSQL container via Docker Compose:
+
+```bash
 pnpm infra:up
+```
 
-# 4. create the tables
+### 4. Run Migrations
+
+Apply the Drizzle database schema to your local database:
+
+```bash
 pnpm db:migrate
+```
 
-# 5. run everything (API on :2020, web on :5173)
+### 5. Launch Development Servers
+
+Start both the Web frontend and Cloudflare Workers API concurrently:
+
+```bash
 pnpm dev
 ```
 
-Open http://localhost:5173.
+- **Frontend**: [http://localhost:5173](http://localhost:5173)
+- **API Worker**: [http://localhost:2020](http://localhost:2020)
 
-Make sure `.env` is in your `.gitignore`.
+In local development, the Vite server automatically proxies `/api` and `/ws` to the local Worker on port 2020.
 
-## Everyday commands
+---
 
-| Command                               | What it does                                                                                             |
-| ------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `pnpm dev`                            | API + web with hot reload                                                                                |
-| `pnpm check-types`                    | Type-check every package                                                                                 |
-| `pnpm lint`                           | ESLint (web)                                                                                             |
-| `pnpm db:generate`                    | After editing `packages/db/src/schema/*`, create a new SQL migration                                     |
-| `pnpm db:migrate`                     | Apply migrations                                                                                         |
-| `pnpm db:studio`                      | Browse the database                                                                                      |
-| `pnpm --filter @kridora/api test:e2e` | Realtime room test (needs the API running; takes ~70s because it waits out the 40s owner-transfer timer) |
+## Available Scripts
 
-## How requests flow
+| Command            | Description                                                       |
+| :----------------- | :---------------------------------------------------------------- |
+| `pnpm dev`         | Starts Vite dev server and Wrangler local dev server concurrently |
+| `pnpm build`       | Builds production bundles for the web app and API worker dry-run  |
+| `pnpm check-types` | Type-checks all packages and applications across the monorepo     |
+| `pnpm lint`        | Runs linter across applications                                   |
+| `pnpm format`      | Formats codebase with Prettier                                    |
+| `pnpm infra:up`    | Boots PostgreSQL Docker container in the background               |
+| `pnpm infra:down`  | Stops PostgreSQL Docker container                                 |
+| `pnpm db:generate` | Generates new SQL migration files after schema edits              |
+| `pnpm db:migrate`  | Applies pending Drizzle migrations to PostgreSQL                  |
+| `pnpm db:studio`   | Opens Drizzle Studio database visualizer in your browser          |
 
-The browser only talks to ONE origin. In development Vite proxies `/api` and `/socket.io` to the API
-(`apps/web/vite.config.ts`); in production put a reverse proxy (Caddy / nginx / your platform's router) in front
-that serves the built web app and forwards the same two paths to the API. That keeps session cookies first-party
-and removes the need for CORS.
+---
 
-Set `APP_URL` to the public web origin (for example `https://kridora.com`) and `TRUST_PROXY=true` when the API runs
-behind your proxy.
+## Real-Time Architecture & Durable Objects
 
-## Accounts
+### Connection Lifecycle
 
-- **Guest**: name only, created with Better Auth's anonymous plugin. Not tied to an email. If the guest later logs in
-  to a real account, the guest user is deleted. Guests with no live session (and no Rings history) are purged after 24h
-  by an hourly job (`apps/api/src/jobs/cleanup.ts`).
-- **Email + password**: email verification is required before login. Password reset is built in.
-- **Google**: enabled automatically when `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set. Authorised redirect
-  URI: `<APP_URL>/api/auth/callback/google`.
-- **Emails** are printed to the API console for now (`apps/api/src/lib/mailer.ts`). Implement the `Mailer` interface
-  with Resend / Postmark / SES later; nothing else changes.
+1. **Authentication Handshake**: When an authenticated or guest player initiates a WebSocket connection, the client issues a `POST /api/ws-ticket` request with their session cookie.
+2. **HMAC Ticket Generation**: The API verifies the session and signs an HMAC-SHA256 ticket containing the player's identity, timestamp expiration (30 seconds), and a cryptographic single-use nonce.
+3. **Upgrade Request**: The client connects to `GET /ws?ticket=<token>`. The Worker verifies the signature, validates and marks the single-use nonce inside the Durable Object (`RealtimeHub`), and upgrades the socket via `101 Switching Protocols`.
+4. **WebSocket Hibernation**: The Durable Object accepts the connection using `ctx.acceptWebSocket(server)`. Sockets sleep when idle and automatically wake on incoming messages or heartbeats (`ping`/`pong`).
 
-## Rings (game currency)
+### Room Management
 
-- `player_profiles.rings_balance` is the fast-read balance; `ring_transactions` is the append-only ledger.
-- Only change balances through `grantRings` / `spendRings` / `applyRingTransaction` from `@kridora/db`
-  (row-locked, atomic, idempotent via `idempotencyKey`). Never `UPDATE` the balance directly.
-- Ad rewards, XP payouts and payment webhooks should pass an `idempotencyKey` so retries cannot double-credit.
+- **Lobby Phase**: Players can ready up, invite others by numeric Player ID or encrypted share links, switch room visibility (public/private), or change the active game without leaving the room.
+- **Match In-Progress**: The room transitions to `in_progress`. Game state updates are coordinated exclusively through the game's registered module. Players can toggle between the active game view and the player roster.
+- **Offline Resilience & Host Succession**: If the room host disconnects, a 40-second grace countdown begins. If the host does not return within the deadline, ownership transfers automatically to the next connected player.
+- **Alarm-Driven Garbage Collection**: The Durable Object schedules system alarms to clean up empty or expired rooms, preventing memory leaks and orphaned sessions.
 
-## Rooms
+---
 
-Live room state is stored in Redis (`apps/api/src/rooms`). Every change is made under a per-room lock, and timers
-(owner transfer after 40s, removal of players who stay offline in a lobby, closing rooms nobody is connected to) are
-stored in Redis too, so they survive API restarts and work with several API instances.
+## Rings Economy & Game Currency
 
-See `docs/ADDING_A_GAME.md` for how games plug in.
+- **Atomic Ledger**: User ring balances in `player_profiles.rings_balance` represent the current balance, while `ring_transactions` provides an immutable, append-only history.
+- **Strict Mutation APIs**: Balances must **only** be modified using `grantRings`, `spendRings`, or `applyRingTransaction` from `@kridora/db`. Direct SQL `UPDATE` statements are strictly prohibited.
+- **Idempotency Guarantee**: Every economy transaction requires an `idempotencyKey` to prevent double-crediting during network retries or concurrent calls.
 
-## Production checklist
+---
 
-- Real `BETTER_AUTH_SECRET`, `NODE_ENV=production`, `TRUST_PROXY=true` behind a proxy, HTTPS everywhere.
-- Replace the console mailer.
-- Run `pnpm db:migrate` as a deploy step.
-- Use managed Postgres and Redis (Redis persistence on; the compose file uses AOF).
-- Only slugs listed in `packages/shared/src/games/config.production.ts` are visible/playable in production.
+## Adding a New Game
+
+To create a new game module for the platform:
+
+1. **Define Game Metadata & Rules** in `packages/shared/src/games/`:
+   - Create game definition conforming to `GameDefinition`.
+   - Register the game slug in `packages/shared/src/games/registry.ts`.
+2. **Implement Server-Side State Machine** in `apps/api/src/games/`:
+   - Implement `ServerGameModule<TState, TAction, TOutcome>`.
+   - Implement `createInitialState`, `handleAction`, and optional state masking via `serializeStateForPlayer`.
+3. **Implement Client-Side Game Component** in `apps/web/src/games/`:
+   - Build the interactive game board utilizing `request(...)` and socket events.
+   - Register the component in `apps/web/src/games/registry.ts`.
+
+---
+
+## Production Deployment
+
+### 1. Database (Cloudflare Hyperdrive / Managed Postgres)
+
+- Deploy a managed PostgreSQL instance (e.g. Neon, Supabase, AWS RDS, or Crunchy Data).
+- Configure **Cloudflare Hyperdrive** in your Cloudflare dashboard pointing to your PostgreSQL connection string for pooled, low-latency queries from the edge.
+
+### 2. Deploy API Worker
+
+```bash
+# Run database migrations
+pnpm db:migrate
+
+# Deploy Cloudflare Worker & Durable Objects
+pnpm --filter @kridora/api deploy
+```
+
+Set required secrets in Cloudflare Workers:
+
+```bash
+npx wrangler secret put BETTER_AUTH_SECRET
+npx wrangler secret put DATABASE_URL
+```
+
+### 3. Deploy Web Frontend
+
+The frontend in `apps/web` builds to static assets (`apps/web/dist`) and can be hosted on **Cloudflare Pages**, **Vercel**, or any CDN:
+
+```bash
+pnpm --filter web build
+```
+
+Configure `VITE_API_URL` to point to your deployed API domain (e.g. `https://api.kridora.org`).
+
+---
+
+## License
+
+Private and proprietary. All rights reserved.
