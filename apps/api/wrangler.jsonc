@@ -21,9 +21,4 @@
       "new_sqlite_classes": ["RealtimeHub"]
     }
   ],
-  "vars": {
-    "NODE_ENV": "development",
-    "WEB_URL": "http://localhost:5173",
-    "BETTER_AUTH_URL": "http://localhost:2020"
-  }
 }
