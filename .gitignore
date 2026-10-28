@@ -1,39 +1,97 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
-# Dependencies
-node_modules
-.pnpm-store
+# ==========================================
+# Dependencies & Package Managers
+# ==========================================
+node_modules/
+.pnpm-store/
 .pnp
 .pnp.js
 
-# Local env files
+# ==========================================
+# Environment & Secrets (Never commit secrets!)
+# ==========================================
 .env
+.env.*
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+!.env.example
 
-# Testing
-coverage
+# Cloudflare / Wrangler secrets
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
 
-# Turbo
-.turbo
+# Certificates & Private Keys
+*.pem
+*.key
+*.cert
+*.crt
 
-# Vercel
-.vercel
+# ==========================================
+# Cloudflare & Wrangler Local Runtime Data
+# ==========================================
+.wrangler/
 
-# Build Outputs
-.next/
+# ==========================================
+# Build Outputs, Bundles & Caches
+# ==========================================
+dist/
+dist-ssr/
+build/
 out/
-build
-dist
+.next/
+.turbo/
+.vercel/
+.cache/
+*.tsbuildinfo
 
+# ==========================================
+# Testing & Code Coverage
+# ==========================================
+coverage/
+.nyc_output/
 
-# Debug
+# ==========================================
+# Logs & Process Traces
+# ==========================================
+logs/
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
 
-# Misc
+# ==========================================
+# Local Database Volumes & SQLite Dumps
+# ==========================================
+postgres_data/
+redis_data/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+
+# ==========================================
+# Operating System & Editor Junk
+# ==========================================
 .DS_Store
-*.pem
+.DS_Store?
+._*
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# IDEs & Editors
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.swp
+*.swo
+*~
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
