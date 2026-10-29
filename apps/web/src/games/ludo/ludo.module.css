@@ -2,14 +2,12 @@
 .nocturneBg {
   background-color: #0c0e14;
   position: relative;
-  overflow-x: hidden;
-  width: 100%;
-  min-height: 100dvh;
+  overflow: hidden;
 }
 
 /* Ambient organic background squircle blobs from reference image */
 .ambientBlob1 {
-  position: fixed;
+  position: absolute;
   top: -80px;
   left: -60px;
   width: 440px;
@@ -23,7 +21,7 @@
 }
 
 .ambientBlob2 {
-  position: fixed;
+  position: absolute;
   top: 15%;
   right: -80px;
   width: 380px;
@@ -37,7 +35,7 @@
 }
 
 .ambientBlob3 {
-  position: fixed;
+  position: absolute;
   bottom: -60px;
   right: 15%;
   width: 460px;
@@ -51,7 +49,7 @@
 }
 
 .ambientBlob4 {
-  position: fixed;
+  position: absolute;
   bottom: 8%;
   left: -80px;
   width: 360px;

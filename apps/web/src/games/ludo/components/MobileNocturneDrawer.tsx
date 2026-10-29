@@ -18,7 +18,6 @@ interface MobileNocturneDrawerProps {
   diceValue: number;
   onRoll: () => void;
   onEmote: (emoji: string) => void;
-  onLeaveGame: () => void;
   activeEmotes: Record<string, { emoji: string; timestamp: number }>;
   playerAvatars: Record<string, string | null>;
 }
@@ -34,7 +33,6 @@ export function MobileNocturneDrawer({
   diceValue,
   onRoll,
   onEmote,
-  onLeaveGame,
   activeEmotes,
   playerAvatars,
 }: MobileNocturneDrawerProps) {
@@ -356,7 +354,7 @@ export function MobileNocturneDrawer({
                 className={cn(
                   "relative flex items-center justify-between rounded-xl px-3 py-2 transition-all duration-200",
                   isActive
-                    ? "bg-gradient-to-r from-[#ff5768] to-[#ff4155] text-white shadow-md"
+                    ? "bg-gradient-to-r from-slate-600 to-slate-500 border border-white/25 text-white shadow-md shadow-black/30"
                     : "bg-[#181a26]/80 border border-white/6 text-slate-200",
                 )}
               >
@@ -470,15 +468,6 @@ export function MobileNocturneDrawer({
               </div>
             );
           })}
-
-          {/* Leave Game inside drawer */}
-          <button
-            type="button"
-            onClick={onLeaveGame}
-            className="flex items-center justify-center gap-1.5 py-1 text-xs font-semibold text-rose-400 hover:text-rose-300 transition cursor-pointer self-center mt-1"
-          >
-            <span>← Leave match</span>
-          </button>
         </div>
       </div>
     </>

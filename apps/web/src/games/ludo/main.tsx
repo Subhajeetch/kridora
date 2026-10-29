@@ -355,7 +355,7 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
   const occupiedColors = new Set(state.players.map((p) => p.color));
 
   return (
-    <div className={cn(styles.nocturneBg, "mx-auto min-h-[calc(100dvh-5.5rem)] w-full max-w-[2000px] rounded-2xl sm:rounded-3xl p-2 sm:p-5 shadow-2xl flex flex-col justify-between select-none relative overflow-hidden pb-36 md:pb-4")}>
+    <div className={cn(styles.nocturneBg, "mx-auto h-fit w-fit max-w-full rounded-2xl sm:rounded-3xl p-2 sm:p-5 shadow-2xl flex flex-col select-none relative overflow-hidden")}>
       {/* Ambient Nocturne background organic squircle blobs matching reference image */}
       <div className={styles.ambientBlob1} />
       <div className={styles.ambientBlob2} />
@@ -366,7 +366,7 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
       <RoomToast players={room.players} audioSettings={audio} />
 
       {/* 2. MAIN LAYOUT: 15x15 LUDO BOARD (Left/Center) + NOCTURNE SIDE PANEL (Right, side-by-side on md+) */}
-      <div className="relative z-10 flex flex-col md:flex-row items-center md:items-start justify-center gap-5 md:gap-6 lg:gap-8 my-auto py-1 w-full max-w-[2000px] mx-auto">
+      <div className="relative z-10 flex flex-col md:flex-row items-center md:items-start justify-center gap-5 md:gap-6 lg:gap-8 w-fit max-w-full h-fit mx-auto">
         {/* Left / Center: 15x15 Ludo Board */}
         <div className="flex items-center justify-center shrink-0">
           <LudoBoard
@@ -391,7 +391,6 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
           diceValue={activePlayer ? getPlayerDiceValue(activePlayer.color) : (state.dice ?? 1)}
           onRoll={handleRoll}
           onEmote={handleSendEmote}
-          onLeaveGame={() => setLeaveConfirmOpen(true)}
           activeEmotes={activeEmotes}
           playerAvatars={playerAvatars}
         />
@@ -409,7 +408,6 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
         diceValue={activePlayer ? getPlayerDiceValue(activePlayer.color) : (state.dice ?? 1)}
         onRoll={handleRoll}
         onEmote={handleSendEmote}
-        onLeaveGame={() => setLeaveConfirmOpen(true)}
         activeEmotes={activeEmotes}
         playerAvatars={playerAvatars}
       />

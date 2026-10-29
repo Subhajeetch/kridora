@@ -1,5 +1,4 @@
-import { ChevronDown, Crown, Dices, Smile } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { Crown, Dices } from "lucide-react";
 import type { LudoColor, LudoGameState, LudoPlayerState, RoomSnapshot } from "@kridora/shared";
 import { cn } from "@/lib/utils";
 import { DICE_ROTATIONS, SEAT_DEFINITIONS } from "../constants";
@@ -18,7 +17,6 @@ interface NocturneSidePanelProps {
   diceValue: number;
   onRoll: () => void;
   onEmote: (emoji: string) => void;
-  onLeaveGame: () => void;
   activeEmotes: Record<string, { emoji: string; timestamp: number }>;
   playerAvatars: Record<string, string | null>;
 }
@@ -34,38 +32,9 @@ export function NocturneSidePanel({
   diceValue,
   onRoll,
   onEmote,
-  onLeaveGame,
   activeEmotes,
   playerAvatars,
 }: NocturneSidePanelProps) {
-  const [emojiDropdownOpen, setEmojiDropdownOpen] = useState(false);
-  const emojiDropdownRef = useRef<HTMLDivElement>(null);
-  const emojiButtonRef = useRef<HTMLButtonElement>(null);
-
-  // Click outside to close vertical emoji dropdown
-  useEffect(() => {
-    if (!emojiDropdownOpen) return;
-
-    function handleClickOutside(e: MouseEvent | TouchEvent) {
-      const target = e.target as Node;
-      if (
-        emojiDropdownRef.current &&
-        !emojiDropdownRef.current.contains(target) &&
-        emojiButtonRef.current &&
-        !emojiButtonRef.current.contains(target)
-      ) {
-        setEmojiDropdownOpen(false);
-      }
-    }
-
-    document.addEventListener("mousedown", handleClickOutside);
-    document.addEventListener("touchstart", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("touchstart", handleClickOutside);
-    };
-  }, [emojiDropdownOpen]);
-
   const isRolling = rollingColor !== null;
   const activeSeat = activePlayer ? SEAT_DEFINITIONS[activePlayer.color] : SEAT_DEFINITIONS.coral;
   const rotation = DICE_ROTATIONS[diceValue] ?? DICE_ROTATIONS[1];
@@ -171,78 +140,31 @@ export function NocturneSidePanel({
         </div>
       </div>
 
-      {/* 3. BIG "ROLL THE DIE" ACTION BUTTON + SMILE EMOJI DROPDOWN */}
-      <div className="relative flex items-center gap-2">
-        <button
-          type="button"
-          onClick={canRoll ? onRoll : undefined}
-          disabled={!canRoll}
-          className={cn(
-            "relative h-12 sm:h-13 flex-1 rounded-2xl font-black text-sm tracking-wider uppercase transition-all duration-150 flex items-center justify-center gap-2 select-none",
-            canRoll
-              ? "bg-gradient-to-r from-[#ff4d64] to-[#ff6b81] text-white shadow-[0_4px_0_#c9253d,0_8px_20px_rgba(255,77,100,0.35)] hover:brightness-110 active:translate-y-1 active:shadow-[0_0_0_#c9253d] cursor-pointer"
-              : "bg-slate-800/60 text-slate-500 border border-white/5 cursor-not-allowed shadow-none",
-          )}
-        >
-          <Dices className="size-5" />
-          <span>
-            {isRolling
-              ? "Rolling..."
-              : canRoll
-                ? "Roll the die"
-                : isMyTurn
-                  ? state.movableTokens.length > 0
-                    ? "Select a piece"
-                    : "Turn passing..."
-                  : `Waiting for ${activePlayer?.name ?? "player"}...`}
-          </span>
-        </button>
-
-        {/* EMOJI SMILE BUTTON */}
-        <div className="relative">
-          <button
-            ref={emojiButtonRef}
-            type="button"
-            onClick={() => setEmojiDropdownOpen((prev) => !prev)}
-            aria-label={emojiDropdownOpen ? "Close emoji menu" : "Reaction emojis"}
-            className={cn(
-              "size-12 sm:size-13 shrink-0 rounded-2xl border border-white/10 transition-all flex items-center justify-center active:scale-95 cursor-pointer shadow-md",
-              emojiDropdownOpen
-                ? "bg-[#282d40] border-amber-400/50 text-slate-200"
-                : "bg-[#1e2230] hover:bg-[#282d40] text-amber-400",
-            )}
-          >
-            {emojiDropdownOpen ? (
-              <ChevronDown className="size-5 text-slate-300" />
-            ) : (
-              <Smile className="size-5 text-amber-400" />
-            )}
-          </button>
-
-          {/* VERY SMALL WIDTH VERTICAL EMOJI DROPDOWN */}
-          {emojiDropdownOpen && (
-            <div
-              ref={emojiDropdownRef}
-              className="absolute bottom-14 right-0 z-50 flex flex-col items-center gap-1 p-1 rounded-2xl border border-white/15 bg-[#141624]/98 backdrop-blur-2xl shadow-2xl animate-in fade-in zoom-in-95 duration-150"
-              style={{ width: "48px" }}
-            >
-              {EMOTES.map((emoji) => (
-                <button
-                  key={emoji}
-                  type="button"
-                  onClick={() => {
-                    onEmote(emoji);
-                    setEmojiDropdownOpen(false);
-                  }}
-                  className="size-9 rounded-xl hover:bg-white/15 active:scale-90 text-2xl flex items-center justify-center transition cursor-pointer"
-                >
-                  {emoji}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
+      {/* 3. BIG "ROLL THE DIE" ACTION BUTTON */}
+      <button
+        type="button"
+        onClick={canRoll ? onRoll : undefined}
+        disabled={!canRoll}
+        className={cn(
+          "relative h-12 sm:h-13 w-full rounded-2xl font-black text-sm tracking-wider uppercase transition-all duration-150 flex items-center justify-center gap-2 select-none",
+          canRoll
+            ? "bg-gradient-to-r from-[#ff4d64] to-[#ff6b81] text-white shadow-[0_4px_0_#c9253d,0_8px_20px_rgba(255,77,100,0.35)] hover:brightness-110 active:translate-y-1 active:shadow-[0_0_0_#c9253d] cursor-pointer"
+            : "bg-slate-800/60 text-slate-500 border border-white/5 cursor-not-allowed shadow-none",
+        )}
+      >
+        <Dices className="size-5" />
+        <span>
+          {isRolling
+            ? "Rolling..."
+            : canRoll
+              ? "Roll the die"
+              : isMyTurn
+                ? state.movableTokens.length > 0
+                  ? "Select a piece"
+                  : "Turn passing..."
+                : `Waiting for ${activePlayer?.name ?? "player"}...`}
+        </span>
+      </button>
 
       {/* 4. PLAYERS LIST (Only showing available players in the match) */}
       <div className="flex flex-col gap-2">
@@ -261,7 +183,7 @@ export function NocturneSidePanel({
               className={cn(
                 "relative flex items-center justify-between rounded-2xl px-3.5 py-2.5 transition-all duration-300",
                 isActive
-                  ? "bg-gradient-to-r from-[#ff5768] to-[#ff4155] text-white shadow-lg shadow-rose-950/40"
+                  ? "bg-[#272b3d]/80 border border-white/25 text-white shadow-lg shadow-black/30"
                   : "bg-[#161822]/80 border border-white/6 hover:border-white/10 text-slate-200 backdrop-blur-md",
               )}
             >
@@ -411,15 +333,6 @@ export function NocturneSidePanel({
           </div>
         </div>
       </div>
-
-      {/* 6. LEAVE GAME BUTTON (Matching reference image bottom left pill) */}
-      <button
-        type="button"
-        onClick={onLeaveGame}
-        className="flex items-center justify-center gap-1.5 py-1.5 text-xs font-semibold text-slate-400 hover:text-white transition cursor-pointer self-center mt-1"
-      >
-        <span>← Leave game</span>
-      </button>
     </div>
   );
 }

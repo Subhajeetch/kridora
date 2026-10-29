@@ -293,66 +293,64 @@ function InGameContainer({
   }, []);
 
   return (
-    <section className={cn("relative w-full", room.gameSlug !== "ludo" ? "py-1 sm:py-2" : "p-0")}>
+    <section className="relative w-full py-1 sm:py-2">
       {/* Dedicated In-Game Top Bar: Back button to room section, match info, audio toggle */}
-      {room.gameSlug !== "ludo" && (
-        <header className="sticky top-2 z-30 mb-2 mx-auto flex w-full max-w-[2000px] items-center justify-between gap-2 rounded-2xl border border-white/10 bg-panel/90 px-3 py-2.5 backdrop-blur-xl shadow-xl shadow-black/40">
-          {/* Back Button leading to the Room section where all players are displayed */}
+      <header className="sticky top-2 z-30 mb-2 mx-auto flex w-full max-w-[2000px] items-center justify-between gap-2 rounded-2xl border border-white/10 bg-panel/90 px-3 py-2.5 backdrop-blur-xl shadow-xl shadow-black/40">
+        {/* Back Button leading to the Room section where all players are displayed */}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onBackToRoom}
+          className="h-9 gap-2 rounded-xl border-white/15 bg-white/5 hover:border-primary/60 hover:bg-white/10 text-foreground transition-all active:scale-95 shadow-sm"
+          aria-label="View room players and settings"
+        >
+          <ArrowLeft className="size-4" />
+          <span className="font-medium text-xs sm:text-sm">Room & Players</span>
+          <span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2 py-0.5 text-xs font-semibold text-muted-foreground">
+            <Users className="size-3 text-neon-pink" />
+            {room.players.length}
+          </span>
+        </Button>
+
+        {/* Center: Game & Room Identifier */}
+        <div className="flex items-center gap-2">
+          <span className="hidden sm:inline-flex items-center gap-1.5 font-display text-sm uppercase tracking-wide text-foreground">
+            <Gamepad2 className="size-4 text-neon-cyan" />
+            {game.name}
+          </span>
+          <span className="rounded-full border border-white/10 bg-black/40 px-2.5 py-0.5 font-mono text-xs font-semibold tracking-wider text-muted-foreground">
+            {room.code}
+          </span>
+        </div>
+
+        {/* Right: Audio Control & Leave Room */}
+        <div className="flex items-center gap-1.5">
           <Button
             variant="outline"
-            size="sm"
-            onClick={onBackToRoom}
-            className="h-9 gap-2 rounded-xl border-white/15 bg-white/5 hover:border-primary/60 hover:bg-white/10 text-foreground transition-all active:scale-95 shadow-sm"
-            aria-label="View room players and settings"
+            size="icon-sm"
+            className="rounded-xl border-white/10 bg-white/5 hover:border-primary/60 hover:text-primary"
+            aria-label={audio.muted ? "Unmute game audio" : "Mute game audio"}
+            onClick={() => updateAudioSettings({ muted: !audio.muted })}
           >
-            <ArrowLeft className="size-4" />
-            <span className="font-medium text-xs sm:text-sm">Room & Players</span>
-            <span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2 py-0.5 text-xs font-semibold text-muted-foreground">
-              <Users className="size-3 text-neon-pink" />
-              {room.players.length}
-            </span>
+            {audio.muted ? (
+              <VolumeX className="size-4" />
+            ) : (
+              <Volume2 className="size-4" />
+            )}
           </Button>
-
-          {/* Center: Game & Room Identifier */}
-          <div className="flex items-center gap-2">
-            <span className="hidden sm:inline-flex items-center gap-1.5 font-display text-sm uppercase tracking-wide text-foreground">
-              <Gamepad2 className="size-4 text-neon-cyan" />
-              {game.name}
-            </span>
-            <span className="rounded-full border border-white/10 bg-black/40 px-2.5 py-0.5 font-mono text-xs font-semibold tracking-wider text-muted-foreground">
-              {room.code}
-            </span>
-          </div>
-
-          {/* Right: Audio Control & Leave Room */}
-          <div className="flex items-center gap-1.5">
-            <Button
-              variant="outline"
-              size="icon-sm"
-              className="rounded-xl border-white/10 bg-white/5 hover:border-primary/60 hover:text-primary"
-              aria-label={audio.muted ? "Unmute game audio" : "Mute game audio"}
-              onClick={() => updateAudioSettings({ muted: !audio.muted })}
-            >
-              {audio.muted ? (
-                <VolumeX className="size-4" />
-              ) : (
-                <Volume2 className="size-4" />
-              )}
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              className="rounded-xl text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-              aria-label="Leave room"
-              title="Leave room"
-              onClick={onLeave}
-              disabled={leaveBusy}
-            >
-              <LogOut className="size-4" />
-            </Button>
-          </div>
-        </header>
-      )}
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="rounded-xl text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+            aria-label="Leave room"
+            title="Leave room"
+            onClick={onLeave}
+            disabled={leaveBusy}
+          >
+            <LogOut className="size-4" />
+          </Button>
+        </div>
+      </header>
 
       {/* Offline Host Countdown Alert */}
       {secondsLeft !== null && owner && (
@@ -372,7 +370,7 @@ function InGameContainer({
       )}
 
       {/* Main Game Screen with Error Boundary and Launch Loader */}
-      <div className={cn("w-full min-h-screen", room.gameSlug !== "ludo" && "lg:relative lg:left-1/2 lg:w-[calc(100vw-2rem)] lg:max-w-[2000px] lg:-translate-x-1/2")}>
+      <div className="lg:relative lg:left-1/2 lg:w-[calc(100vw-2rem)] lg:max-w-[2000px] lg:-translate-x-1/2">
         <GameErrorBoundary
           gameName={game.name}
           onBackToRoom={onBackToRoom}
