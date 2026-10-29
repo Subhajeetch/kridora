@@ -80,10 +80,10 @@ export const SEAT_DEFINITIONS: Record<LudoColor, LudoSeatDefinition> = {
     ],
     goalCoord: [7.5, 6.42],
     yardCoords: [
-      [2.05, 2.05],
-      [2.05, 3.95],
-      [3.95, 2.05],
-      [3.95, 3.95],
+      [2, 2],
+      [2, 4],
+      [4, 2],
+      [4, 4],
     ],
   },
   mint: {
@@ -108,10 +108,10 @@ export const SEAT_DEFINITIONS: Record<LudoColor, LudoSeatDefinition> = {
     ],
     goalCoord: [6.42, 7.5],
     yardCoords: [
-      [2.05, 11.05],
-      [2.05, 12.95],
-      [3.95, 11.05],
-      [3.95, 12.95],
+      [2, 11],
+      [2, 13],
+      [4, 11],
+      [4, 13],
     ],
   },
   sunshine: {
@@ -136,10 +136,10 @@ export const SEAT_DEFINITIONS: Record<LudoColor, LudoSeatDefinition> = {
     ],
     goalCoord: [7.5, 8.58],
     yardCoords: [
-      [11.05, 11.05],
-      [11.05, 12.95],
-      [12.95, 11.05],
-      [12.95, 12.95],
+      [11, 11],
+      [11, 13],
+      [13, 11],
+      [13, 13],
     ],
   },
   sky: {
@@ -164,10 +164,10 @@ export const SEAT_DEFINITIONS: Record<LudoColor, LudoSeatDefinition> = {
     ],
     goalCoord: [8.58, 7.5],
     yardCoords: [
-      [11.05, 2.05],
-      [11.05, 3.95],
-      [12.95, 2.05],
-      [12.95, 3.95],
+      [11, 2],
+      [11, 4],
+      [13, 2],
+      [13, 4],
     ],
   },
 };

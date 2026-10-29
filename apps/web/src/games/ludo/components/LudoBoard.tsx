@@ -56,7 +56,6 @@ function Pawn3D({
 }) {
   const seat = SEAT_DEFINITIONS[color];
   const gradId = `pawnGrad_${color}`;
-  const baseGradId = `pawnBase_${color}`;
 
   return (
     <div
@@ -93,8 +92,8 @@ function Pawn3D({
       >
         {movable && <div className={styles.tokenBaseRing} />}
         <svg
-          viewBox="0 0 64 78"
-          className="size-full overflow-visible drop-shadow-[0_4px_4px_rgba(0,0,0,0.55)]"
+          viewBox="0 3.5 64 64"
+          className="size-full overflow-visible drop-shadow-[0_3px_4px_rgba(0,0,0,0.55)]"
         >
           <defs>
             <radialGradient id={gradId} cx="32%" cy="28%" r="70%">
@@ -102,20 +101,12 @@ function Pawn3D({
               <stop offset="45%" stopColor={seat.pawnMid} />
               <stop offset="100%" stopColor={seat.pawnDark} />
             </radialGradient>
-            <linearGradient id={baseGradId} x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0%" stopColor={seat.pawnMid} />
-              <stop offset="100%" stopColor={seat.pawnDark} />
-            </linearGradient>
           </defs>
 
-          {/* Ground Shadow Ellipse */}
-          <ellipse cx="32" cy="70" rx="22" ry="6" fill="rgba(0,0,0,0.38)" />
+          {/* Ground Contact Shadow Ellipse beneath pawn base */}
+          <ellipse cx="32" cy="58.5" rx="15" ry="4" fill="rgba(0,0,0,0.32)" />
 
-          {/* Outer Circular Rim Collar (double-ring base) */}
-          <circle cx="32" cy="52" r="22" fill={`url(#${baseGradId})`} stroke="#062238" strokeWidth="3.2" />
-          <circle cx="32" cy="52" r="17.5" fill={seat.pawnDark} stroke="rgba(255,255,255,0.45)" strokeWidth="1.5" />
-
-          {/* Upright Sculpted Pawn Body */}
+          {/* Upright Sculpted Chess Pawn Body */}
           <path
             d="M16 52 C16 39, 23 32, 25 23 C22 19, 22 11, 32 11 C42 11, 42 19, 39 23 C41 32, 48 39, 48 52 C48 61, 16 61, 16 52 Z"
             fill={`url(#${gradId})`}
@@ -132,6 +123,7 @@ function Pawn3D({
             strokeLinecap="round"
             fill="none"
           />
+          {/* Top Head Specular Highlight */}
           <ellipse cx="29" cy="16.5" rx="3.8" ry="2.6" transform="rotate(-20 29 16.5)" fill="rgba(255,255,255,0.88)" />
         </svg>
       </div>

@@ -305,7 +305,7 @@ function InGameContainer({
           aria-label="View room players and settings"
         >
           <ArrowLeft className="size-4" />
-          <span className="font-medium text-xs sm:text-sm">Room & Players</span>
+          <span className="font-medium text-xs sm:text-sm">Room</span>
           <span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2 py-0.5 text-xs font-semibold text-muted-foreground">
             <Users className="size-3 text-neon-pink" />
             {room.players.length}

@@ -69,8 +69,8 @@
   max-width: 100%;
   position: relative;
   background: #11141d;
-  padding: 4px;
-  border-radius: 18px;
+  padding: 5px;
+  border-radius: 24px;
   box-shadow: 0 25px 60px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(255, 255, 255, 0.08);
   flex-shrink: 0;
 }
@@ -96,6 +96,8 @@
   background-color: #ffffff;
   position: relative;
   overflow: hidden;
+  border-radius: 19px;
+  -webkit-mask-image: -webkit-radial-gradient(white, black);
 }
 
 .boardCell {
@@ -116,7 +118,7 @@
 /* 4 Corner Yards matching exact reference colors and white inner box */
 .yardBox {
   position: relative;
-  padding: 15.5%;
+  padding: calc(100% / 6);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -129,6 +131,7 @@
   background-color: #ff1a1a;
   border-right: 1.5px solid #0f172a;
   border-bottom: 1.5px solid #0f172a;
+  border-top-left-radius: 19px;
 }
 
 .yardGreen {
@@ -137,6 +140,7 @@
   background-color: #12b84a;
   border-left: 1.5px solid #0f172a;
   border-bottom: 1.5px solid #0f172a;
+  border-top-right-radius: 19px;
 }
 
 .yardBlue {
@@ -145,6 +149,7 @@
   background-color: #0098ec;
   border-right: 1.5px solid #0f172a;
   border-top: 1.5px solid #0f172a;
+  border-bottom-left-radius: 19px;
 }
 
 .yardYellow {
@@ -153,6 +158,7 @@
   background-color: #f6ce00;
   border-left: 1.5px solid #0f172a;
   border-top: 1.5px solid #0f172a;
+  border-bottom-right-radius: 19px;
 }
 
 /* Dimmed yard when unoccupied (e.g. 2-player or 3-player match) */
@@ -169,14 +175,14 @@
   grid-template-columns: 1fr 1fr;
   grid-template-rows: 1fr 1fr;
   place-items: center;
-  padding: 9%;
+  padding: 0;
   box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.18);
   border-radius: 4px;
 }
 
 .yardSocket {
-  width: 72%;
-  height: 72%;
+  width: 68%;
+  height: 68%;
   border-radius: 9999px;
   position: relative;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
@@ -250,16 +256,16 @@
    ------------------------------------------------------------------- */
 .tokensLayer {
   position: absolute;
-  inset: 0;
+  inset: 5px;
   pointer-events: none;
   z-index: 30;
 }
 
 .tokenHitBox {
   position: absolute;
-  width: calc(100% / 15 * 1.08);
-  height: calc(100% / 15 * 1.18);
-  transform: translate(-50%, -62%);
+  width: calc(100% / 15);
+  height: calc(100% / 15);
+  transform: translate(-50%, -50%);
   pointer-events: none;
   display: flex;
   align-items: center;
@@ -287,7 +293,7 @@
   transition:
     transform 0.16s cubic-bezier(0.34, 1.56, 0.64, 1),
     filter 0.16s ease;
-  transform-origin: 50% 80%;
+  transform-origin: 50% 86%;
   pointer-events: none;
 }
 
@@ -336,11 +342,13 @@
 /* Pulsing selection ring beneath movable pawn base */
 .tokenBaseRing {
   position: absolute;
-  bottom: 4%;
-  width: 82%;
-  height: 44%;
+  bottom: 8%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60%;
+  height: 25%;
   border-radius: 9999px;
-  border: 2.5px solid #ffffff;
+  border: 2px solid #ffffff;
   box-shadow:
     0 0 10px 2px rgba(255, 255, 255, 0.95),
     inset 0 0 6px rgba(255, 255, 255, 0.8);
@@ -350,12 +358,12 @@
 
 @keyframes baseRingPulse {
   0%, 100% {
-    transform: scale(0.92);
+    transform: translateX(-50%) scale(0.92);
     opacity: 0.95;
   }
   50% {
-    transform: scale(1.28);
-    opacity: 0.4;
+    transform: translateX(-50%) scale(1.22);
+    opacity: 0.45;
   }
 }
 
