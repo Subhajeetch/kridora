@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { AckFn } from "./errors";
 import type { RoomSnapshot } from "./room";
 import { roomCodeSchema } from "./validation";
-import type { LudoGameState } from "./games/ludo";
+import type { LudoColor, LudoGameState } from "./games/ludo";
 
 export const createRoomSchema = z.object({
   gameSlug: z.string().min(1).max(40),
@@ -24,6 +24,9 @@ export const targetPlayerSchema = z.object({
 export const ludoMoveSchema = z.object({
   tokenIndex: z.number().int().min(0).max(3),
 });
+export const ludoEmoteSchema = z.object({
+  emoji: z.string().min(1).max(10),
+});
 export const inviteUserSchema = z.object({
   targetNumericId: z
     .string()
@@ -41,6 +44,7 @@ export type SetVisibilityPayload = z.input<typeof setVisibilitySchema>;
 export type SetReadyPayload = z.input<typeof setReadySchema>;
 export type TargetPlayerPayload = z.input<typeof targetPlayerSchema>;
 export type LudoMovePayload = z.input<typeof ludoMoveSchema>;
+export type LudoEmotePayload = z.input<typeof ludoEmoteSchema>;
 export type InviteUserPayload = z.input<typeof inviteUserSchema>;
 export type ChangeGamePayload = z.input<typeof changeGameSchema>;
 export type EmptyPayload = z.input<typeof emptySchema>;
@@ -66,6 +70,7 @@ export interface ClientToServerEvents {
     ack: AckFn<RoomSnapshot>,
   ) => void;
   "room:kick": (payload: TargetPlayerPayload, ack: AckFn<RoomSnapshot>) => void;
+  "room:end-game": (payload: EmptyPayload, ack: AckFn<RoomSnapshot>) => void;
   "room:start": (payload: EmptyPayload, ack: AckFn<RoomSnapshot>) => void;
   "room:get-invite-token": (
     payload: EmptyPayload,
@@ -82,6 +87,8 @@ export interface ClientToServerEvents {
   "ludo:get-state": (payload: EmptyPayload, ack: AckFn<LudoGameState>) => void;
   "ludo:roll": (payload: EmptyPayload, ack: AckFn<LudoGameState>) => void;
   "ludo:move": (payload: LudoMovePayload, ack: AckFn<LudoGameState>) => void;
+  "ludo:pass": (payload: EmptyPayload, ack: AckFn<LudoGameState>) => void;
+  "ludo:emote": (payload: LudoEmotePayload, ack: AckFn<{ ok: boolean }>) => void;
 }
 
 export type ClientToServerEventName = keyof ClientToServerEvents;
@@ -101,6 +108,8 @@ export interface ServerToClientEvents {
     inviteToken: string;
   }) => void;
   "ludo:state": (state: LudoGameState) => void;
+  "ludo:rolling": (payload: { color: LudoColor; userId: string }) => void;
+  "ludo:emote": (payload: { userId: string; emoji: string }) => void;
 }
 
 export type InterServerEvents = Record<never, never>;

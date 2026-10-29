@@ -111,6 +111,36 @@ export class RoomManager {
             }
           }
         }
+      } else if (room.status === "in_progress") {
+        for (const [uid, deadline] of Object.entries(
+          room.disconnectDeadlines,
+        )) {
+          if (now >= deadline) {
+            const target = room.players.find((p) => p.userId === uid);
+            if (target && !target.connected) {
+              room.players = room.players.filter((p) => p.userId !== uid);
+              delete room.disconnectDeadlines[uid];
+              this.userToRoom.delete(uid);
+
+              if (room.gameState !== null) {
+                const gameModule = getServerGameModule(room.gameSlug);
+                gameModule.onPlayerLeft?.(room.gameState, uid);
+              }
+
+              if (room.players.length < 2) {
+                room.status = "lobby";
+                room.gameState = null;
+                room.matchId = null;
+                for (const p of room.players) {
+                  p.isReady = p.userId === room.ownerId;
+                }
+              } else {
+                this.broadcaster.broadcastGameState(room);
+              }
+              roomChanged = true;
+            }
+          }
+        }
       }
 
       if (room.ownerTransferAt !== null && now >= room.ownerTransferAt) {
@@ -183,8 +213,12 @@ export class RoomManager {
 
     if (room.ownerId === userId) {
       room.ownerTransferAt = now + OWNER_TRANSFER_DELAY_MS;
-    } else if (room.status === "lobby") {
+    }
+    if (room.status === "lobby") {
       room.disconnectDeadlines[userId] = now + PLAYER_DISCONNECT_GRACE_MS;
+    } else if (room.status === "in_progress") {
+      // 5-minute offline grace period during match
+      room.disconnectDeadlines[userId] = now + 5 * 60 * 1000;
     }
 
     if (!room.players.some((p) => p.connected)) {
@@ -474,6 +508,26 @@ export class RoomManager {
       room.ownerTransferAt = null;
     }
 
+    if (room.status === "in_progress") {
+      let stateMutated = false;
+      if (room.gameState !== null) {
+        const gameModule = getServerGameModule(room.gameSlug);
+        stateMutated = Boolean(
+          gameModule.onPlayerLeft?.(room.gameState, userId),
+        );
+      }
+      if (room.players.length < 2) {
+        room.status = "lobby";
+        room.gameState = null;
+        room.matchId = null;
+        for (const p of room.players) {
+          p.isReady = p.userId === room.ownerId;
+        }
+      } else if (stateMutated) {
+        this.broadcaster.broadcastGameState(room);
+      }
+    }
+
     this.broadcastRoomState(room);
     return null;
   }
@@ -553,12 +607,6 @@ export class RoomManager {
         "Only the room owner can remove players.",
       );
     }
-    if (room.status !== "lobby") {
-      throw new ApiError(
-        "ROOM_IN_PROGRESS",
-        "Cannot kick players during an active match.",
-      );
-    }
     if (targetUserId === userId) {
       throw new ApiError("INVALID_TARGET", "You cannot kick yourself.");
     }
@@ -574,9 +622,55 @@ export class RoomManager {
     }
     this.userToRoom.delete(targetUserId);
 
+    if (room.status === "in_progress") {
+      let stateMutated = false;
+      if (room.gameState !== null) {
+        const gameModule = getServerGameModule(room.gameSlug);
+        stateMutated = Boolean(
+          gameModule.onPlayerLeft?.(room.gameState, targetUserId),
+        );
+      }
+      if (room.players.length < 2) {
+        room.status = "lobby";
+        room.gameState = null;
+        room.matchId = null;
+        for (const p of room.players) {
+          p.isReady = p.userId === room.ownerId;
+        }
+      } else if (stateMutated) {
+        this.broadcaster.broadcastGameState(room);
+      }
+    }
+
     this.broadcaster.sendToUser(targetUserId, "room:kicked", {
       code: room.code,
     });
+    this.broadcastRoomState(room);
+    return this.toSnapshot(room);
+  }
+
+  endGame(userId: string): RoomSnapshot {
+    const room = this.getRequiredRoomForUser(userId);
+    if (room.ownerId !== userId) {
+      throw new ApiError(
+        "NOT_ROOM_OWNER",
+        "Only the room owner can end the match.",
+      );
+    }
+    if (room.status !== "in_progress") {
+      throw new ApiError(
+        "VALIDATION_ERROR",
+        "No match is currently in progress.",
+      );
+    }
+
+    room.status = "lobby";
+    room.gameState = null;
+    room.matchId = null;
+    for (const p of room.players) {
+      p.isReady = p.userId === room.ownerId;
+    }
+
     this.broadcastRoomState(room);
     return this.toSnapshot(room);
   }

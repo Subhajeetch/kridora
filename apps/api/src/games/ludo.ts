@@ -4,6 +4,7 @@ import {
   getLudoCaptureTargets,
   getLudoMovableTokens,
   getLudoTrackSquare,
+  ludoEmoteSchema,
   ludoMoveSchema,
   type LudoGameState,
 } from "@kridora/shared";
@@ -30,6 +31,39 @@ export const ludoGameModule: ServerGameModule<LudoGameState> = {
     const player = state.players.find((p) => p.userId === userId);
     if (!player) return false;
     player.name = newName;
+    state.updatedAt = Date.now();
+    return true;
+  },
+
+  onPlayerLeft(state, userId) {
+    const playerIndex = state.players.findIndex((p) => p.userId === userId);
+    if (playerIndex === -1) return false;
+    const removedPlayer = state.players[playerIndex]!;
+    state.players.splice(playerIndex, 1);
+    state.lastRolls.splice(playerIndex, 1);
+
+    if (state.players.length <= 1) {
+      if (state.players.length === 1) {
+        const soleWinner = state.players[0]!;
+        state.winnerId = soleWinner.userId;
+        state.lastAction = `${removedPlayer.name} left. ${soleWinner.name} wins the match!`;
+      }
+      state.updatedAt = Date.now();
+      return true;
+    }
+
+    if (state.currentPlayerIndex === playerIndex) {
+      state.dice = null;
+      state.movableTokens = [];
+      state.currentPlayerIndex = state.currentPlayerIndex % state.players.length;
+      const nextPlayer = state.players[state.currentPlayerIndex];
+      state.lastAction = `${removedPlayer.name} left. ${nextPlayer?.name ?? "Next player"}'s turn.`;
+    } else if (state.currentPlayerIndex > playerIndex) {
+      state.currentPlayerIndex -= 1;
+      state.lastAction = `${removedPlayer.name} left the match.`;
+    } else {
+      state.lastAction = `${removedPlayer.name} left the match.`;
+    }
     state.updatedAt = Date.now();
     return true;
   },
@@ -62,26 +96,45 @@ export const ludoGameModule: ServerGameModule<LudoGameState> = {
           );
         }
 
+        // Broadcast to all players that this player's dice pod is rolling
+        ctx.broadcastEvent("ludo:rolling", {
+          color: activePlayer.color,
+          userId: activePlayer.userId,
+        });
+
         const dice = rollSecureDie(6);
         state.lastRolls[state.currentPlayerIndex] = dice;
         const movable = getLudoMovableTokens(activePlayer, dice);
         state.updatedAt = Date.now();
+        state.dice = dice;
+        state.movableTokens = movable;
 
         if (movable.length === 0) {
-          state.dice = null;
-          state.movableTokens = [];
-          state.currentPlayerIndex =
-            (state.currentPlayerIndex + 1) % state.players.length;
-          const nextPlayer = state.players[state.currentPlayerIndex];
-          state.lastAction = `${activePlayer.name} rolled a ${dice}. No valid moves — ${nextPlayer?.name ?? "Next player"}'s turn.`;
+          state.lastAction = `${activePlayer.name} rolled a ${dice}. No valid moves.`;
         } else {
-          state.dice = dice;
-          state.movableTokens = movable;
           state.lastAction = `${activePlayer.name} rolled a ${dice}. Select a piece to move.`;
         }
 
         ctx.setState(state);
         ctx.broadcastState();
+        return state;
+      }
+
+      case "pass": {
+        emptySchema.parse(rawPayload);
+        if (state.winnerId) return state;
+        if (state.dice !== null && state.movableTokens.length === 0) {
+          const activePlayer = state.players[state.currentPlayerIndex];
+          state.dice = null;
+          state.movableTokens = [];
+          state.currentPlayerIndex =
+            (state.currentPlayerIndex + 1) % state.players.length;
+          const nextPlayer = state.players[state.currentPlayerIndex];
+          state.lastAction = `${activePlayer?.name ?? "Player"} had no moves — ${nextPlayer?.name ?? "Next player"}'s turn.`;
+          state.updatedAt = Date.now();
+          ctx.setState(state);
+          ctx.broadcastState();
+        }
         return state;
       }
 
@@ -176,6 +229,22 @@ export const ludoGameModule: ServerGameModule<LudoGameState> = {
         ctx.setState(state);
         ctx.broadcastState();
         return state;
+      }
+
+      case "emote": {
+        const { emoji } = ludoEmoteSchema.parse(rawPayload);
+        const player = state.players.find((p) => p.userId === user.id);
+        if (!player) {
+          throw new ApiError(
+            "FORBIDDEN",
+            "Only players in this match can send emotes.",
+          );
+        }
+        ctx.broadcastEvent("ludo:emote", {
+          userId: user.id,
+          emoji,
+        });
+        return { ok: true };
       }
 
       default:

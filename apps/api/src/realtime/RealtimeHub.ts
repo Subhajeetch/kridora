@@ -425,6 +425,10 @@ export class RealtimeHub extends DurableObject<Env> {
         const input = targetPlayerSchema.parse(rawPayload);
         return this.roomManager.kickPlayer(user.id, input.userId);
       }
+      case "end-game": {
+        emptySchema.parse(rawPayload);
+        return this.roomManager.endGame(user.id);
+      }
       case "start": {
         emptySchema.parse(rawPayload);
         return this.roomManager.startGame(user.id);

@@ -34,6 +34,12 @@ import { GameLaunchScreen } from "@/components/games/GameLaunchScreen";
 import { GameThumbnail } from "@/components/games/GameThumbnail";
 import { InviteUserDialog } from "@/components/InviteUserDialog";
 import { Button, buttonVariants } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { findEnabledGame } from "@/config/games";
 import { gameComponents } from "@/games/registry";
 import { useCountdown } from "@/hooks/useCountdown";
@@ -287,64 +293,66 @@ function InGameContainer({
   }, []);
 
   return (
-    <section className="relative w-full py-2 sm:py-4">
+    <section className={cn("relative w-full", room.gameSlug !== "ludo" ? "py-1 sm:py-2" : "p-0")}>
       {/* Dedicated In-Game Top Bar: Back button to room section, match info, audio toggle */}
-      <header className="sticky top-2 z-30 mb-4 mx-auto flex w-full max-w-5xl items-center justify-between gap-2 rounded-2xl border border-white/10 bg-panel/90 px-3 py-2.5 backdrop-blur-xl shadow-xl shadow-black/40">
-        {/* Back Button leading to the Room section where all players are displayed */}
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onBackToRoom}
-          className="h-9 gap-2 rounded-xl border-white/15 bg-white/5 hover:border-primary/60 hover:bg-white/10 text-foreground transition-all active:scale-95 shadow-sm"
-          aria-label="View room players and settings"
-        >
-          <ArrowLeft className="size-4" />
-          <span className="font-medium text-xs sm:text-sm">Room & Players</span>
-          <span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2 py-0.5 text-xs font-semibold text-muted-foreground">
-            <Users className="size-3 text-neon-pink" />
-            {room.players.length}
-          </span>
-        </Button>
-
-        {/* Center: Game & Room Identifier */}
-        <div className="flex items-center gap-2">
-          <span className="hidden sm:inline-flex items-center gap-1.5 font-display text-sm uppercase tracking-wide text-foreground">
-            <Gamepad2 className="size-4 text-neon-cyan" />
-            {game.name}
-          </span>
-          <span className="rounded-full border border-white/10 bg-black/40 px-2.5 py-0.5 font-mono text-xs font-semibold tracking-wider text-muted-foreground">
-            {room.code}
-          </span>
-        </div>
-
-        {/* Right: Audio Control & Leave Room */}
-        <div className="flex items-center gap-1.5">
+      {room.gameSlug !== "ludo" && (
+        <header className="sticky top-2 z-30 mb-2 mx-auto flex w-full max-w-[2000px] items-center justify-between gap-2 rounded-2xl border border-white/10 bg-panel/90 px-3 py-2.5 backdrop-blur-xl shadow-xl shadow-black/40">
+          {/* Back Button leading to the Room section where all players are displayed */}
           <Button
             variant="outline"
-            size="icon-sm"
-            className="rounded-xl border-white/10 bg-white/5 hover:border-primary/60 hover:text-primary"
-            aria-label={audio.muted ? "Unmute game audio" : "Mute game audio"}
-            onClick={() => updateAudioSettings({ muted: !audio.muted })}
+            size="sm"
+            onClick={onBackToRoom}
+            className="h-9 gap-2 rounded-xl border-white/15 bg-white/5 hover:border-primary/60 hover:bg-white/10 text-foreground transition-all active:scale-95 shadow-sm"
+            aria-label="View room players and settings"
           >
-            {audio.muted ? (
-              <VolumeX className="size-4" />
-            ) : (
-              <Volume2 className="size-4" />
-            )}
+            <ArrowLeft className="size-4" />
+            <span className="font-medium text-xs sm:text-sm">Room & Players</span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2 py-0.5 text-xs font-semibold text-muted-foreground">
+              <Users className="size-3 text-neon-pink" />
+              {room.players.length}
+            </span>
           </Button>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            className="rounded-xl text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-            aria-label="Leave room"
-            title="Leave room"
-            onClick={onLeave}
-            disabled={leaveBusy}
-          >
-            <LogOut className="size-4" />
-          </Button>
-        </div>
-      </header>
+
+          {/* Center: Game & Room Identifier */}
+          <div className="flex items-center gap-2">
+            <span className="hidden sm:inline-flex items-center gap-1.5 font-display text-sm uppercase tracking-wide text-foreground">
+              <Gamepad2 className="size-4 text-neon-cyan" />
+              {game.name}
+            </span>
+            <span className="rounded-full border border-white/10 bg-black/40 px-2.5 py-0.5 font-mono text-xs font-semibold tracking-wider text-muted-foreground">
+              {room.code}
+            </span>
+          </div>
+
+          {/* Right: Audio Control & Leave Room */}
+          <div className="flex items-center gap-1.5">
+            <Button
+              variant="outline"
+              size="icon-sm"
+              className="rounded-xl border-white/10 bg-white/5 hover:border-primary/60 hover:text-primary"
+              aria-label={audio.muted ? "Unmute game audio" : "Mute game audio"}
+              onClick={() => updateAudioSettings({ muted: !audio.muted })}
+            >
+              {audio.muted ? (
+                <VolumeX className="size-4" />
+              ) : (
+                <Volume2 className="size-4" />
+              )}
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="rounded-xl text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+              aria-label="Leave room"
+              title="Leave room"
+              onClick={onLeave}
+              disabled={leaveBusy}
+            >
+              <LogOut className="size-4" />
+            </Button>
+          </div>
+        </header>
+      )}
 
       {/* Offline Host Countdown Alert */}
       {secondsLeft !== null && owner && (
@@ -364,7 +372,7 @@ function InGameContainer({
       )}
 
       {/* Main Game Screen with Error Boundary and Launch Loader */}
-      <div className="lg:relative lg:left-1/2 lg:w-[calc(100vw-2rem)] lg:max-w-[1500px] lg:-translate-x-1/2">
+      <div className={cn("w-full min-h-screen", room.gameSlug !== "ludo" && "lg:relative lg:left-1/2 lg:w-[calc(100vw-2rem)] lg:max-w-[2000px] lg:-translate-x-1/2")}>
         <GameErrorBoundary
           gameName={game.name}
           onBackToRoom={onBackToRoom}
@@ -408,6 +416,7 @@ function RoomView({ room, userId }: { room: RoomSnapshot; userId: string }) {
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [changeGameOpen, setChangeGameOpen] = useState(false);
   const [gameChangeNotice, setGameChangeNotice] = useState<string | null>(null);
+  const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
   const prevSlugRef = useRef(room.gameSlug);
 
   useEffect(() => {
@@ -480,6 +489,14 @@ function RoomView({ room, userId }: { room: RoomSnapshot; userId: string }) {
     } catch (err) {
       setError(describeError(err));
       setBusy(false);
+    }
+  }
+
+  function requestLeave() {
+    if (room.status === "in_progress") {
+      setLeaveConfirmOpen(true);
+    } else {
+      void leave();
     }
   }
 
@@ -562,7 +579,7 @@ function RoomView({ room, userId }: { room: RoomSnapshot; userId: string }) {
           </p>
         </div>
       </div>
-      <Button variant="outline" onClick={() => void leave()} disabled={busy}>
+      <Button variant="outline" onClick={requestLeave} disabled={busy}>
         <LogOut /> Leave room
       </Button>
     </div>
@@ -587,7 +604,7 @@ function RoomView({ room, userId }: { room: RoomSnapshot; userId: string }) {
             owner={owner}
             successor={successor}
             onBackToRoom={() => setInGameViewActive(false)}
-            onLeave={() => void leave()}
+            onLeave={requestLeave}
             leaveBusy={busy}
           />
         </div>
@@ -869,6 +886,50 @@ function RoomView({ room, userId }: { room: RoomSnapshot; userId: string }) {
         open={inviteDialogOpen}
         onOpenChange={setInviteDialogOpen}
       />
+
+      <Dialog open={leaveConfirmOpen} onOpenChange={setLeaveConfirmOpen}>
+        <DialogContent className="max-w-md border-rose-500/30 bg-card text-card-foreground">
+          <div className="flex items-center gap-3">
+            <div className="grid size-11 place-items-center rounded-2xl bg-rose-500/15 text-rose-400 border border-rose-500/30">
+              <LogOut className="size-5" />
+            </div>
+            <div>
+              <DialogTitle className="text-lg font-bold">
+                Leave Match & Room?
+              </DialogTitle>
+              <p className="text-xs text-rose-400">Match in progress</p>
+            </div>
+          </div>
+
+          <DialogDescription className="mt-3 text-sm leading-relaxed">
+            If you intentionally leave the room now, <strong className="font-bold text-foreground">all your game pieces and match progress will be permanently removed</strong>.
+          </DialogDescription>
+
+          <div className="mt-6 flex items-center justify-end gap-2.5">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setLeaveConfirmOpen(false)}
+              disabled={busy}
+              className="rounded-xl"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => {
+                setLeaveConfirmOpen(false);
+                void leave();
+              }}
+              disabled={busy}
+              className="rounded-xl font-bold bg-rose-600 hover:bg-rose-500 text-white"
+            >
+              Leave Match
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

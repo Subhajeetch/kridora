@@ -47,6 +47,8 @@ export interface ServerGameModule<TState = unknown> {
   serializeStateForPlayer?: (state: TState, userId: string) => unknown;
   /** Updates in-memory player display names if a player edits their name mid-match. */
   onPlayerRenamed?: (state: TState, userId: string, newName: string) => boolean;
+  /** Handles a player leaving mid-match (removes their pieces/state). */
+  onPlayerLeft?: (state: TState, userId: string) => boolean;
   /** Handles any `<eventPrefix>:<action>` client request and returns the Ack payload. */
   handleAction: (
     ctx: GameActionContext<TState>,
