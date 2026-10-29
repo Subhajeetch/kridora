@@ -1,6 +1,6 @@
 import type { LudoColor, LudoGameState, LudoPlayerState } from "@kridora/shared"
 import { getLudoTrackSquare, LUDO_COLOR_STARTS, LUDO_STAR_SQUARES, LUDO_TRACK_COORDINATES } from "@kridora/shared"
-import { motion, useReducedMotion } from "framer-motion"
+import { motion } from "framer-motion"
 import { UserRound, Volume2, VolumeX } from "lucide-react"
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react"
 import { useAudioSettings, updateAudioSettings } from "@/lib/audio-settings"
@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils"
 import { useRealtime } from "@/providers/realtime-context"
 import type { GameComponentProps } from "../types"
 import styles from "./ludo.module.css"
-import { playLudoSound } from "./sounds"
+import { playLudoSound, unlockLudoAudio } from "./sounds"
 
 const COLORS: Record<LudoColor, { main: string; pale: string; deep: string; label: string }> = {
   coral: { main: "#f51d38", pale: "#ffe0e4", deep: "#9f1025", label: "Red" },
@@ -40,7 +40,8 @@ const START_SQUARES = Object.fromEntries(
   COLOR_SEATS.map((color) => [color, BOARD_TRACK[LUDO_COLOR_STARTS[color]]]),
 ) as Record<LudoColor, readonly [number, number]>
 const SAFE_INDICES = LUDO_STAR_SQUARES
-const STAR = "M0 -11 L2.8 -3.5 L10.5 -3.5 L4.2 1.2 L6.5 9 L0 4.5 L-6.5 9 L-4.2 1.2 L-10.5 -3.5 L-2.8 -3.5 Z"
+const STAR = "M0 -11 L2.9 -3.7 L10.6 -3.4 L4.3 1.2 L6.6 8.8 L0 4.4 L-6.6 8.8 L-4.3 1.2 L-10.6 -3.4 L-2.9 -3.7 Z"
+const TRACK_FILL = "#fffdf8"
 const START_ARROWS: Array<{ column: number; row: number; rotation: number }> = [
   { column: 0, row: 7, rotation: 0 },
   { column: 7, row: 0, rotation: 90 },
@@ -73,7 +74,8 @@ type DragState = {
   pointerId: number
 }
 type BoardPosition = readonly [number, number]
-type MovementPath = { id: number; points: BoardPosition[]; step: number; launchFrom?: BoardPosition }
+type MovementPath = { id: number; points: BoardPosition[]; kind: "move" | "launch" | "capture" }
+const MOVEMENT_STEP_MS = 250
 
 function houseAt(column: number, row: number): LudoColor | null {
   if (column < 6 && row < 6) return "coral"
@@ -98,17 +100,46 @@ function LudoToken({ x, y, color, rotation, movable = false, dragging = false, d
   label: string
 }) {
   const fill = COLORS[color]
-  const reduceMotion = useReducedMotion()
   const center = 20
-  const radians = rotation * Math.PI / 180
-  const liftX = -13 * Math.sin(radians)
-  const liftY = -13 * Math.cos(radians)
-  const landX = 2 * Math.sin(radians)
-  const landY = 2 * Math.cos(radians)
-  const launchX = movementPath?.launchFrom ? movementPath.launchFrom[0] - x : 0
-  const launchY = movementPath?.launchFrom ? movementPath.launchFrom[1] - y : 0
-  const isLaunching = Boolean(movementPath?.launchFrom)
   const isHighlighted = movable && !dragging
+  const pathSteps = Math.max(0, (movementPath?.points.length ?? 0) - 1)
+  const pathFrames = movementPath && pathSteps > 0 ? (() => {
+    const points = movementPath.points
+    const start = points[0]!
+    const x: number[] = [0]
+    const y: number[] = [0]
+    const opacity: number[] = [1]
+    const times: number[] = [0]
+
+    if (movementPath.kind === "move") {
+      for (let step = 0; step < pathSteps; step += 1) {
+        const from = points[step]!
+        const to = points[step + 1]!
+        x.push((from[0] + to[0]) / 2 - start[0], to[0] - start[0])
+        y.push((from[1] + to[1]) / 2 - start[1] - 9, to[1] - start[1])
+        opacity.push(1, 1)
+        times.push((step + 0.5) / pathSteps, (step + 1) / pathSteps)
+      }
+    } else {
+      const from = points[0]!
+      const to = points[pathSteps]!
+      x.push((from[0] + to[0]) / 2 - start[0], to[0] - start[0])
+      y.push((from[1] + to[1]) / 2 - start[1] - 6, to[1] - start[1])
+      opacity.push(1, movementPath.kind === "capture" ? 0 : 1)
+      times.push(0.58, 1)
+    }
+
+    return { x, y, opacity, times }
+  })() : null
+  const pathDuration = movementPath?.kind === "move"
+    ? pathSteps * MOVEMENT_STEP_MS / 1000
+    : 0.5
+  const motionTransition = pathFrames ? {
+    duration: pathDuration,
+    ease: movementPath?.kind === "move" ? "linear" as const : "easeOut" as const,
+    times: pathFrames.times,
+  } : { duration: 0 }
+
   return (
     <svg
       x={x - center}
@@ -116,12 +147,12 @@ function LudoToken({ x, y, color, rotation, movable = false, dragging = false, d
       width="40"
       height="40"
       viewBox="0 0 40 40"
+      overflow="visible"
       style={{
         opacity: dragging && !dragPreview ? 0.28 : undefined,
         filter: dragPreview ? "drop-shadow(0 4px 4px #0008)"
           : movable ? `drop-shadow(0 0 5px ${fill.main}bb)` : undefined,
         touchAction: "none",
-        overflow: "visible",
       }}
       role={movable ? "button" : undefined}
       tabIndex={movable ? 0 : undefined}
@@ -133,39 +164,34 @@ function LudoToken({ x, y, color, rotation, movable = false, dragging = false, d
       onKeyDown={movable ? (event) => {
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault()
+          unlockLudoAudio()
           onMove?.()
         }
       } : undefined}
     >
       <motion.g
-        key={movementPath ? `${movementPath.id}:${movementPath.step}` : "piece-rest"}
-        initial={movementPath ? {
-          x: isLaunching ? launchX : 0,
-          y: isLaunching ? launchY : 0,
-          scaleX: isLaunching ? 0.82 : 0.9,
-          scaleY: isLaunching ? 0.9 : 1.08,
-        } : false}
-        animate={movementPath && !reduceMotion ? {
-          x: isLaunching ? [launchX, 0] : [0, liftX, landX, 0],
-          y: isLaunching ? [launchY, 0] : [0, liftY, landY, 0],
-          scaleX: isLaunching ? [0.82 * stackScale, stackScale] : [0.9 * stackScale, 1.08 * stackScale, 0.88 * stackScale, stackScale],
-          scaleY: isLaunching ? [0.9 * stackScale, stackScale] : [1.08 * stackScale, 1.18 * stackScale, 0.84 * stackScale, stackScale],
-        } : { x: 0, y: 0, scaleX: stackScale, scaleY: stackScale }}
-        transition={movementPath && !reduceMotion
-          ? { duration: 0.25, ease: [0.2, 0.8, 0.25, 1] }
-          : { duration: 0 }}
-        style={{ transformBox: "fill-box", transformOrigin: "center" }}
+        key={movementPath?.id ?? "piece-rest"}
+        initial={pathFrames ? { x: 0, y: 0, opacity: 1 } : false}
+        animate={pathFrames ? {
+          x: pathFrames.x,
+          y: pathFrames.y,
+          opacity: pathFrames.opacity,
+        } : { x: 0, y: 0, opacity: 1 }}
+        transition={motionTransition}
+        style={{ transformBox: "view-box", transformOrigin: "center" }}
       >
-        <g transform={`rotate(${-rotation} ${center} ${center})`}>
-          <g className={isHighlighted ? styles.tokenPulse : undefined}>
-            <g transform={`translate(${center} ${center}) scale(1.2) translate(${-center} ${-center})`}>
-              <ellipse cx={center} cy={center + 11} rx="12" ry="4.5" fill="#000" opacity=".3" />
-              <ellipse cx={center} cy={center + 8} rx="12" ry="4.5" fill={fill.deep} stroke="#20242a" strokeWidth="1.8" />
-              <path d={`M ${center - 8} ${center + 7} Q ${center - 8} ${center + 3} ${center - 5} ${center} L ${center - 5} ${center - 4} L ${center + 5} ${center - 4} L ${center + 5} ${center} Q ${center + 8} ${center + 3} ${center + 8} ${center + 7} Q ${center} ${center + 12} ${center - 8} ${center + 7} Z`} fill={fill.main} stroke="#20242a" strokeWidth="1.8" />
-              <circle cx={center} cy={center - 6} r="11" fill={fill.main} stroke="#20242a" strokeWidth="1.8" />
-              <circle cx={center} cy={center - 6} r="6.5" fill={fill.pale} stroke="#fff" strokeWidth="1.6" />
-              <circle cx={center} cy={center - 6} r="3.4" fill={fill.main} />
-              <ellipse cx={center - 4} cy={center - 10} rx="2.4" ry="1.4" fill="#fff" opacity=".65" />
+        <g transform={`translate(${center} ${center}) scale(${stackScale}) translate(${-center} ${-center})`}>
+          <g transform={`rotate(${-rotation} ${center} ${center})`}>
+            <g className={isHighlighted ? styles.tokenPulse : undefined}>
+              <g transform={`translate(${center} ${center}) scale(1.2) translate(${-center} ${-center})`}>
+                <ellipse cx={center} cy={center + 11} rx="12" ry="4.5" fill="#000" opacity=".3" />
+                <ellipse cx={center} cy={center + 8} rx="12" ry="4.5" fill={fill.deep} stroke="#20242a" strokeWidth="1.8" />
+                <path d={`M ${center - 8} ${center + 7} Q ${center - 8} ${center + 3} ${center - 5} ${center} L ${center - 5} ${center - 4} L ${center + 5} ${center - 4} L ${center + 5} ${center} Q ${center + 8} ${center + 3} ${center + 8} ${center + 7} Q ${center} ${center + 12} ${center - 8} ${center + 7} Z`} fill={fill.main} stroke="#20242a" strokeWidth="1.8" />
+                <circle cx={center} cy={center - 6} r="11" fill={fill.main} stroke="#20242a" strokeWidth="1.8" />
+                <circle cx={center} cy={center - 6} r="6.5" fill={fill.pale} stroke="#fff" strokeWidth="1.6" />
+                <circle cx={center} cy={center - 6} r="3.4" fill={fill.main} />
+                <ellipse cx={center - 4} cy={center - 10} rx="2.4" ry="1.4" fill="#fff" opacity=".65" />
+              </g>
             </g>
           </g>
         </g>
@@ -197,6 +223,7 @@ function LudoBoard({ state, userId, onMove, rotation, busy, audio }: { state: Lu
 
   const beginDrag = (event: ReactPointerEvent<SVGSVGElement>, player: LudoPlayerState, tokenIndex: number) => {
     if (busy || event.button !== 0) return
+    unlockLudoAudio()
     event.preventDefault()
     event.stopPropagation()
     const point = pointerToBoardPoint(event.clientX, event.clientY)
@@ -263,54 +290,60 @@ function LudoBoard({ state, userId, onMove, rotation, busy, audio }: { state: Lu
     previousProgress.current = nextProgress
     if (!previous) return
 
-    const moved = state.players.flatMap((player) => player.tokens.flatMap((progress, tokenIndex) => {
+    const movedTokens = state.players.flatMap((player) => player.tokens.flatMap((progress, tokenIndex) => {
       const id = `${player.userId}:${tokenIndex}`
       const oldProgress = previous.get(id)
-      if (oldProgress === undefined || progress < 0 || progress <= oldProgress) return []
+      if (oldProgress === undefined || progress === oldProgress) return []
+      const captured = oldProgress >= 0 && progress < 0
+      if (!captured && (progress < 0 || progress <= oldProgress)) return []
       const from = cellCenter(getTokenCellAt(player.color, tokenIndex, oldProgress))
       const points: BoardPosition[] = [from]
-      for (let step = oldProgress < 0 ? 0 : oldProgress + 1; step <= progress; step += 1) {
-        points.push(cellCenter(getTokenCellAt(player.color, tokenIndex, step)))
+      if (captured) {
+        points.push(cellCenter(HOME_YARDS[player.color][tokenIndex]!))
+      } else {
+        for (let step = oldProgress < 0 ? 0 : oldProgress + 1; step <= progress; step += 1) {
+          points.push(cellCenter(getTokenCellAt(player.color, tokenIndex, step)))
+        }
       }
-      return [{ id, oldProgress, progress, points }]
-    }))[0]
+      return points.length > 1 ? [{ id, oldProgress, progress, points, captured }] : []
+    }))
 
-    if (!moved || moved.points.length < 2) return
-
-    const steps = moved.points.length - 1
-    const launchFrom = moved.oldProgress < 0 ? moved.points[0] : undefined
-    const initialStep = launchFrom ? 1 : 0
-    const animationId = ++movementSequence.current
-    const previousTimers = movementTimers.current.get(moved.id)
-    previousTimers?.forEach((timer) => window.clearTimeout(timer))
-    if (launchFrom) playLudoSound("unlock", audio)
-    setMovementPaths((paths) => ({ ...paths, [moved.id]: {
-      id: animationId,
-      points: moved.points,
-      step: initialStep,
-      ...(launchFrom ? { launchFrom } : {}),
-    } }))
-    const timers: number[] = []
-    for (let step = initialStep + 1; step <= steps; step += 1) {
+    for (const moved of movedTokens) {
+      const steps = moved.points.length - 1
+      const animationId = ++movementSequence.current
+      const previousTimers = movementTimers.current.get(moved.id)
+      previousTimers?.forEach((timer) => window.clearTimeout(timer))
+      const kind = moved.captured ? "capture" : moved.oldProgress < 0 ? "launch" : "move"
+      if (kind === "launch") playLudoSound("unlock", audio)
+      setMovementPaths((paths) => ({ ...paths, [moved.id]: {
+        id: animationId,
+        points: moved.points,
+        kind,
+      } }))
+      const timers: number[] = []
+      const totalDuration = kind === "move" ? steps * MOVEMENT_STEP_MS : 500
+      if (kind === "capture") {
+        timers.push(window.setTimeout(() => {
+          playLudoSound("capture", audio)
+        }, totalDuration))
+      } else if (kind === "move") {
+        for (let step = 1; step <= steps; step += 1) {
+          timers.push(window.setTimeout(() => {
+            playLudoSound(step === steps && moved.progress === 57 ? "home" : "step", audio)
+          }, step * MOVEMENT_STEP_MS))
+        }
+      }
       timers.push(window.setTimeout(() => {
-        playLudoSound(step === steps && moved.progress === 57 && !state.winnerId ? "home" : "step", audio)
         setMovementPaths((paths) => {
-          const active = paths[moved.id]
-          if (!active || active.id !== animationId) return paths
-          return { ...paths, [moved.id]: { id: active.id, points: active.points, step } }
+          if (paths[moved.id]?.id !== animationId) return paths
+          const next = { ...paths }
+          delete next[moved.id]
+          return next
         })
-      }, (step - initialStep) * 250))
+        movementTimers.current.delete(moved.id)
+      }, totalDuration + 50))
+      movementTimers.current.set(moved.id, timers)
     }
-    timers.push(window.setTimeout(() => {
-      setMovementPaths((paths) => {
-        if (paths[moved.id]?.id !== animationId) return paths
-        const next = { ...paths }
-        delete next[moved.id]
-        return next
-      })
-      movementTimers.current.delete(moved.id)
-    }, (steps - initialStep) * 250 + 270))
-    movementTimers.current.set(moved.id, timers)
   }, [audio, state.players, state.updatedAt])
 
   useEffect(() => () => {
@@ -325,10 +358,10 @@ function LudoBoard({ state, userId, onMove, rotation, busy, audio }: { state: Lu
     ? getTokenCellAt(drag.color, drag.tokenIndex, dropProgress)
     : null
   const visibleTokens = state.players.flatMap((player) => player.tokens.flatMap((progress, tokenIndex) => {
-    if (progress < 0) return []
     const id = `${player.userId}:${tokenIndex}`
     const movementPath = movementPaths[id]
-    const cell = movementPath?.points[movementPath.step] ?? cellCenter(getTokenCell(player, tokenIndex))
+    if (progress < 0 && movementPath?.kind !== "capture") return []
+    const cell = movementPath?.points[0] ?? cellCenter(getTokenCell(player, tokenIndex))
     return [{ id, player, tokenIndex, movementPath, cell }]
   }))
   const stacks = new Map<string, typeof visibleTokens>()
@@ -362,7 +395,6 @@ function LudoBoard({ state, userId, onMove, rotation, busy, audio }: { state: Lu
 
       {Array.from({ length: 15 }, (_, row) => Array.from({ length: 15 }, (_, column) => {
         const house = houseAt(column, row)
-        const road = !house && (column >= 6 && column <= 8 || row >= 6 && row <= 8)
         const startColor = COLOR_SEATS.find((color) => START_SQUARES[color][0] === column && START_SQUARES[color][1] === row)
         const lane = row === 7 && column <= 5 ? "coral"
           : column === 7 && row <= 5 ? "mint"
@@ -378,7 +410,7 @@ function LudoBoard({ state, userId, onMove, rotation, busy, audio }: { state: Lu
             y={y}
             width={CELL}
             height={CELL}
-            fill={house ? COLORS[house].main : startColor ? COLORS[startColor].main : color ? color.main : road ? "#fff" : "#fff"}
+            fill={house ? COLORS[house].main : startColor ? COLORS[startColor].main : color ? color.main : TRACK_FILL}
             stroke="#111820"
             strokeWidth="1.25"
           />
@@ -394,13 +426,11 @@ function LudoBoard({ state, userId, onMove, rotation, busy, audio }: { state: Lu
           <g key={`house-${color}`}>
             <rect x={x + 40} y={y + 40} width="160" height="160" rx="14" fill={house.pale} stroke="#111820" strokeWidth="1.4" />
             {HOME_YARDS[color].map((cell, tokenIndex) => {
-              const progress = player?.tokens[tokenIndex]
-              if (progress !== undefined && progress < 0) return null
               const [centerX, centerY] = cellCenter(cell)
               return <circle key={`nest-${color}-${tokenIndex}`} cx={centerX} cy={centerY} r="16" fill="#fff" fillOpacity=".8" stroke={house.main} strokeOpacity=".5" strokeWidth="1.8" />
             })}
             {player?.tokens.map((progress, tokenIndex) => {
-              if (progress >= 0) return null
+              if (progress >= 0 || movementPaths[`${player.userId}:${tokenIndex}`]?.kind === "capture") return null
               const [centerX, centerY] = cellCenter(HOME_YARDS[color][tokenIndex]!)
               const canMove = player.userId === userId && state.players[state.currentPlayerIndex]?.userId === userId && state.movableTokens.includes(tokenIndex)
               return <LudoToken
@@ -434,7 +464,12 @@ function LudoBoard({ state, userId, onMove, rotation, busy, audio }: { state: Lu
 
       {SAFE_INDICES.map((index) => {
         const [x, y] = cellCenter(BOARD_TRACK[index]!)
-        return <path key={`safe-${index}`} d={STAR} transform={`translate(${x} ${y}) scale(1.05)`} fill="#fff" stroke="#111820" strokeWidth="1" />
+        return (
+          <g key={`safe-${index}`} transform={`translate(${x} ${y})`}>
+            <path d={STAR} transform="translate(0 1.5) scale(1.12)" fill="#101820" opacity=".2" />
+            <path d={STAR} transform="scale(1.08)" fill="#fff" stroke="#111820" strokeWidth="1.7" strokeLinejoin="round" />
+          </g>
+        )
       })}
 
       {START_ARROWS.map(({ column, row, rotation: arrowRotation }) => {
@@ -517,26 +552,77 @@ const DIE_PIPS: Record<number, Array<[number, number]>> = {
   6: [[25, 23], [75, 23], [25, 50], [75, 50], [25, 77], [75, 77]],
 }
 
-function DiceFace({ value, color, disabled, current, onClick, playerName }: {
+const DICE_VARIANTS = {
+  rest: { scale: 1, rotate: 0, x: 0, y: 0, transition: { duration: 0.18 } },
+  roll: {
+    scale: [1, 0.88, 1.12, 0.94, 1.04, 1],
+    rotate: [0, -13, 16, -12, 8, -3, 0],
+    x: [0, -3, 3, -2, 1, 0],
+    y: [0, 2, -3, 2, -1, 0],
+    transition: { duration: 0.68, ease: "easeInOut" as const },
+  },
+}
+
+function DiceFace({ value, color, disabled, current, onClick, playerName, rollEvent }: {
   value: number
   color: LudoColor
   disabled: boolean
   current: boolean
   onClick: () => void
   playerName: string
+  rollEvent: number | null
 }) {
+  const [rolling, setRolling] = useState(false)
+  const [rollingValue, setRollingValue] = useState(value)
+  const rollTimeout = useRef<number | null>(null)
+  const previousRollEvent = useRef(rollEvent)
   const faceId = `ludo-die-${color}`
+  const startRoll = useCallback(() => {
+    setRollingValue(1 + Math.floor(Math.random() * 6))
+    setRolling(true)
+    if (rollTimeout.current !== null) window.clearTimeout(rollTimeout.current)
+    rollTimeout.current = window.setTimeout(() => {
+      setRolling(false)
+      rollTimeout.current = null
+    }, 680)
+  }, [])
+  useEffect(() => () => {
+    if (rollTimeout.current !== null) window.clearTimeout(rollTimeout.current)
+  }, [])
+  useEffect(() => {
+    if (rollEvent === previousRollEvent.current) return
+    previousRollEvent.current = rollEvent
+    if (rollEvent !== null) startRoll()
+  }, [rollEvent, startRoll])
+  useEffect(() => {
+    if (!rolling) {
+      setRollingValue(value)
+      return
+    }
+    const interval = window.setInterval(() => setRollingValue(1 + Math.floor(Math.random() * 6)), 76)
+    return () => window.clearInterval(interval)
+  }, [rolling, value])
+  const roll = () => {
+    if (disabled || !current || rolling) return
+    unlockLudoAudio()
+    startRoll()
+    onClick()
+  }
   return (
-    <button
+    <motion.button
       type="button"
       aria-label={current && !disabled ? `Roll the dice for ${playerName}` : `${playerName}'s die showing ${value}`}
       disabled={disabled}
-      onClick={onClick}
+      onClick={roll}
+      variants={DICE_VARIANTS}
+      animate={rolling ? "roll" : "rest"}
+      whileTap={current && !disabled ? { scale: 0.9 } : undefined}
       className={cn(
         styles.dieButton,
         "relative shrink-0 rounded-[22%] border-[3px] border-[#9e7726] bg-gradient-to-br from-[#fffef8] via-[#f8f5eb] to-[#ded7c7] p-0.5 shadow-[inset_0_2px_3px_#fff,0_4px_10px_#0007] focus-visible:outline focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-white",
         current && "border-[#f5d35e] shadow-[inset_0_2px_3px_#fff,0_0_16px_#ffe60099,0_4px_10px_#0007]",
         current && !disabled && "cursor-pointer",
+        current && !disabled && styles.dieReady,
         disabled && !current && "cursor-default opacity-60",
       )}
     >
@@ -551,7 +637,7 @@ function DiceFace({ value, color, disabled, current, onClick, playerName }: {
         <rect x="4" y="4" width="92" height="92" rx="20" fill={`url(#${faceId})`} stroke="#9e7726" strokeWidth="4" />
         <rect x="9" y="9" width="82" height="82" rx="16" fill="none" stroke="#fff" strokeOpacity=".9" strokeWidth="3" />
         <path d="M20 12 H80" fill="none" stroke="#fff" strokeOpacity=".78" strokeWidth="3" strokeLinecap="round" />
-        {DIE_PIPS[value]?.map(([cx, cy]) => (
+        {DIE_PIPS[rolling ? rollingValue : value]?.map(([cx, cy]) => (
           <g key={`${cx}-${cy}`}>
             <circle cx={cx} cy={cy + 1.5} r="8.5" fill="#000" opacity=".16" />
             <circle cx={cx} cy={cy} r="8" fill="#242932" stroke="#12171e" strokeWidth="1.5" />
@@ -560,7 +646,7 @@ function DiceFace({ value, color, disabled, current, onClick, playerName }: {
         ))}
       </svg>
       <span className="sr-only">{COLORS[color].label}</span>
-    </button>
+    </motion.button>
   )
 }
 
@@ -590,7 +676,15 @@ function PlayerPanel({ player, seatIndex, state, userId, onRoll, busy }: {
         <UserRound strokeWidth={2.3} />
       </span>
       <span className={cn(styles.playerName, "min-w-0 flex-1 truncate font-extrabold text-white", onLeft ? "text-left" : "text-right")}>{player.name}</span>
-      <DiceFace value={value} color={color} current={isActive} disabled={!canRoll} onClick={onRoll} playerName={player.name} />
+      <DiceFace
+        value={value}
+        color={color}
+        current={isActive}
+        disabled={!canRoll}
+        onClick={onRoll}
+        playerName={player.name}
+        rollEvent={state.lastAction.startsWith(`${player.name} rolled a`) ? state.updatedAt : null}
+      />
     </div>
   )
 }
@@ -616,7 +710,6 @@ export default function Ludo({ room, userId }: GameComponentProps) {
         if (!next.winnerId && nextTurnUserId === userId) playLudoSound("turn", audio)
       } else if (isNewState) {
         if (next.winnerId) playLudoSound("win", audio)
-        else if (next.lastAction.includes("sent a rival")) playLudoSound("capture", audio)
         else if (next.lastAction.includes("rolled a")) playLudoSound("roll", audio)
         if (!next.winnerId && nextTurnUserId === userId && (lastTurnUserId.current !== userId || next.lastAction.includes("Roll again") || next.lastAction.includes("roll again"))) {
           playLudoSound("turn", audio)
