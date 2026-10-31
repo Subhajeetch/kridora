@@ -1,23 +1,25 @@
-/* Nocturne Dark Modern Canvas matching reference image */
+/* Nocturne Dark Modern Canvas optimized for mobile performance */
 .nocturneBg {
   background-color: #0c0e14;
   position: relative;
   overflow: hidden;
+  transform: translateZ(0);
+  /* Force GPU acceleration layer */
 }
 
-/* Ambient organic background squircle blobs from reference image */
+/* Lightweight background gradients replacing heavy blur filters */
 .ambientBlob1 {
   position: absolute;
   top: -80px;
   left: -60px;
   width: 440px;
   height: 440px;
-  border-radius: 120px;
-  background: radial-gradient(circle, rgba(30, 36, 54, 0.55) 0%, rgba(18, 22, 34, 0) 70%);
-  filter: blur(55px);
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgba(30, 36, 54, 0.35) 0%, rgba(18, 22, 34, 0) 70%);
   pointer-events: none;
   z-index: 0;
-  transform: rotate(-18deg);
+  transform: translate3d(0, 0, 0) rotate(-18deg);
+  will-change: transform;
 }
 
 .ambientBlob2 {
@@ -26,12 +28,12 @@
   right: -80px;
   width: 380px;
   height: 380px;
-  border-radius: 100px;
-  background: radial-gradient(circle, rgba(46, 22, 32, 0.45) 0%, rgba(26, 14, 20, 0) 70%);
-  filter: blur(60px);
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgba(46, 22, 32, 0.3) 0%, rgba(26, 14, 20, 0) 70%);
   pointer-events: none;
   z-index: 0;
-  transform: rotate(25deg);
+  transform: translate3d(0, 0, 0) rotate(25deg);
+  will-change: transform;
 }
 
 .ambientBlob3 {
@@ -40,12 +42,12 @@
   right: 15%;
   width: 460px;
   height: 460px;
-  border-radius: 140px;
-  background: radial-gradient(circle, rgba(16, 36, 34, 0.5) 0%, rgba(10, 22, 22, 0) 70%);
-  filter: blur(65px);
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgba(16, 36, 34, 0.32) 0%, rgba(10, 22, 22, 0) 70%);
   pointer-events: none;
   z-index: 0;
-  transform: rotate(-12deg);
+  transform: translate3d(0, 0, 0) rotate(-12deg);
+  will-change: transform;
 }
 
 .ambientBlob4 {
@@ -54,12 +56,12 @@
   left: -80px;
   width: 360px;
   height: 360px;
-  border-radius: 90px;
-  background: radial-gradient(circle, rgba(35, 30, 20, 0.4) 0%, rgba(20, 18, 12, 0) 70%);
-  filter: blur(55px);
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgba(35, 30, 20, 0.28) 0%, rgba(20, 18, 12, 0) 70%);
   pointer-events: none;
   z-index: 0;
-  transform: rotate(15deg);
+  transform: translate3d(0, 0, 0) rotate(15deg);
+  will-change: transform;
 }
 
 /* Board Sizing: Responsive square framed in dark slate */
@@ -115,7 +117,7 @@
   background-color: rgba(254, 240, 138, 0.45) !important;
 }
 
-/* 4 Corner Yards matching exact reference colors and white inner box */
+/* 4 Corner Yards */
 .yardBox {
   position: relative;
   padding: calc(100% / 6);
@@ -161,7 +163,6 @@
   border-bottom-right-radius: 19px;
 }
 
-/* Dimmed yard when unoccupied (e.g. 2-player or 3-player match) */
 .yardDimmed {
   opacity: 0.32 !important;
   filter: grayscale(0.5) contrast(0.85);
@@ -208,7 +209,6 @@
   box-shadow: inset 0 3px 6px rgba(0, 0, 0, 0.3), 0 0 0 2px #a88d00;
 }
 
-/* Yard Player Labels */
 .yardLabel {
   position: absolute;
   font-size: clamp(10px, 2vw, 13px);
@@ -241,7 +241,6 @@
   transform: translateX(-50%);
 }
 
-/* Center 3x3 Home Goal */
 .centerGoal {
   grid-row: 7 / 10;
   grid-column: 7 / 10;
@@ -252,7 +251,7 @@
 }
 
 /* -------------------------------------------------------------------
-   3D GLOSSY PAWN TOKENS & INTERACTIVE LAYER
+   GPU-ACCELERATED 3D PAWN TOKENS & CAPTURE REWIND ANIMATIONS
    ------------------------------------------------------------------- */
 .tokensLayer {
   position: absolute;
@@ -263,18 +262,20 @@
 
 .tokenHitBox {
   position: absolute;
+  top: 0;
+  left: 0;
   width: calc(100% / 15);
   height: calc(100% / 15);
-  transform: translate(-50%, -50%);
+  transform: translate3d(0, 0, 0);
+  transform-origin: 50% 50%;
   pointer-events: none;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition:
-    left 0.14s cubic-bezier(0.25, 1, 0.5, 1),
-    top 0.14s cubic-bezier(0.25, 1, 0.5, 1);
+  transition: transform 0.14s cubic-bezier(0.25, 1, 0.5, 1);
   z-index: 32;
   cursor: default;
+  will-change: transform;
 }
 
 .tokenHitBox.isMovable {
@@ -295,19 +296,31 @@
     filter 0.16s ease;
   transform-origin: 50% 86%;
   pointer-events: none;
+  will-change: transform;
+  z-index: 2;
 }
 
-/* Hover & Focus lift for movable pieces */
 .tokenHitBox.isMovable:hover .tokenVisual,
 .tokenHitBox.isMovable:focus-visible .tokenVisual {
   transform: translateY(-16%) scale(1.18) !important;
   filter: drop-shadow(0 8px 10px rgba(0, 0, 0, 0.6)) brightness(1.08);
 }
 
+.tokenHitBox.isMovable:hover .tokenBaseRing,
+.tokenHitBox.isMovable:focus-visible .tokenBaseRing {
+  border-color: #ff3b5c;
+  box-shadow:
+    0 0 14px 3px rgba(255, 34, 68, 0.95),
+    inset 0 0 8px rgba(255, 34, 68, 0.5);
+}
+
 @keyframes movableFloat {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: translateY(0%) scale(1.04);
   }
+
   50% {
     transform: translateY(-11%) scale(1.12);
   }
@@ -327,52 +340,64 @@
   filter: drop-shadow(0 12px 10px rgba(0, 0, 0, 0.55));
 }
 
+/* Capturing opponent piece: smooth reverse rewind slide back to yard */
 .tokenHitBox.isReturning {
   z-index: 60 !important;
-  transition:
-    left 0.055s linear,
-    top 0.055s linear !important;
+  transition: transform 0.05s linear !important;
 }
 
 .tokenHitBox.isReturning .tokenVisual {
-  transform: scale(0.85) rotate(-12deg) !important;
-  filter: brightness(1.3);
+  transform: scale(0.82) rotate(-15deg) !important;
+  filter: brightness(1.35) drop-shadow(0 0 12px rgba(255, 77, 100, 0.8));
 }
 
-/* Pulsing selection ring beneath movable pawn base */
 .tokenBaseRing {
   position: absolute;
-  bottom: 8%;
+  top: 58%;
   left: 50%;
-  transform: translateX(-50%);
-  width: 60%;
-  height: 25%;
+  transform: translate(-50%, -50%);
+  width: 78%;
+  height: 78%;
+  aspect-ratio: 1 / 1;
   border-radius: 9999px;
-  border: 2px solid #ffffff;
+  border: 2.5px dotted #ff2244;
+  background: radial-gradient(
+    circle,
+    rgba(255, 34, 68, 0.22) 0%,
+    rgba(255, 34, 68, 0.05) 60%,
+    transparent 75%
+  );
   box-shadow:
-    0 0 10px 2px rgba(255, 255, 255, 0.95),
-    inset 0 0 6px rgba(255, 255, 255, 0.8);
-  animation: baseRingPulse 1.05s ease-in-out infinite;
+    0 0 10px 2px rgba(255, 34, 68, 0.75),
+    inset 0 0 6px rgba(255, 34, 68, 0.35);
+  animation: dottedRingSpinPulse 3s linear infinite;
   pointer-events: none;
+  z-index: 1;
+  will-change: transform;
 }
 
-@keyframes baseRingPulse {
-  0%, 100% {
-    transform: translateX(-50%) scale(0.92);
+@keyframes dottedRingSpinPulse {
+  0% {
+    transform: translate(-50%, -50%) rotate(0deg) scale(0.90);
     opacity: 0.95;
   }
+
   50% {
-    transform: translateX(-50%) scale(1.22);
-    opacity: 0.45;
+    transform: translate(-50%, -50%) rotate(180deg) scale(1.10);
+    opacity: 0.70;
+  }
+
+  100% {
+    transform: translate(-50%, -50%) rotate(360deg) scale(0.90);
+    opacity: 0.95;
   }
 }
 
-/* Destination Reticle & Path Breadcrumb Dots matching HTML */
 .destReticle {
   position: absolute;
   width: calc(100% / 15 * 0.86);
   height: calc(100% / 15 * 0.86);
-  transform: translate(-50%, -50%);
+  transform: translate(-50%, -50%) translate3d(0, 0, 0);
   border-radius: 9999px;
   border: 3px dashed #0f172a;
   box-shadow: 0 0 0 2px #ffffff, 0 0 14px rgba(0, 0, 0, 0.55);
@@ -380,6 +405,7 @@
   pointer-events: auto;
   cursor: pointer;
   animation: spinReticle 3.2s linear infinite;
+  will-change: transform;
 }
 
 .pathDot {
@@ -398,34 +424,86 @@
   0% {
     transform: translate(-50%, -50%) rotate(0deg) scale(0.95);
   }
+
   50% {
     transform: translate(-50%, -50%) rotate(180deg) scale(1.08);
   }
+
   100% {
     transform: translate(-50%, -50%) rotate(360deg) scale(0.95);
   }
 }
 
-/* Stack count pill */
 .stackCountBadge {
   position: absolute;
-  bottom: 1px;
-  right: 1px;
-  background: #0f172a;
-  color: #ffffff;
-  font-size: 9px;
-  font-weight: 800;
-  padding: 1px 4px;
+  transform: translate(-50%, -50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
   border-radius: 9999px;
-  border: 1px solid rgba(255, 255, 255, 0.5);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
-  z-index: 35;
+  background-color: #0f172a;
+  border: 1.5px solid #ffffff;
+  color: #fde047;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.7);
+  z-index: 52;
   pointer-events: none;
 }
 
-/* -------------------------------------------------------------------
-   CORNER METALLIC DICE PODS
-   ------------------------------------------------------------------- */
+.captureShockwave {
+  position: absolute;
+  width: calc(100% / 15 * 1.8);
+  height: calc(100% / 15 * 1.8);
+  transform: translate(-50%, -50%);
+  border-radius: 9999px;
+  border: 3px solid #f43f5e;
+  box-shadow: 0 0 16px #f43f5e;
+  animation: shockwaveExpand 0.5s ease-out forwards;
+  pointer-events: none;
+  z-index: 55;
+}
+
+@keyframes shockwaveExpand {
+  0% {
+    transform: translate(-50%, -50%) scale(0.2);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1.6);
+    opacity: 0;
+  }
+}
+
+.safeSparkleRing {
+  position: absolute;
+  width: calc(100% / 15 * 1.6);
+  height: calc(100% / 15 * 1.6);
+  transform: translate(-50%, -50%);
+  border-radius: 9999px;
+  border: 2px solid #38bdf8;
+  box-shadow: 0 0 12px #38bdf8;
+  animation: sparkleExpand 0.5s ease-out forwards;
+  pointer-events: none;
+  z-index: 55;
+}
+
+@keyframes sparkleExpand {
+  0% {
+    transform: translate(-50%, -50%) scale(0.3);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1.4);
+    opacity: 0;
+  }
+}
+
+/* Corner Metallic Dice Pods */
 .dicePod {
   width: 78px;
   height: 78px;
@@ -457,14 +535,12 @@
   }
 }
 
-/* Dimmed pod when unoccupied */
 .dicePodDimmed {
   opacity: 0.32 !important;
   cursor: default !important;
   pointer-events: none;
 }
 
-/* Neon rim when pod belongs to active player */
 .podActive {
   background: linear-gradient(135deg, #38bdf8 0%, #818cf8 50%, #c084fc 100%) !important;
   box-shadow:
@@ -492,13 +568,13 @@
   border-color: #7dd3fc;
 }
 
-/* 3D Dice inside each Pod */
 .podDieCube {
   width: 44px;
   height: 44px;
   position: relative;
   transform-style: preserve-3d;
   transition: transform 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
 }
 
 @media (max-width: 420px) {
@@ -516,15 +592,19 @@
   0% {
     transform: rotateX(0deg) rotateY(0deg) rotateZ(0deg);
   }
+
   25% {
     transform: rotateX(170deg) rotateY(95deg) rotateZ(45deg);
   }
+
   50% {
     transform: rotateX(310deg) rotateY(205deg) rotateZ(135deg);
   }
+
   75% {
     transform: rotateX(190deg) rotateY(295deg) rotateZ(245deg);
   }
+
   100% {
     transform: rotateX(360deg) rotateY(360deg) rotateZ(360deg);
   }
@@ -564,18 +644,23 @@
 .pface1 {
   transform: rotateY(0deg) translateZ(22px);
 }
+
 .pface6 {
   transform: rotateY(180deg) translateZ(22px);
 }
+
 .pface3 {
   transform: rotateY(90deg) translateZ(22px);
 }
+
 .pface4 {
   transform: rotateY(-90deg) translateZ(22px);
 }
+
 .pface2 {
   transform: rotateX(90deg) translateZ(22px);
 }
+
 .pface5 {
   transform: rotateX(-90deg) translateZ(22px);
 }
@@ -584,37 +669,47 @@
   .pface1 {
     transform: rotateY(0deg) translateZ(19px);
   }
+
   .pface6 {
     transform: rotateY(180deg) translateZ(19px);
   }
+
   .pface3 {
     transform: rotateY(90deg) translateZ(19px);
   }
+
   .pface4 {
     transform: rotateY(-90deg) translateZ(19px);
   }
+
   .pface2 {
     transform: rotateX(90deg) translateZ(19px);
   }
+
   .pface5 {
     transform: rotateX(-90deg) translateZ(19px);
   }
 }
 
-/* Bouncing golden turn arrows */
 @keyframes arrowBounceLeft {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: translateX(0);
   }
+
   50% {
     transform: translateX(8px);
   }
 }
 
 @keyframes arrowBounceRight {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: translateX(0) scaleX(-1);
   }
+
   50% {
     transform: translateX(-8px) scaleX(-1);
   }
@@ -630,24 +725,27 @@
   filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.6));
 }
 
-/* Floating animated emote reaction over avatar */
 @keyframes emotePopFloat {
   0% {
     transform: scale(0.2) translateY(10px);
     opacity: 0;
   }
+
   15% {
     transform: scale(1.35) translateY(-6px);
     opacity: 1;
   }
+
   35% {
     transform: scale(1) translateY(-14px);
     opacity: 1;
   }
+
   75% {
     transform: scale(1) translateY(-28px);
     opacity: 0.95;
   }
+
   100% {
     transform: scale(0.7) translateY(-44px);
     opacity: 0;

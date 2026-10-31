@@ -1,5 +1,5 @@
 import { Crown } from "lucide-react";
-import type { LudoPlayerState } from "@kridora/shared";
+import { LUDO_HOME_STEP, type LudoPlayerState } from "@kridora/shared";
 import { cn } from "@/lib/utils";
 import { DICE_ROTATIONS } from "../constants";
 import styles from "../ludo.module.css";
@@ -35,7 +35,7 @@ export function DicePod({
   isRoomOwner = false,
 }: DicePodProps) {
   const homeCount =
-    player?.tokens.filter((step) => step === 57).length ?? 0;
+    player?.tokens.filter((step) => step === LUDO_HOME_STEP).length ?? 0;
   const rotation = DICE_ROTATIONS[diceValue] ?? DICE_ROTATIONS[1];
 
   // The arrow icon ONLY shows when it's OUR turn and this is OUR seat!
