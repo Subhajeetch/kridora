@@ -4,7 +4,6 @@ import { useNavigate } from "react-router";
 import {
   getLudoAutoMoveToken,
   LUDO_HOME_STEP,
-  LUDO_YARD_STEP,
   type LudoColor,
   type LudoGameState,
 } from "@kridora/shared";
@@ -22,16 +21,13 @@ import { useRealtime } from "@/providers/realtime-context";
 import type { GameComponentProps } from "../types";
 import { ludoAudio } from "./audio";
 import { LeaveConfirmDialog } from "./components/LeaveConfirmDialog";
-import { LudoBoard } from "./components/LudoBoard";
-import { MobileNocturneDrawer } from "./components/MobileNocturneDrawer";
-import { NocturneSidePanel } from "./components/NocturneSidePanel";
+import { LudoTable } from "./components/LudoTable";
 import { OfflineWaitScreen } from "./components/OfflineWaitScreen";
 import { RoomToast } from "./components/RoomToast";
 import { SEAT_DEFINITIONS } from "./constants";
-import styles from "./ludo.module.css";
+import { ROLL_MS } from "./motion";
 
-const ROLL_TUMBLE_MS = 460;
-const HOP_STEP_MS = 130;
+const ROLL_TUMBLE_MS = ROLL_MS;
 
 export default function LudoGame({ room, userId }: GameComponentProps) {
   const navigate = useNavigate();
@@ -67,14 +63,15 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
   const rollingUntilRef = useRef(0);
   const rollClearTimerRef = useRef<number | null>(null);
   const delayedStateTimerRef = useRef<number | null>(null);
-  const animLockTimerRef = useRef<number | null>(null);
+  const animationLockedRef = useRef(false);
+  const committedRef = useRef<LudoGameState | null>(null);
+  const pendingStatesRef = useRef<LudoGameState[]>([]);
   const errorTimerRef = useRef<number | null>(null);
   const emoteTimersRef = useRef<Map<string, number>>(new Map());
 
   const autoMoveTriggeredRef = useRef<string | null>(null);
   const autoPassTriggeredRef = useRef<string | null>(null);
   const lastLandedRollKeyRef = useRef<string | null>(null);
-  const prevTokensRef = useRef<Map<string, number> | null>(null);
   const prevTurnUserIdRef = useRef<string | null>(null);
 
   const showTransientError = useCallback((msg: string) => {
@@ -87,65 +84,41 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
     }, 4500);
   }, []);
 
-  /** Computes board animation duration from token deltas so rolls/modals wait for hops & rewinds. */
+  // Hold authoritative snapshots until the visible move completes. Both the
+  // socket broadcast and request response can deliver the same snapshot.
   const applyCommittedState = useCallback((next: LudoGameState) => {
-    const nextMap = new Map<string, number>();
-    for (const p of next.players) {
-      p.tokens.forEach((step, idx) => {
-        nextMap.set(`${p.userId}:${idx}`, step);
-      });
+    const last = pendingStatesRef.current.at(-1) ?? committedRef.current;
+    if (last && (next.updatedAt < last.updatedAt || JSON.stringify(next) === JSON.stringify(last))) return;
+    if (animationLockedRef.current) {
+      pendingStatesRef.current.push(next);
+      return;
     }
-
-    const prevMap = prevTokensRef.current;
-    prevTokensRef.current = nextMap;
-
-    if (prevMap) {
-      let forwardMs = 0;
-      let rewindMs = 0;
-
-      for (const p of next.players) {
-        p.tokens.forEach((step, idx) => {
-          const oldStep = prevMap.get(`${p.userId}:${idx}`);
-          if (oldStep === undefined || oldStep === step) return;
-
-          if (step > oldStep) {
-            const hops = oldStep < 0 ? 1 : step - oldStep;
-            forwardMs = Math.max(forwardMs, hops * HOP_STEP_MS + 90);
-          } else if (oldStep >= 0 && step === LUDO_YARD_STEP) {
-            const stepCount = oldStep + 2;
-            const perStep = Math.max(
-              18,
-              Math.min(42, Math.floor(680 / stepCount)),
-            );
-            rewindMs = Math.max(rewindMs, 80 + stepCount * perStep + 90);
-          }
-        });
-      }
-
-      const totalAnimMs = forwardMs + rewindMs;
-      if (totalAnimMs > 0) {
-        setIsBoardAnimating(true);
-        if (animLockTimerRef.current) {
-          window.clearTimeout(animLockTimerRef.current);
-        }
-        animLockTimerRef.current = window.setTimeout(() => {
-          setIsBoardAnimating(false);
-          animLockTimerRef.current = null;
-        }, totalAnimMs);
-      }
+    const previous = committedRef.current;
+    const moves = previous && next.players.some(player => {
+      const before = previous.players.find(p => p.userId === player.userId);
+      return before && player.tokens.some((step, i) => step !== before.tokens[i]);
+    });
+    if (moves) {
+      animationLockedRef.current = true;
+      setIsBoardAnimating(true);
     }
-
-    // Play dice landing sound once per unique roll
-    if (next.dice !== null) {
-      const rollKey = `${next.updatedAt}:${next.dice}:${next.currentPlayerIndex}`;
+    if (previous && next.dice !== null && (previous.dice === null || previous.currentPlayerIndex !== next.currentPlayerIndex)) {
+      const rollKey = [next.updatedAt, next.dice, next.currentPlayerIndex].join(':');
       if (lastLandedRollKeyRef.current !== rollKey) {
         lastLandedRollKeyRef.current = rollKey;
         ludoAudio.diceLand(next.dice, audioRef.current);
       }
     }
-
+    committedRef.current = next;
     setState(next);
   }, []);
+
+  const handleAnimationComplete = useCallback(() => {
+    animationLockedRef.current = false;
+    setIsBoardAnimating(false);
+    const pending = pendingStatesRef.current.splice(0);
+    for (const next of pending) applyCommittedState(next);
+  }, [applyCommittedState]);
 
   const startRollVisuals = useCallback((color: LudoColor) => {
     rollingUntilRef.current = performance.now() + ROLL_TUMBLE_MS;
@@ -217,6 +190,7 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
     }
 
     function onEmoteReceived(payload: { userId: string; emoji: string }) {
+      if (payload.userId === userId) return;
       ludoAudio.emotePop(audioRef.current);
       const ts = Date.now();
       setActiveEmotes((prev) => ({
@@ -255,8 +229,6 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
         window.clearTimeout(rollClearTimerRef.current);
       if (delayedStateTimerRef.current)
         window.clearTimeout(delayedStateTimerRef.current);
-      if (animLockTimerRef.current)
-        window.clearTimeout(animLockTimerRef.current);
       if (errorTimerRef.current) window.clearTimeout(errorTimerRef.current);
       emoteTimers.forEach((t) => window.clearTimeout(t));
       emoteTimers.clear();
@@ -276,7 +248,7 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
       activeTurnUser === userId &&
       state.dice === null
     ) {
-      ludoAudio.hoverTick(audioRef.current);
+      ludoAudio.yourTurn(audioRef.current);
       if (typeof navigator !== "undefined" && "vibrate" in navigator) {
         try {
           navigator.vibrate(18);
@@ -303,18 +275,13 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
     );
   }, [state, room.players]);
 
-  const occupiedColors = useMemo(
-    () => new Set(state?.players.map((p) => p.color) ?? []),
-    [state?.players],
-  );
-
   const isPaused = offlinePlayers.length > 0;
   const isRoomOwner = room.ownerId === userId;
 
   // Synchronous + React state action guard preventing double-tap race conditions
   const act = useCallback(
     async (fn: () => Promise<LudoGameState>) => {
-      if (busyRef.current || isPaused) return;
+      if (busyRef.current || isPaused || animationLockedRef.current) return;
       busyRef.current = true;
       setBusy(true);
       setError(null);
@@ -335,7 +302,7 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
     [isPaused, applyCommittedState, showTransientError],
   );
 
-  // Dice Roll Handler with authentic 460ms 3D tumble
+  // Give the die time to settle before presenting the authoritative roll.
   const handleRoll = useCallback(() => {
     if (
       busyRef.current ||
@@ -380,9 +347,12 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
       if (
         busyRef.current ||
         isPaused ||
+        animationLockedRef.current ||
+        rollingUntilRef.current > performance.now() ||
         !state ||
         state.winnerId !== null ||
-        state.dice === null
+        state.dice === null ||
+        state.players[state.currentPlayerIndex]?.userId !== userId
       ) {
         return;
       }
@@ -392,7 +362,7 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
       }
       void act(() => request("ludo:move", { tokenIndex }));
     },
-    [isPaused, state, act],
+    [isPaused, state, act, userId],
   );
 
   // Desktop Spacebar convenience shortcut to roll when it's your turn
@@ -454,9 +424,9 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
 
     const rollKey = `${state.updatedAt}:${state.dice}:${state.currentPlayerIndex}`;
     if (autoMoveTriggeredRef.current === rollKey) return;
-    autoMoveTriggeredRef.current = rollKey;
-
     const timer = window.setTimeout(() => {
+      if (busyRef.current || animationLockedRef.current) return;
+      autoMoveTriggeredRef.current = rollKey;
       handleMoveToken(autoTokenIdx);
     }, 380);
 
@@ -479,7 +449,6 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
     if (state.movableTokens.length === 0) {
       const passKey = `${state.updatedAt}:${state.dice}:${state.currentPlayerIndex}`;
       if (autoPassTriggeredRef.current === passKey) return;
-      autoPassTriggeredRef.current = passKey;
 
       const active = state.players[state.currentPlayerIndex];
       const isMe = active?.userId === userId;
@@ -487,6 +456,8 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
 
       if (delay > 0) {
         const timer = window.setTimeout(() => {
+          if (busyRef.current || animationLockedRef.current) return;
+          autoPassTriggeredRef.current = passKey;
           void act(() => request("ludo:pass", {}));
         }, delay);
         return () => window.clearTimeout(timer);
@@ -609,14 +580,6 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
     !isBoardAnimating &&
     rollingColor === null;
 
-  const getPlayerDiceValue = (color: LudoColor) => {
-    if (state.dice !== null && activePlayer?.color === color) {
-      return state.dice;
-    }
-    const idx = state.players.findIndex((p) => p.color === color);
-    return idx !== -1 ? (state.lastRolls[idx] ?? 1) : 1;
-  };
-
   const winnerPlayer = state.winnerId
     ? state.players.find((p) => p.userId === state.winnerId)
     : undefined;
@@ -638,18 +601,7 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
   });
 
   return (
-    <div
-      className={cn(
-        styles.nocturneBg,
-        "relative mx-auto flex h-fit w-fit max-w-full flex-col overflow-hidden rounded-2xl p-2 pb-44 shadow-2xl select-none sm:rounded-3xl sm:p-5 md:pb-5",
-      )}
-    >
-      {/* Ambient Nocturne background radial layers */}
-      <div className={styles.ambientBlob1} />
-      <div className={styles.ambientBlob2} />
-      <div className={styles.ambientBlob3} />
-      <div className={styles.ambientBlob4} />
-
+    <div className="relative mx-auto w-full max-w-[780px]">
       {/* Realtime Toasts for Room Joins / Leaves */}
       <RoomToast players={room.players} audioSettings={audio} />
 
@@ -691,57 +643,13 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
         </div>
       )}
 
-      {/* MAIN LAYOUT: 15x15 LUDO BOARD + NOCTURNE SIDE PANEL */}
-      <div className="relative z-10 mx-auto flex h-fit w-fit max-w-full flex-col items-center justify-center gap-5 md:flex-row md:items-start md:gap-6 lg:gap-8">
-        <div className="flex shrink-0 items-center justify-center">
-          <LudoBoard
-            state={state}
-            userId={userId}
-            onMoveToken={handleMoveToken}
-            audioSettings={audio}
-            occupiedColors={occupiedColors}
-            playerAvatars={playerAvatars}
-          />
-        </div>
-
-        <NocturneSidePanel
-          state={state}
-          room={room}
-          userId={userId}
-          activePlayer={activePlayer}
-          isMyTurn={Boolean(isMyTurn)}
-          canRoll={canRoll}
-          rollingColor={rollingColor}
-          diceValue={
-            activePlayer
-              ? getPlayerDiceValue(activePlayer.color)
-              : (state.dice ?? 1)
-          }
-          onRoll={handleRoll}
-          onEmote={handleSendEmote}
-          activeEmotes={activeEmotes}
-          playerAvatars={playerAvatars}
-        />
-      </div>
-
-      {/* MOBILE: Nocturne Bottom Drawer (< md) */}
-      <MobileNocturneDrawer
-        state={state}
-        room={room}
-        userId={userId}
-        activePlayer={activePlayer}
-        isMyTurn={Boolean(isMyTurn)}
-        canRoll={canRoll}
-        rollingColor={rollingColor}
-        diceValue={
-          activePlayer
-            ? getPlayerDiceValue(activePlayer.color)
-            : (state.dice ?? 1)
-        }
-        onRoll={handleRoll}
-        onEmote={handleSendEmote}
-        activeEmotes={activeEmotes}
-        playerAvatars={playerAvatars}
+      <LudoTable
+        state={state} userId={userId} roomCode={room.code} audio={audio}
+        canRoll={canRoll} rollingColor={rollingColor} animating={isBoardAnimating}
+        disabled={busy || isPaused || isBoardAnimating || rollingColor !== null}
+        onRoll={handleRoll} onMove={handleMoveToken} onAnimationComplete={handleAnimationComplete}
+        onLeave={() => setLeaveConfirmOpen(true)} onStandings={() => setRankingModalOpen(true)}
+        onEmote={handleSendEmote} activeEmotes={activeEmotes} playerAvatars={playerAvatars}
       />
 
       {/* OFFLINE WAIT SCREEN */}

@@ -1,6 +1,7 @@
 import {
   LUDO_COLOR_STARTS,
   LUDO_STAR_SQUARES,
+  LUDO_TRACK_COORDINATES,
   type LudoColor,
 } from "@kridora/shared";
 import type { BoardCoordinate, LudoSeatDefinition } from "./types";
@@ -11,73 +12,8 @@ import type { BoardCoordinate, LudoSeatDefinition } from "./types";
  * turning directly into their 5-square safe home column (progress 51..55) and goal (56).
  * All coordinates are [row, column].
  */
-export const MAIN_TRACK: ReadonlyArray<BoardCoordinate> = [
-  // Red arm top row moving right (0..4)
-  [6, 1],
-  [6, 2],
-  [6, 3],
-  [6, 4],
-  [6, 5],
-  // Top arm left col moving up (5..10)
-  [5, 6],
-  [4, 6],
-  [3, 6],
-  [2, 6],
-  [1, 6],
-  [0, 6],
-  // Top middle turn / Green entry arrow (11)
-  [0, 7],
-  // Top arm right col moving down (12..17) - index 13 is Green start [1, 8]
-  [0, 8],
-  [1, 8],
-  [2, 8],
-  [3, 8],
-  [4, 8],
-  [5, 8],
-  // Right arm top row moving right (18..23)
-  [6, 9],
-  [6, 10],
-  [6, 11],
-  [6, 12],
-  [6, 13],
-  [6, 14],
-  // Right middle turn / Yellow entry arrow (24)
-  [7, 14],
-  // Right arm bottom row moving left (25..30) - index 26 is Yellow start [8, 13]
-  [8, 14],
-  [8, 13],
-  [8, 12],
-  [8, 11],
-  [8, 10],
-  [8, 9],
-  // Bottom arm right col moving down (31..36)
-  [9, 8],
-  [10, 8],
-  [11, 8],
-  [12, 8],
-  [13, 8],
-  [14, 8],
-  // Bottom middle turn / Blue entry arrow (37)
-  [14, 7],
-  // Bottom arm left col moving up (38..43) - index 39 is Blue start [13, 6]
-  [14, 6],
-  [13, 6],
-  [12, 6],
-  [11, 6],
-  [10, 6],
-  [9, 6],
-  // Left arm bottom row moving left (44..49)
-  [8, 5],
-  [8, 4],
-  [8, 3],
-  [8, 2],
-  [8, 1],
-  [8, 0],
-  // Left middle turn / Red entry arrow (50) and corner before Red start (51)
-  [7, 0],
-  [6, 0],
-];
-
+// The server owns the track. Convert its [column, row] coordinates once for the UI.
+export const MAIN_TRACK: ReadonlyArray<BoardCoordinate> = LUDO_TRACK_COORDINATES.map(([col, row]) => [row, col]);
 export const BOARD_TRACK = MAIN_TRACK;
 export const GREY_STAR_INDICES = new Set<number>(LUDO_STAR_SQUARES);
 
@@ -105,7 +41,7 @@ export const SEAT_DEFINITIONS: Record<LudoColor, LudoSeatDefinition> = {
     color: "coral",
     name: "Red",
     defaultLabel: "Player1",
-    boardHex: "#ff1a1a",
+    boardHex: "#ef4258",
     socketHex: "#c81919",
     pawnLight: "#ff6b6b",
     pawnMid: "#ef1a1a",
@@ -132,10 +68,10 @@ export const SEAT_DEFINITIONS: Record<LudoColor, LudoSeatDefinition> = {
     color: "mint",
     name: "Green",
     defaultLabel: "Player2",
-    boardHex: "#12b84a",
+    boardHex: "#1ebd76",
     socketHex: "#0b7a30",
     pawnLight: "#5ff58f",
-    pawnMid: "#12b84a",
+    pawnMid: "#1ebd76",
     pawnDark: "#065f22",
     rimStroke: "#043b15",
     startTrackIdx: LUDO_COLOR_STARTS.mint,
@@ -159,7 +95,7 @@ export const SEAT_DEFINITIONS: Record<LudoColor, LudoSeatDefinition> = {
     color: "sunshine",
     name: "Yellow",
     defaultLabel: "Player3",
-    boardHex: "#f6ce00",
+    boardHex: "#f9ca38",
     socketHex: "#c5a500",
     pawnLight: "#fff066",
     pawnMid: "#eab308",
@@ -186,10 +122,10 @@ export const SEAT_DEFINITIONS: Record<LudoColor, LudoSeatDefinition> = {
     color: "sky",
     name: "Blue",
     defaultLabel: "Player4",
-    boardHex: "#0098ec",
+    boardHex: "#28a7ee",
     socketHex: "#006ca8",
     pawnLight: "#67d4ff",
-    pawnMid: "#0098ec",
+    pawnMid: "#28a7ee",
     pawnDark: "#004d80",
     rimStroke: "#022a47",
     startTrackIdx: LUDO_COLOR_STARTS.sky,
@@ -245,10 +181,10 @@ export const COLOR_ORDER: LudoColor[] = ["coral", "mint", "sunshine", "sky"];
 
 /** Entry arrows [row, col] pointing directly into each color's 5-box home lane. */
 export const ENTRY_ARROWS: Record<string, { hex: string; rot: number }> = {
-  "7,0": { hex: "#ff1a1a", rot: 0 },
-  "0,7": { hex: "#12b84a", rot: 90 },
-  "7,14": { hex: "#f6ce00", rot: 180 },
-  "14,7": { hex: "#0098ec", rot: 270 },
+  "7,0": { hex: "#ef4258", rot: 0 },
+  "0,7": { hex: "#1ebd76", rot: 90 },
+  "7,14": { hex: "#f9ca38", rot: 180 },
+  "14,7": { hex: "#28a7ee", rot: 270 },
 };
 
 export interface StaticBoardCell {
