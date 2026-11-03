@@ -88,7 +88,10 @@ export interface ClientToServerEvents {
   "ludo:roll": (payload: EmptyPayload, ack: AckFn<LudoGameState>) => void;
   "ludo:move": (payload: LudoMovePayload, ack: AckFn<LudoGameState>) => void;
   "ludo:pass": (payload: EmptyPayload, ack: AckFn<LudoGameState>) => void;
-  "ludo:emote": (payload: LudoEmotePayload, ack: AckFn<{ ok: boolean }>) => void;
+  "ludo:emote": (
+    payload: LudoEmotePayload,
+    ack: AckFn<{ ok: boolean }>,
+  ) => void;
 }
 
 export type ClientToServerEventName = keyof ClientToServerEvents;

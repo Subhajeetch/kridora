@@ -41,11 +41,10 @@ kridora/
 ├── apps/
 │   ├── api/                 # Cloudflare Worker API (Hono + Durable Objects RealtimeHub)
 │   └── web/                 # Single-page application (React 19, Vite, Tailwind CSS v4)
-├── packages/
-│   ├── db/                  # Drizzle ORM schemas, SQL migrations, Rings ledger service
-│   ├── shared/              # Shared types, Zod schemas, socket contracts, game definitions
-│   └── typescript-config/   # Shared tsconfig bases for Node, DOM, and Workers
-└── docker-compose.yml       # Local development PostgreSQL infrastructure
+└── packages/
+    ├── db/                  # Drizzle ORM schemas, D1 migrations, Rings ledger service
+    ├── shared/              # Shared types, Zod schemas, socket contracts, game definitions
+    └── typescript-config/   # Shared tsconfig bases for Node, DOM, and Workers
 ```
 
 ---
@@ -56,7 +55,6 @@ kridora/
 
 - **Node.js**: `v24` or later
 - **pnpm**: `v11` or later
-- **Docker**: For running the local PostgreSQL container
 - **Wrangler**: Cloudflare Workers CLI (bundled via devDependencies)
 
 ### 1. Clone & Install Dependencies
@@ -72,7 +70,7 @@ pnpm install
 Copy the environment templates:
 
 ```bash
-# Root & database configuration
+# Root environment configuration
 cp .env.example .env
 
 # API Worker configuration (wrangler dev secrets)
@@ -87,23 +85,15 @@ openssl rand -base64 32
 
 Paste this secret into both `.env` and `apps/api/.dev.vars`.
 
-### 3. Start Local Database Infrastructure
+### 3. Run Local D1 Migrations
 
-Launch the PostgreSQL container via Docker Compose:
-
-```bash
-pnpm infra:up
-```
-
-### 4. Run Migrations
-
-Apply the Drizzle database schema to your local database:
+Apply the database schema to your local Cloudflare D1 database:
 
 ```bash
 pnpm db:migrate
 ```
 
-### 5. Launch Development Servers
+### 4. Launch Development Servers
 
 Start both the Web frontend and Cloudflare Workers API concurrently:
 
@@ -120,18 +110,17 @@ In local development, the Vite server automatically proxies `/api` and `/ws` to 
 
 ## Available Scripts
 
-| Command            | Description                                                       |
-| :----------------- | :---------------------------------------------------------------- |
-| `pnpm dev`         | Starts Vite dev server and Wrangler local dev server concurrently |
-| `pnpm build`       | Builds production bundles for the web app and API worker dry-run  |
-| `pnpm check-types` | Type-checks all packages and applications across the monorepo     |
-| `pnpm lint`        | Runs linter across applications                                   |
-| `pnpm format`      | Formats codebase with Prettier                                    |
-| `pnpm infra:up`    | Boots PostgreSQL Docker container in the background               |
-| `pnpm infra:down`  | Stops PostgreSQL Docker container                                 |
-| `pnpm db:generate` | Generates new SQL migration files after schema edits              |
-| `pnpm db:migrate`  | Applies pending Drizzle migrations to PostgreSQL                  |
-| `pnpm db:studio`   | Opens Drizzle Studio database visualizer in your browser          |
+| Command                | Description                                                       |
+| :--------------------- | :---------------------------------------------------------------- |
+| `pnpm dev`             | Starts Vite dev server and Wrangler local dev server concurrently |
+| `pnpm build`           | Builds production bundles for the web app and API worker dry-run  |
+| `pnpm check-types`     | Type-checks all packages and applications across the monorepo     |
+| `pnpm lint`            | Runs linter across applications                                   |
+| `pnpm format`          | Formats codebase with Prettier                                    |
+| `pnpm db:generate`     | Generates new SQL migration files after schema edits              |
+| `pnpm db:migrate`      | Applies pending Drizzle migrations to local Cloudflare D1         |
+| `pnpm db:migrate:remote` | Applies pending Drizzle migrations to production Cloudflare D1  |
+| `pnpm db:studio`       | Opens Drizzle Studio database visualizer in your browser          |
 
 ---
 

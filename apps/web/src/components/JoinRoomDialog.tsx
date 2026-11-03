@@ -4,19 +4,19 @@ import {
   ROOM_CODE_LENGTH,
   type RoomSnapshot,
 } from "@kridora/shared";
-import { ArrowRight, DoorOpen, Loader2, LogOut, X } from "lucide-react";
-import { useState, type FormEvent } from "react";
+import { ArrowRight, Loader2, LogOut, Users } from "lucide-react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router";
-import { AuthDialog } from "@/components/AuthDialog";
+import { AuthDialog, GoogleIcon } from "@/components/AuthDialog";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
+  DialogCloseButton,
   DialogContent,
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Field, Input } from "@/components/ui/input";
-import { usePublicConfig } from "@/hooks/usePublicConfig";
 import { authClient, startGuestSession } from "@/lib/auth-client";
 import {
   describeError,
@@ -25,6 +25,7 @@ import {
   waitForSocketConnected,
 } from "@/lib/socket";
 import { useRealtime } from "@/providers/realtime-context";
+import { cn } from "@/lib/utils";
 
 interface JoinRoomDialogProps {
   open: boolean;
@@ -38,6 +39,174 @@ function getInitial(name: string): string {
   const trimmed = (name ?? "").trim();
   if (!trimmed) return "P";
   return Array.from(trimmed)[0]?.toUpperCase() || "P";
+}
+
+const OTP_PLACEHOLDERS = ["A", "B", "C", "9"];
+
+interface OtpCodeInputProps {
+  value: string;
+  onChange: (value: string) => void;
+  hasError?: boolean;
+  disabled?: boolean;
+}
+
+function OtpCodeInput({
+  value,
+  onChange,
+  hasError,
+  disabled,
+}: OtpCodeInputProps) {
+  const inputsRef = useRef<Array<HTMLInputElement | null>>([]);
+  const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
+
+  const chars = Array.from({ length: 4 }, (_, i) => value[i] || "");
+
+  useEffect(() => {
+    // Automatically focus the first input so user can type immediately on open
+    const timer = setTimeout(() => {
+      inputsRef.current[0]?.focus();
+      inputsRef.current[0]?.select();
+    }, 60);
+    return () => clearTimeout(timer);
+  }, []);
+
+  function handleCharChange(index: number, rawInput: string) {
+    const clean = rawInput.toUpperCase().replace(/[^A-Z0-9]/g, "");
+    if (!clean) {
+      const next = [...chars];
+      next[index] = "";
+      onChange(next.join(""));
+      return;
+    }
+
+    if (clean.length > 1) {
+      handlePasteString(clean, index);
+      return;
+    }
+
+    const char = clean.slice(-1);
+    const next = [...chars];
+    next[index] = char;
+    onChange(next.join(""));
+
+    if (index < 3) {
+      inputsRef.current[index + 1]?.focus();
+      inputsRef.current[index + 1]?.select();
+    }
+  }
+
+  function handleKeyDown(
+    index: number,
+    e: React.KeyboardEvent<HTMLInputElement>,
+  ) {
+    if (e.key === "Backspace") {
+      if (!chars[index] && index > 0) {
+        e.preventDefault();
+        const next = [...chars];
+        next[index - 1] = "";
+        onChange(next.join(""));
+        inputsRef.current[index - 1]?.focus();
+      }
+    } else if (e.key === "ArrowLeft" && index > 0) {
+      e.preventDefault();
+      inputsRef.current[index - 1]?.focus();
+      inputsRef.current[index - 1]?.select();
+    } else if (e.key === "ArrowRight" && index < 3) {
+      e.preventDefault();
+      inputsRef.current[index + 1]?.focus();
+      inputsRef.current[index + 1]?.select();
+    }
+  }
+
+  function handlePasteString(pasted: string, startIndex: number = 0) {
+    const clean = pasted.toUpperCase().replace(/[^A-Z0-9]/g, "");
+    if (!clean) return;
+
+    const next = [...chars];
+    let nextFocus = startIndex;
+    for (let i = 0; i < clean.length && startIndex + i < 4; i++) {
+      next[startIndex + i] = clean[i]!;
+      nextFocus = startIndex + i;
+    }
+    onChange(next.join(""));
+    const targetFocus = Math.min(3, nextFocus + 1);
+    inputsRef.current[targetFocus]?.focus();
+    inputsRef.current[targetFocus]?.select();
+  }
+
+  function handlePaste(
+    e: React.ClipboardEvent<HTMLInputElement>,
+    index: number,
+  ) {
+    e.preventDefault();
+    const text = e.clipboardData.getData("text");
+    handlePasteString(text, index);
+  }
+
+  return (
+    <div className="flex items-center justify-between gap-2.5 sm:gap-3.5 w-full">
+      {Array.from({ length: 4 }).map((_, i) => {
+        const isFocused = focusedIndex === i;
+        const isFilled = Boolean(chars[i]);
+
+        return (
+          <div
+            key={i}
+            className={cn(
+              "relative flex-1 filter transition-all",
+              hasError
+                ? "drop-shadow-[0_4px_0_#881337]"
+                : isFocused
+                  ? "drop-shadow-[0_4px_0_#78350f]"
+                  : isFilled
+                    ? "drop-shadow-[0_3px_0_#78350f]"
+                    : "drop-shadow-[0_2px_0_#000000]",
+            )}
+          >
+            <div
+              className={cn(
+                "pixel-corners-sm p-[2.5px] transition-colors",
+                hasError
+                  ? "bg-destructive"
+                  : isFocused
+                    ? "bg-[#facc15]"
+                    : isFilled
+                      ? "bg-[#facc15]/70 hover:bg-[#facc15]"
+                      : "bg-white/20 hover:bg-[#facc15]/40",
+              )}
+            >
+              <div className="pixel-corners-sm bg-[#12131a] flex items-center justify-center h-14 sm:h-16 w-full">
+                <input
+                  ref={(el) => {
+                    inputsRef.current[i] = el;
+                  }}
+                  type="text"
+                  inputMode="text"
+                  autoFocus={i === 0}
+                  autoCapitalize="characters"
+                  autoComplete="off"
+                  spellCheck={false}
+                  maxLength={4}
+                  value={chars[i]}
+                  onChange={(e) => handleCharChange(i, e.target.value)}
+                  onKeyDown={(e) => handleKeyDown(i, e)}
+                  onPaste={(e) => handlePaste(e, i)}
+                  onFocus={(e) => {
+                    setFocusedIndex(i);
+                    e.target.select();
+                  }}
+                  onBlur={() => setFocusedIndex(null)}
+                  disabled={disabled}
+                  placeholder={isFocused ? "" : OTP_PLACEHOLDERS[i]}
+                  className="size-full bg-transparent text-center font-mono text-2xl sm:text-3xl font-bold uppercase text-[#facc15] placeholder:text-gray-600 outline-none caret-[#facc15]"
+                />
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 /**
@@ -55,7 +224,6 @@ export function JoinRoomDialog({
   const navigate = useNavigate();
   const { data: session } = authClient.useSession();
   const { setActiveRoom } = useRealtime();
-  const { googleEnabled } = usePublicConfig();
 
   const [code, setCode] = useState(
     defaultCode ? defaultCode.toUpperCase() : "",
@@ -183,6 +351,7 @@ export function JoinRoomDialog({
       const res = await authClient.signIn.social({
         provider: "google",
         callbackURL: window.location.href,
+        errorCallbackURL: `${window.location.origin}/?authError=google`,
       });
       if (res.error) {
         setError(
@@ -214,27 +383,25 @@ export function JoinRoomDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogContent className="max-w-md overflow-hidden border border-white/15 bg-card/95 p-6 backdrop-blur-2xl shadow-2xl sm:p-7">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-xs"
-            aria-label="Close"
-            className="absolute top-4 right-4 rounded-xl text-muted-foreground hover:bg-white/10 hover:text-foreground z-20"
-            onClick={() => handleOpenChange(false)}
-          >
-            <X className="size-4" />
-          </Button>
+        <DialogContent className="max-w-md">
+          <DialogCloseButton onClick={() => handleOpenChange(false)} />
 
           {/* Dialog Header */}
-          <div className="pr-6">
-            <DialogTitle className="mt-2 text-2xl font-bold tracking-tight">
-              Join a room
-            </DialogTitle>
-            <DialogDescription className="mt-1 text-sm text-muted-foreground">
-              Enter the {ROOM_CODE_LENGTH}-character room code your friend gave
-              you.
-            </DialogDescription>
+          <div className="flex items-center gap-3 pr-6">
+            <div className="pixel-corners-sm bg-[#facc15] p-[2px] shrink-0 filter drop-shadow-[0_2px_0_#78350f]">
+              <div className="grid size-10 place-items-center pixel-corners-sm bg-[#12131a] text-[#facc15]">
+                <Users className="size-5" />
+              </div>
+            </div>
+            <div>
+              <DialogTitle className="font-retro text-base sm:text-lg font-bold uppercase tracking-wide text-white">
+                Join a Room
+              </DialogTitle>
+              <DialogDescription className="mt-0.5 text-xs text-muted-foreground">
+                Enter the {ROOM_CODE_LENGTH}-character room code your friend
+                gave you.
+              </DialogDescription>
+            </div>
           </div>
 
           <form onSubmit={onSubmit} className="mt-6 space-y-4" noValidate>
@@ -242,138 +409,141 @@ export function JoinRoomDialog({
               label="Room code"
               error={error && !conflictRoom ? error : undefined}
             >
-              <Input
+              <OtpCodeInput
                 value={code}
-                onChange={(e) => {
-                  setCode(e.target.value.toUpperCase());
+                onChange={(val) => {
+                  setCode(val);
                   setError(undefined);
                   setConflictRoom(null);
                 }}
-                placeholder="ABCD"
-                maxLength={ROOM_CODE_LENGTH}
-                autoFocus
-                autoCapitalize="characters"
-                autoComplete="off"
-                spellCheck={false}
-                aria-label="Room code"
-                aria-invalid={Boolean(error && !conflictRoom)}
-                className="h-12 text-center text-xl font-bold tracking-[0.35em] uppercase font-mono"
+                hasError={Boolean(error && !conflictRoom)}
+                disabled={busy}
               />
             </Field>
 
             {/* Identity: When Signed in vs Not Signed in */}
             {session ? (
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-3.5">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2.5">
-                    <span className="grid size-8 shrink-0 place-items-center rounded-full bg-linear-to-br from-neon-violet to-neon-pink font-display text-xs uppercase text-white overflow-hidden">
-                      {session.user.image ? (
-                        <img
-                          src={session.user.image}
-                          alt=""
-                          className="size-full object-cover"
-                        />
-                      ) : (
-                        getInitial(session.user.name)
-                      )}
-                    </span>
-                    <div className="min-w-0">
-                      <p className="text-xs text-muted-foreground">
-                        Playing as
-                      </p>
-                      <p className="truncate text-sm font-semibold text-foreground">
-                        {session.user.name}
-                      </p>
+              <div className="pixel-corners-sm bg-white/20 p-[2px] filter drop-shadow-[0_2px_0_#000000]">
+                <div className="pixel-corners-sm bg-[#12131a] p-3.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2.5">
+                      <div className="pixel-corners-sm bg-[#facc15] p-[1.5px] shrink-0">
+                        <span className="grid size-8 place-items-center pixel-corners-sm bg-linear-to-br from-amber-400 to-amber-600 font-display text-xs uppercase text-black font-bold overflow-hidden">
+                          {session.user.image ? (
+                            <img
+                              src={session.user.image}
+                              alt=""
+                              className="size-full object-cover"
+                            />
+                          ) : (
+                            getInitial(session.user.name)
+                          )}
+                        </span>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-retro font-bold uppercase tracking-wider text-muted-foreground">
+                          Playing as
+                        </p>
+                        <p className="truncate text-sm font-semibold text-white">
+                          {session.user.name}
+                        </p>
+                      </div>
                     </div>
+                    <button
+                      type="button"
+                      className="text-xs font-retro font-bold text-[#facc15] hover:text-white uppercase transition-colors"
+                      onClick={() => setAuthOpen(true)}
+                    >
+                      Switch
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    className="text-xs font-medium text-muted-foreground hover:text-foreground underline underline-offset-4"
-                    onClick={() => setAuthOpen(true)}
-                  >
-                    Switch account
-                  </button>
                 </div>
               </div>
             ) : (
-              <div className="space-y-3 rounded-2xl border border-white/10 bg-white/5 p-4">
-                <Field label="Your display name" error={nameError}>
-                  <Input
-                    value={name}
-                    onChange={(e) => {
-                      setName(e.target.value);
-                      setNameError(undefined);
-                    }}
-                    placeholder="What should players call you?"
-                    maxLength={20}
-                    autoComplete="nickname"
-                    aria-invalid={Boolean(nameError)}
-                    className="h-11"
-                  />
-                </Field>
+              <div className="pixel-corners-sm bg-white/20 p-[2px] filter drop-shadow-[0_2px_0_#000000]">
+                <div className="space-y-3 pixel-corners-sm bg-[#12131a] p-4">
+                  <Field label="Your display name" error={nameError}>
+                    <Input
+                      value={name}
+                      onChange={(e) => {
+                        setName(e.target.value);
+                        setNameError(undefined);
+                      }}
+                      placeholder="What should players call you?"
+                      maxLength={20}
+                      autoComplete="nickname"
+                      aria-invalid={Boolean(nameError)}
+                      className="h-11"
+                    />
+                  </Field>
 
-                <p className="text-xs text-muted-foreground">
-                  Joining as a guest lets you play immediately without
-                  passwords.
-                </p>
+                  <p className="text-xs text-muted-foreground">
+                    Joining as a guest lets you play immediately without
+                    passwords.
+                  </p>
+                </div>
               </div>
             )}
 
             {/* Conflict Error Banner */}
             {error && conflictRoom && (
-              <div
-                role="alert"
-                className="rounded-2xl bg-destructive/10 border border-destructive/20 px-3.5 py-2.5 text-sm text-destructive"
-              >
-                <p>{error}</p>
-                <div className="mt-3 flex gap-2">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="destructive"
-                    disabled={busy}
-                    onClick={() => void handleLeaveAndJoin()}
-                  >
-                    <LogOut className="size-3.5" /> Leave current & join
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      onOpenChange(false);
-                      void navigate(
-                        `/${conflictRoom.gameSlug || defaultGameSlug || "game"}/room`,
-                      );
-                    }}
-                  >
-                    Go to room
-                  </Button>
+              <div className="pixel-corners-sm bg-destructive p-[2px] filter drop-shadow-[0_2px_0_#881337]">
+                <div className="pixel-corners-sm bg-[#1a0a0d] p-3.5 text-sm text-destructive">
+                  <p>{error}</p>
+                  <div className="mt-3 flex gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="destructive"
+                      disabled={busy}
+                      onClick={() => void handleLeaveAndJoin()}
+                      className="pixel-corners-sm"
+                    >
+                      <LogOut className="size-3.5" /> Leave current & join
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="pixel-corners-sm"
+                      onClick={() => {
+                        onOpenChange(false);
+                        void navigate(
+                          `/${conflictRoom.gameSlug || defaultGameSlug || "game"}/room`,
+                        );
+                      }}
+                    >
+                      Go to room
+                    </Button>
+                  </div>
                 </div>
               </div>
             )}
 
             {/* Submit Action */}
             <div className="pt-2">
-              <Button
+              <button
                 type="submit"
-                size="lg"
-                className="w-full h-12 text-base font-semibold shadow-lg shadow-primary/20 active:scale-[0.99] transition-all"
                 disabled={!canJoin}
+                className="w-full filter drop-shadow-[0_4px_0_#78350f] active:translate-y-0.5 active:drop-shadow-[0_1px_0_#78350f] transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
               >
-                {busy ? (
-                  <>
-                    <Loader2 className="size-4 animate-spin" />
-                    <span>Joining room...</span>
-                  </>
-                ) : (
-                  <>
-                    <DoorOpen className="size-4" />
-                    <span>{!session ? "Join as Guest" : "Join room"}</span>
-                    <ArrowRight className="size-4 ml-auto" />
-                  </>
-                )}
-              </Button>
+                <div className="pixel-corners-sm bg-black p-[2px]">
+                  <div className="pixel-corners-sm bg-[#facc15] hover:bg-[#fbbf24] text-black font-retro text-xs sm:text-sm font-bold uppercase tracking-wider h-11 flex items-center justify-center gap-2">
+                    {busy ? (
+                      <>
+                        <Loader2 className="size-4 animate-spin text-black" />
+                        <span>Joining room...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Users className="size-4" />
+                        <span>{!session ? "Join as Guest" : "Join room"}</span>
+                        <ArrowRight className="size-4 ml-1" />
+                      </>
+                    )}
+                  </div>
+                </div>
+              </button>
             </div>
 
             {/* Alternates when not signed in */}
@@ -389,18 +559,19 @@ export function JoinRoomDialog({
                 </div>
 
                 <div className="grid gap-2">
-                  {googleEnabled && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="default"
-                      className="w-full h-10 border-white/15 hover:border-primary/50 text-sm"
-                      disabled={busy}
-                      onClick={() => void handleGoogleLogin()}
-                    >
-                      Continue with Google
-                    </Button>
-                  )}
+                  <button
+                    type="button"
+                    className="w-full filter drop-shadow-[0_4px_0_#000000] active:translate-y-0.5 active:drop-shadow-[0_1px_0_#000000] transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={busy}
+                    onClick={() => void handleGoogleLogin()}
+                  >
+                    <div className="pixel-corners-sm bg-black p-[2px]">
+                      <div className="pixel-corners-sm bg-white hover:bg-[#f3f4f6] text-black font-retro text-xs sm:text-sm font-bold uppercase tracking-wider h-10 px-4 flex items-center justify-center gap-2.5 transition-colors">
+                        <GoogleIcon className="size-4.5 shrink-0" />
+                        <span>Continue with Google</span>
+                      </div>
+                    </div>
+                  </button>
 
                   <p className="text-center text-xs text-muted-foreground">
                     Already have an account?{" "}

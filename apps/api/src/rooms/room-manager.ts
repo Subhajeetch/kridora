@@ -50,9 +50,15 @@ export class RoomManager {
     if (!savedRooms) return;
 
     for (const [code, room] of Object.entries(savedRooms)) {
+      if (!room || room.players.length === 0) {
+        continue;
+      }
       for (const p of room.players) {
         p.connected = activeUserIds.has(p.userId);
         this.userToRoom.set(p.userId, code);
+      }
+      if (!room.players.some((p) => p.connected) && room.emptyCloseAt === null) {
+        room.emptyCloseAt = Date.now() + EMPTY_ROOM_CLOSE_DELAY_MS;
       }
       this.rooms.set(code, room);
       this.inviteToRoom.set(room.inviteToken, code);
@@ -91,7 +97,11 @@ export class RoomManager {
     for (const room of Array.from(this.rooms.values())) {
       let roomChanged = false;
 
-      if (room.emptyCloseAt !== null && now >= room.emptyCloseAt) {
+      // 1. Immediately delete empty room or room where empty timer expired
+      if (
+        room.players.length === 0 ||
+        (room.emptyCloseAt !== null && now >= room.emptyCloseAt)
+      ) {
         this.destroyRoom(room, true);
         dirty = true;
         continue;
@@ -101,13 +111,23 @@ export class RoomManager {
         for (const [uid, deadline] of Object.entries(
           room.disconnectDeadlines,
         )) {
-          if (now >= deadline && uid !== room.ownerId) {
+          if (now >= deadline) {
             const target = room.players.find((p) => p.userId === uid);
             if (target && !target.connected) {
               room.players = room.players.filter((p) => p.userId !== uid);
               delete room.disconnectDeadlines[uid];
               this.userToRoom.delete(uid);
               roomChanged = true;
+
+              if (room.ownerId === uid) {
+                const nextOwner =
+                  room.players.find((p) => p.connected) ?? room.players[0];
+                if (nextOwner) {
+                  room.ownerId = nextOwner.userId;
+                  nextOwner.isReady = true;
+                }
+                room.ownerTransferAt = null;
+              }
             }
           }
         }
@@ -127,7 +147,11 @@ export class RoomManager {
                 gameModule.onPlayerLeft?.(room.gameState, uid);
               }
 
-              if (room.players.length < 2) {
+              if (room.players.length === 0) {
+                this.destroyRoom(room, true);
+                dirty = true;
+                continue;
+              } else if (room.players.length < 2) {
                 room.status = "lobby";
                 room.gameState = null;
                 room.matchId = null;
@@ -155,12 +179,23 @@ export class RoomManager {
         roomChanged = true;
       }
 
+      // If 0 players remain in the room, delete it immediately
       if (room.players.length === 0) {
         this.destroyRoom(room, true);
         dirty = true;
-      } else if (roomChanged) {
-        this.broadcastRoomState(room);
-        dirty = true;
+      } else {
+        // If 0 players are currently connected, set emptyCloseAt if not already set
+        if (
+          !room.players.some((p) => p.connected) &&
+          room.emptyCloseAt === null
+        ) {
+          room.emptyCloseAt = now + EMPTY_ROOM_CLOSE_DELAY_MS;
+          dirty = true;
+        }
+        if (roomChanged) {
+          this.broadcastRoomState(room);
+          dirty = true;
+        }
       }
     }
 
@@ -217,8 +252,8 @@ export class RoomManager {
     if (room.status === "lobby") {
       room.disconnectDeadlines[userId] = now + PLAYER_DISCONNECT_GRACE_MS;
     } else if (room.status === "in_progress") {
-      // 5-minute offline grace period during match
-      room.disconnectDeadlines[userId] = now + 5 * 60 * 1000;
+      // 3-minute offline grace period during match
+      room.disconnectDeadlines[userId] = now + EMPTY_ROOM_CLOSE_DELAY_MS;
     }
 
     if (!room.players.some((p) => p.connected)) {
@@ -498,6 +533,10 @@ export class RoomManager {
       return null;
     }
 
+    if (!room.players.some((p) => p.connected) && room.emptyCloseAt === null) {
+      room.emptyCloseAt = Date.now() + EMPTY_ROOM_CLOSE_DELAY_MS;
+    }
+
     if (room.ownerId === userId) {
       const nextOwner =
         room.players.find((p) => p.connected) ?? room.players[0];
@@ -645,6 +684,9 @@ export class RoomManager {
     this.broadcaster.sendToUser(targetUserId, "room:kicked", {
       code: room.code,
     });
+    if (!room.players.some((p) => p.connected) && room.emptyCloseAt === null) {
+      room.emptyCloseAt = Date.now() + EMPTY_ROOM_CLOSE_DELAY_MS;
+    }
     this.broadcastRoomState(room);
     return this.toSnapshot(room);
   }

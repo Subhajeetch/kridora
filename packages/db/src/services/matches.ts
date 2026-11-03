@@ -14,26 +14,26 @@ export async function createMatch(
   db: Database,
   input: CreateMatchInput,
 ): Promise<string> {
-  return db.transaction(async (tx) => {
-    const [match] = await tx
-      .insert(matches)
-      .values({
-        gameSlug: input.gameSlug,
-        roomCode: input.roomCode,
-        settings: input.settings ?? {},
-      })
-      .returning({ id: matches.id });
-    if (!match) throw new Error("Failed to create match");
-
-    if (input.playerIds.length > 0) {
-      await tx.insert(matchPlayers).values(
-        input.playerIds.map((userId, seat) => ({
-          matchId: match.id,
-          userId,
-          seat,
-        })),
-      );
-    }
-    return match.id;
+  const matchId = crypto.randomUUID();
+  const insertMatch = db.insert(matches).values({
+    id: matchId,
+    gameSlug: input.gameSlug,
+    roomCode: input.roomCode,
+    settings: input.settings ?? {},
   });
+
+  if (input.playerIds.length > 0) {
+    const insertPlayers = db.insert(matchPlayers).values(
+      input.playerIds.map((userId, seat) => ({
+        matchId,
+        userId,
+        seat,
+      })),
+    );
+    await db.batch([insertMatch, insertPlayers]);
+  } else {
+    await insertMatch;
+  }
+
+  return matchId;
 }

@@ -1,13 +1,15 @@
+import { lazy, Suspense } from "react";
 import { Route, Routes } from "react-router";
 import { AppShell } from "@/components/AppShell";
-import GameLobbyPage from "@/pages/GameLobbyPage";
-import GamesPage from "@/pages/GamesPage";
-import HomePage from "@/pages/HomePage";
-import InviteJoinPage from "@/pages/InviteJoinPage";
-import NotFoundPage from "@/pages/NotFoundPage";
-import ResetPasswordPage from "@/pages/ResetPasswordPage";
-import RoomPage from "@/pages/RoomPage";
 import { RealtimeProvider } from "@/providers/RealtimeProvider";
+
+const HomePage = lazy(() => import("@/pages/HomePage"));
+const GamesPage = lazy(() => import("@/pages/GamesPage"));
+const GameLobbyPage = lazy(() => import("@/pages/GameLobbyPage"));
+const RoomPage = lazy(() => import("@/pages/RoomPage"));
+const InviteJoinPage = lazy(() => import("@/pages/InviteJoinPage"));
+const ResetPasswordPage = lazy(() => import("@/pages/ResetPasswordPage"));
+const NotFoundPage = lazy(() => import("@/pages/NotFoundPage"));
 
 /**
  * Routes:
@@ -22,18 +24,20 @@ import { RealtimeProvider } from "@/providers/RealtimeProvider";
 function App() {
   return (
     <RealtimeProvider>
-      <Routes>
-        <Route element={<AppShell />}>
-          <Route index element={<HomePage />} />
-          <Route path="games" element={<GamesPage />} />
-          <Route path="reset-password" element={<ResetPasswordPage />} />
-          <Route path="join/:token" element={<InviteJoinPage />} />
-          <Route path=":slug/join/:token" element={<InviteJoinPage />} />
-          <Route path=":slug" element={<GameLobbyPage />} />
-          <Route path=":slug/room" element={<RoomPage />} />
-          <Route path="*" element={<NotFoundPage />} />
-        </Route>
-      </Routes>
+      <Suspense fallback={null}>
+        <Routes>
+          <Route element={<AppShell />}>
+            <Route index element={<HomePage />} />
+            <Route path="games" element={<GamesPage />} />
+            <Route path="reset-password" element={<ResetPasswordPage />} />
+            <Route path="join/:token" element={<InviteJoinPage />} />
+            <Route path=":slug/join/:token" element={<InviteJoinPage />} />
+            <Route path=":slug" element={<GameLobbyPage />} />
+            <Route path=":slug/room" element={<RoomPage />} />
+            <Route path="*" element={<NotFoundPage />} />
+          </Route>
+        </Routes>
+      </Suspense>
     </RealtimeProvider>
   );
 }

@@ -1,4 +1,7 @@
 {
   "extends": "@kridora/typescript-config/node.json",
+  "compilerOptions": {
+    "types": ["node", "@cloudflare/workers-types"]
+  },
   "include": ["src", "drizzle.config.ts"]
 }

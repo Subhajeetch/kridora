@@ -7,10 +7,9 @@
     "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "check-types": "turbo run check-types",
-    "infra:up": "docker compose up -d",
-    "infra:down": "docker compose down",
     "db:generate": "pnpm --filter @kridora/db db:generate",
-    "db:migrate": "pnpm --filter @kridora/db db:migrate",
+    "db:migrate": "pnpm --filter @kridora/api d1:migrate:local",
+    "db:migrate:remote": "pnpm --filter @kridora/api d1:migrate:remote",
     "db:studio": "pnpm --filter @kridora/db db:studio"
   },
   "devDependencies": {

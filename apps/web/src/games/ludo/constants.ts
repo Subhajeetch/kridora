@@ -13,7 +13,8 @@ import type { BoardCoordinate, LudoSeatDefinition } from "./types";
  * All coordinates are [row, column].
  */
 // The server owns the track. Convert its [column, row] coordinates once for the UI.
-export const MAIN_TRACK: ReadonlyArray<BoardCoordinate> = LUDO_TRACK_COORDINATES.map(([col, row]) => [row, col]);
+export const MAIN_TRACK: ReadonlyArray<BoardCoordinate> =
+  LUDO_TRACK_COORDINATES.map(([col, row]) => [row, col]);
 export const BOARD_TRACK = MAIN_TRACK;
 export const GREY_STAR_INDICES = new Set<number>(LUDO_STAR_SQUARES);
 

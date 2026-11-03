@@ -52,6 +52,18 @@ export async function fetchInvitePreviewFromHub(
   return (await res.json()) as RoomPreview;
 }
 
+export async function evictUserFromHub(
+  env: Env,
+  userId: string,
+): Promise<void> {
+  const stub = getHubStub(env);
+  await stub.fetch(`${INTERNAL_ORIGIN}/internal/evict-user`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ userId }),
+  });
+}
+
 export function upgradeWebSocketInHub(
   env: Env,
   rawRequest: Request,

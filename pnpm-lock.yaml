@@ -144,20 +144,17 @@ importers:
     dependencies:
       drizzle-orm:
         specifier: ^0.45.4
-        version: 0.45.4(@cloudflare/workers-types@5.20261027.1)(@types/pg@8.23.1)(kysely@0.29.6)(pg@8.23.1)
-      pg:
-        specifier: ^8.23.1
-        version: 8.23.1
+        version: 0.45.4(@cloudflare/workers-types@4.20260702.1)(@types/pg@8.23.1)(kysely@0.29.6)(pg@8.23.1)
     devDependencies:
+      '@cloudflare/workers-types':
+        specifier: ^4.20260401.0
+        version: 4.20260702.1
       '@kridora/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config
       '@types/node':
         specifier: ^24.19.2
         version: 24.19.2
-      '@types/pg':
-        specifier: ^8.15.0
-        version: 8.23.1
       drizzle-kit:
         specifier: ^0.31.11
         version: 0.31.11
@@ -4662,6 +4659,7 @@ snapshots:
       '@types/node': 24.19.2
       pg-protocol: 1.16.1
       pg-types: 2.2.0
+    optional: true
 
   '@types/react-dom@19.3.0(@types/react@19.2.18)':
     dependencies:
@@ -5123,7 +5121,6 @@ snapshots:
       '@types/pg': 8.23.1
       kysely: 0.29.6
       pg: 8.23.1
-    optional: true
 
   drizzle-orm@0.45.4(@cloudflare/workers-types@5.20261027.1)(@types/pg@8.23.1)(kysely@0.29.6)(pg@8.23.1):
     optionalDependencies:
@@ -5131,6 +5128,7 @@ snapshots:
       '@types/pg': 8.23.1
       kysely: 0.29.6
       pg: 8.23.1
+    optional: true
 
   dunder-proto@1.0.1:
     dependencies:
@@ -5996,15 +5994,19 @@ snapshots:
   pg-cloudflare@1.4.1:
     optional: true
 
-  pg-connection-string@2.14.1: {}
+  pg-connection-string@2.14.1:
+    optional: true
 
-  pg-int8@1.0.1: {}
+  pg-int8@1.0.1:
+    optional: true
 
   pg-pool@3.14.0(pg@8.23.1):
     dependencies:
       pg: 8.23.1
+    optional: true
 
-  pg-protocol@1.16.1: {}
+  pg-protocol@1.16.1:
+    optional: true
 
   pg-types@2.2.0:
     dependencies:
@@ -6013,6 +6015,7 @@ snapshots:
       postgres-bytea: 1.0.1
       postgres-date: 1.0.7
       postgres-interval: 1.2.0
+    optional: true
 
   pg@8.23.1:
     dependencies:
@@ -6023,10 +6026,12 @@ snapshots:
       pgpass: 1.0.5
     optionalDependencies:
       pg-cloudflare: 1.4.1
+    optional: true
 
   pgpass@1.0.5:
     dependencies:
       split2: 4.2.0
+    optional: true
 
   picocolors@1.1.1: {}
 
@@ -6051,15 +6056,19 @@ snapshots:
       picocolors: 1.1.1
       source-map-js: 1.2.2
 
-  postgres-array@2.0.0: {}
+  postgres-array@2.0.0:
+    optional: true
 
-  postgres-bytea@1.0.1: {}
+  postgres-bytea@1.0.1:
+    optional: true
 
-  postgres-date@1.0.7: {}
+  postgres-date@1.0.7:
+    optional: true
 
   postgres-interval@1.2.0:
     dependencies:
       xtend: 4.0.2
+    optional: true
 
   powershell-utils@0.2.1: {}
 
@@ -6344,7 +6353,8 @@ snapshots:
 
   source-map@0.6.1: {}
 
-  split2@4.2.0: {}
+  split2@4.2.0:
+    optional: true
 
   statuses@2.0.2: {}
 
@@ -6574,7 +6584,8 @@ snapshots:
       is-wsl: 3.1.1
       powershell-utils: 0.2.1
 
-  xtend@4.0.2: {}
+  xtend@4.0.2:
+    optional: true
 
   yallist@3.1.1: {}
 

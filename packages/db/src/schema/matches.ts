@@ -1,52 +1,61 @@
 import {
-  bigint,
   index,
   integer,
-  jsonb,
-  pgEnum,
-  pgTable,
+  sqliteTable,
   text,
-  timestamp,
   unique,
-  uuid,
-} from "drizzle-orm/pg-core";
+} from "drizzle-orm/sqlite-core";
 import { user } from "./auth";
 
-export const matchStatus = pgEnum("match_status", [
+export const MATCH_STATUSES = [
   "in_progress",
   "completed",
   "abandoned",
-]);
+] as const;
 
-/** One row per game that was actually started from a room. Live room state lives in Redis, not here. */
-export const matches = pgTable(
+export type MatchStatus = (typeof MATCH_STATUSES)[number];
+
+/** One row per game that was actually started from a room. Live room state lives in Redis/Durable Objects, not here. */
+export const matches = sqliteTable(
   "matches",
   {
-    id: uuid().primaryKey().defaultRandom(),
-    gameSlug: text().notNull(),
-    roomCode: text().notNull(),
-    status: matchStatus().notNull().default("in_progress"),
-    settings: jsonb().$type<Record<string, unknown>>().notNull().default({}),
-    startedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
-    endedAt: timestamp({ withTimezone: true }),
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    gameSlug: text("game_slug").notNull(),
+    roomCode: text("room_code").notNull(),
+    status: text("status")
+      .$type<MatchStatus>()
+      .notNull()
+      .default("in_progress"),
+    settings: text("settings", { mode: "json" })
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default({}),
+    startedAt: integer("started_at", { mode: "timestamp" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+    endedAt: integer("ended_at", { mode: "timestamp" }),
   },
   (t) => [index("matches_game_started_idx").on(t.gameSlug, t.startedAt)],
 );
 
-export const matchPlayers = pgTable(
+export const matchPlayers = sqliteTable(
   "match_players",
   {
-    id: uuid().primaryKey().defaultRandom(),
-    matchId: uuid()
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    matchId: text("match_id")
       .notNull()
       .references(() => matches.id, { onDelete: "cascade" }),
     // SET NULL: deleting a (guest) account must not erase the match history of the other players.
-    userId: text().references(() => user.id, { onDelete: "set null" }),
+    userId: text("user_id").references(() => user.id, { onDelete: "set null" }),
     /** Join order in the room (0 = room creator). Games can map this to turn order or colours. */
-    seat: integer().notNull(),
-    placement: integer(),
-    xpEarned: integer().notNull().default(0),
-    ringsEarned: bigint({ mode: "number" }).notNull().default(0),
+    seat: integer("seat").notNull(),
+    placement: integer("placement"),
+    xpEarned: integer("xp_earned").notNull().default(0),
+    ringsEarned: integer("rings_earned").notNull().default(0),
   },
   (t) => [
     unique("match_players_match_user_unique").on(t.matchId, t.userId),

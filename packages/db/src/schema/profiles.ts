@@ -1,13 +1,5 @@
 import { sql } from "drizzle-orm";
-import {
-  bigint,
-  check,
-  integer,
-  jsonb,
-  pgTable,
-  text,
-  timestamp,
-} from "drizzle-orm/pg-core";
+import { check, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 import { user } from "./auth";
 
 export interface PlayerSettings {
@@ -20,27 +12,32 @@ export interface PlayerSettings {
  * One row per user (guests included). Holds the game wallet (Rings) and progression.
  *
  * `rings_balance` is a cache of the ledger in `ring_transactions` so reads are O(1).
- * It must ONLY be changed through `applyRingTransaction` (services/rings.ts), which locks the row,
+ * It must ONLY be changed through `applyRingTransaction` (services/rings.ts), which
  * writes the ledger entry and updates the balance in a single database transaction.
  */
-export const playerProfiles = pgTable(
+export const playerProfiles = sqliteTable(
   "player_profiles",
   {
-    userId: text()
+    userId: text("user_id")
       .primaryKey()
       .references(() => user.id, { onDelete: "cascade" }),
-    numericId: text().unique(),
-    ringsBalance: bigint({ mode: "number" }).notNull().default(0),
-    lifetimeRingsEarned: bigint({ mode: "number" }).notNull().default(0),
-    lifetimeRingsSpent: bigint({ mode: "number" }).notNull().default(0),
-    xp: bigint({ mode: "number" }).notNull().default(0),
-    gamesPlayed: integer().notNull().default(0),
-    gamesWon: integer().notNull().default(0),
-    settings: jsonb().$type<PlayerSettings>().notNull().default({}),
-    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp({ withTimezone: true })
+    numericId: text("numeric_id").unique(),
+    ringsBalance: integer("rings_balance").notNull().default(0),
+    lifetimeRingsEarned: integer("lifetime_rings_earned").notNull().default(0),
+    lifetimeRingsSpent: integer("lifetime_rings_spent").notNull().default(0),
+    xp: integer("xp").notNull().default(0),
+    gamesPlayed: integer("games_played").notNull().default(0),
+    gamesWon: integer("games_won").notNull().default(0),
+    settings: text("settings", { mode: "json" })
+      .$type<PlayerSettings>()
       .notNull()
-      .defaultNow()
+      .default({}),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+    updatedAt: integer("updated_at", { mode: "timestamp" })
+      .notNull()
+      .$defaultFn(() => new Date())
       .$onUpdate(() => new Date()),
   },
   (t) => [

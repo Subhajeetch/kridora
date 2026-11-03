@@ -1,6 +1,7 @@
 import { and, eq, sql } from "drizzle-orm";
 import type { Database } from "../client";
 import {
+  account,
   matchPlayers,
   playerProfiles,
   ringTransactions,
@@ -111,7 +112,7 @@ export async function findUserByNumericId(
     userId: row.userId,
     name: row.name,
     image: row.image,
-    isAnonymous: row.isAnonymous,
+    isAnonymous: Boolean(row.isAnonymous),
     numericId: row.numericId,
   };
 }
@@ -165,92 +166,87 @@ export async function mergeGuestProfileIntoUser(
 ): Promise<void> {
   if (!guestUserId || !newUserId || guestUserId === newUserId) return;
 
-  await db.transaction(async (tx) => {
-    // 1. Fetch guest profile
-    const [guestProfile] = await tx
-      .select()
-      .from(playerProfiles)
-      .where(eq(playerProfiles.userId, guestUserId))
-      .limit(1);
+  // 1. Fetch guest profile
+  const [guestProfile] = await db
+    .select()
+    .from(playerProfiles)
+    .where(eq(playerProfiles.userId, guestUserId))
+    .limit(1);
 
-    if (guestProfile) {
-      const guestNumericId = guestProfile.numericId;
+  if (guestProfile) {
+    const guestNumericId = guestProfile.numericId;
 
-      // Free the numericId from guestProfile first to prevent unique constraint conflict
-      if (guestNumericId) {
-        await tx
-          .update(playerProfiles)
-          .set({ numericId: null })
-          .where(eq(playerProfiles.userId, guestUserId));
-      }
-
-      // Check if new user profile already exists
-      const [newProfile] = await tx
-        .select()
-        .from(playerProfiles)
-        .where(eq(playerProfiles.userId, newUserId))
-        .limit(1);
-
-      if (newProfile) {
-        // Update new user's profile: inherit guest numericId, add rings balance & stats
-        await tx
-          .update(playerProfiles)
-          .set({
-            numericId: guestNumericId ?? newProfile.numericId,
-            ringsBalance: sql`${playerProfiles.ringsBalance} + ${guestProfile.ringsBalance}`,
-            lifetimeRingsEarned: sql`${playerProfiles.lifetimeRingsEarned} + ${guestProfile.lifetimeRingsEarned}`,
-            lifetimeRingsSpent: sql`${playerProfiles.lifetimeRingsSpent} + ${guestProfile.lifetimeRingsSpent}`,
-            xp: sql`${playerProfiles.xp} + ${guestProfile.xp}`,
-            gamesPlayed: sql`${playerProfiles.gamesPlayed} + ${guestProfile.gamesPlayed}`,
-            gamesWon: sql`${playerProfiles.gamesWon} + ${guestProfile.gamesWon}`,
-            settings: {
-              ...guestProfile.settings,
-              ...newProfile.settings,
-            },
-          })
-          .where(eq(playerProfiles.userId, newUserId));
-      } else {
-        // Insert new profile with merged values
-        await tx.insert(playerProfiles).values({
-          userId: newUserId,
-          numericId: guestNumericId,
-          ringsBalance: guestProfile.ringsBalance,
-          lifetimeRingsEarned: guestProfile.lifetimeRingsEarned,
-          lifetimeRingsSpent: guestProfile.lifetimeRingsSpent,
-          xp: guestProfile.xp,
-          gamesPlayed: guestProfile.gamesPlayed,
-          gamesWon: guestProfile.gamesWon,
-          settings: guestProfile.settings,
-        });
-      }
+    // Free the numericId from guestProfile first to prevent unique constraint conflict
+    if (guestNumericId) {
+      await db
+        .update(playerProfiles)
+        .set({ numericId: null })
+        .where(eq(playerProfiles.userId, guestUserId));
     }
 
-    // 2. Transfer ring transactions from guest to new user
-    await tx
+    // Check if new user profile already exists
+    const [newProfile] = await db
+      .select()
+      .from(playerProfiles)
+      .where(eq(playerProfiles.userId, newUserId))
+      .limit(1);
+
+    if (newProfile) {
+      // Update new user's profile: inherit guest numericId, add rings balance & stats
+      await db
+        .update(playerProfiles)
+        .set({
+          numericId: guestNumericId ?? newProfile.numericId,
+          ringsBalance: sql`${playerProfiles.ringsBalance} + ${guestProfile.ringsBalance}`,
+          lifetimeRingsEarned: sql`${playerProfiles.lifetimeRingsEarned} + ${guestProfile.lifetimeRingsEarned}`,
+          lifetimeRingsSpent: sql`${playerProfiles.lifetimeRingsSpent} + ${guestProfile.lifetimeRingsSpent}`,
+          xp: sql`${playerProfiles.xp} + ${guestProfile.xp}`,
+          gamesPlayed: sql`${playerProfiles.gamesPlayed} + ${guestProfile.gamesPlayed}`,
+          gamesWon: sql`${playerProfiles.gamesWon} + ${guestProfile.gamesWon}`,
+          settings: {
+            ...guestProfile.settings,
+            ...newProfile.settings,
+          },
+        })
+        .where(eq(playerProfiles.userId, newUserId));
+    } else {
+      // Insert new profile with merged values
+      await db.insert(playerProfiles).values({
+        userId: newUserId,
+        numericId: guestNumericId,
+        ringsBalance: guestProfile.ringsBalance,
+        lifetimeRingsEarned: guestProfile.lifetimeRingsEarned,
+        lifetimeRingsSpent: guestProfile.lifetimeRingsSpent,
+        xp: guestProfile.xp,
+        gamesPlayed: guestProfile.gamesPlayed,
+        gamesWon: guestProfile.gamesWon,
+        settings: guestProfile.settings,
+      });
+    }
+  }
+
+  // 2. Transfer ring transactions & match history, and clean up guest user atomically in a single batch
+  await db.batch([
+    db
       .update(ringTransactions)
       .set({ userId: newUserId })
-      .where(eq(ringTransactions.userId, guestUserId));
-
-    // 3. Transfer match player history from guest to new user
-    await tx
+      .where(eq(ringTransactions.userId, guestUserId)),
+    db
       .update(matchPlayers)
       .set({ userId: newUserId })
-      .where(eq(matchPlayers.userId, guestUserId));
-
-    // 4. Clean up guest profile, sessions, and guest user row
-    await tx
+      .where(eq(matchPlayers.userId, guestUserId)),
+    db
       .delete(playerProfiles)
-      .where(eq(playerProfiles.userId, guestUserId));
-
-    await tx.delete(session).where(eq(session.userId, guestUserId));
-
-    await tx.delete(user).where(eq(user.id, guestUserId));
-  });
+      .where(eq(playerProfiles.userId, guestUserId)),
+    db.delete(account).where(eq(account.userId, guestUserId)),
+    db.delete(session).where(eq(session.userId, guestUserId)),
+    db.delete(user).where(eq(user.id, guestUserId)),
+  ]);
 }
 
 /**
- * Safely discards an anonymous guest account when a user logs into an existing account.
- * Does NOT merge stats or numericId. Ensures foreign key restrict on ring_transactions is handled.
+ * Safely discards an anonymous guest account when a user logs into an existing account or signs out.
+ * Completely clears profile, ring transactions, match associations, account credentials, sessions, and the user row.
  */
 export async function discardGuestAccount(
   db: Database,
@@ -258,27 +254,25 @@ export async function discardGuestAccount(
 ): Promise<void> {
   if (!guestUserId) return;
 
-  await db.transaction(async (tx) => {
+  await db.batch([
     // Delete ephemeral guest ring transactions so onDelete: restrict doesn't block deletion
-    await tx
+    db
       .delete(ringTransactions)
-      .where(eq(ringTransactions.userId, guestUserId));
-
+      .where(eq(ringTransactions.userId, guestUserId)),
     // Dissociate match_players
-    await tx
+    db
       .update(matchPlayers)
       .set({ userId: null })
-      .where(eq(matchPlayers.userId, guestUserId));
-
+      .where(eq(matchPlayers.userId, guestUserId)),
     // Delete player profile
-    await tx
+    db
       .delete(playerProfiles)
-      .where(eq(playerProfiles.userId, guestUserId));
-
+      .where(eq(playerProfiles.userId, guestUserId)),
+    // Delete guest accounts (if any)
+    db.delete(account).where(eq(account.userId, guestUserId)),
     // Delete guest user sessions
-    await tx.delete(session).where(eq(session.userId, guestUserId));
-
+    db.delete(session).where(eq(session.userId, guestUserId)),
     // Delete guest user
-    await tx.delete(user).where(eq(user.id, guestUserId));
-  });
+    db.delete(user).where(eq(user.id, guestUserId)),
+  ]);
 }

@@ -31,7 +31,7 @@ export function createAuth(db: Database, env: Env) {
 
   return betterAuth({
     database: drizzleAdapter(db, {
-      provider: "pg",
+      provider: "sqlite",
       schema: {
         user: schema.user,
         session: schema.session,
@@ -66,6 +66,14 @@ export function createAuth(db: Database, env: Env) {
     plugins: [
       anonymous({
         emailDomainName: "guest.kridora.local",
+        generateName: (ctx) => {
+          const body = ctx?.body as { name?: string } | undefined;
+          const cleanName = body?.name
+            ? normalizeDisplayName(body.name) || "Player"
+            : "Player";
+          const parsed = displayNameSchema.safeParse(cleanName);
+          return parsed.success ? parsed.data : "Player";
+        },
         onLinkAccount: async ({ anonymousUser, newUser }) => {
           await mergeGuestProfileIntoUser(
             db,

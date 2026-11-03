@@ -42,6 +42,8 @@ app.use("*", async (c, next) => {
 app.use("*", contextMiddleware);
 app.use("*", originGuardMiddleware);
 
+app.get("/favicon.ico", (c) => c.body(null, 204));
+
 app.route("/", routes);
 
 app.notFound((c) => {

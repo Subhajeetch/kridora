@@ -1,4 +1,11 @@
-import { AlertCircle, Crown, DoorOpen, Sparkles, Trophy, X } from "lucide-react";
+import {
+  AlertCircle,
+  Crown,
+  DoorOpen,
+  Sparkles,
+  Trophy,
+  X,
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import {
@@ -88,22 +95,38 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
   // socket broadcast and request response can deliver the same snapshot.
   const applyCommittedState = useCallback((next: LudoGameState) => {
     const last = pendingStatesRef.current.at(-1) ?? committedRef.current;
-    if (last && (next.updatedAt < last.updatedAt || JSON.stringify(next) === JSON.stringify(last))) return;
+    if (
+      last &&
+      (next.updatedAt < last.updatedAt ||
+        JSON.stringify(next) === JSON.stringify(last))
+    )
+      return;
     if (animationLockedRef.current) {
       pendingStatesRef.current.push(next);
       return;
     }
     const previous = committedRef.current;
-    const moves = previous && next.players.some(player => {
-      const before = previous.players.find(p => p.userId === player.userId);
-      return before && player.tokens.some((step, i) => step !== before.tokens[i]);
-    });
+    const moves =
+      previous &&
+      next.players.some((player) => {
+        const before = previous.players.find((p) => p.userId === player.userId);
+        return (
+          before && player.tokens.some((step, i) => step !== before.tokens[i])
+        );
+      });
     if (moves) {
       animationLockedRef.current = true;
       setIsBoardAnimating(true);
     }
-    if (previous && next.dice !== null && (previous.dice === null || previous.currentPlayerIndex !== next.currentPlayerIndex)) {
-      const rollKey = [next.updatedAt, next.dice, next.currentPlayerIndex].join(':');
+    if (
+      previous &&
+      next.dice !== null &&
+      (previous.dice === null ||
+        previous.currentPlayerIndex !== next.currentPlayerIndex)
+    ) {
+      const rollKey = [next.updatedAt, next.dice, next.currentPlayerIndex].join(
+        ":",
+      );
       if (lastLandedRollKeyRef.current !== rollKey) {
         lastLandedRollKeyRef.current = rollKey;
         ludoAudio.diceLand(next.dice, audioRef.current);
@@ -238,7 +261,8 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
   // Subtle turn-start notification chime & light haptic tap when turn rotates to local player
   useEffect(() => {
     if (!state || state.winnerId || isBoardAnimating) return;
-    const activeTurnUser = state.players[state.currentPlayerIndex]?.userId ?? null;
+    const activeTurnUser =
+      state.players[state.currentPlayerIndex]?.userId ?? null;
     const prevTurnUser = prevTurnUserIdRef.current;
     prevTurnUserIdRef.current = activeTurnUser;
 
@@ -398,7 +422,15 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [state, userId, busy, isPaused, isBoardAnimating, rollingColor, handleRoll]);
+  }, [
+    state,
+    userId,
+    busy,
+    isPaused,
+    isBoardAnimating,
+    rollingColor,
+    handleRoll,
+  ]);
 
   // Smart Auto-Move:
   // 1) Only 1 movable piece, OR
@@ -431,7 +463,14 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
     }, 380);
 
     return () => window.clearTimeout(timer);
-  }, [state, isPaused, isBoardAnimating, rollingColor, userId, handleMoveToken]);
+  }, [
+    state,
+    isPaused,
+    isBoardAnimating,
+    rollingColor,
+    userId,
+    handleMoveToken,
+  ]);
 
   // Automatic turn pass when zero legal moves exist
   useEffect(() => {
@@ -644,12 +683,22 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
       )}
 
       <LudoTable
-        state={state} userId={userId} roomCode={room.code} audio={audio}
-        canRoll={canRoll} rollingColor={rollingColor} animating={isBoardAnimating}
+        state={state}
+        userId={userId}
+        roomCode={room.code}
+        audio={audio}
+        canRoll={canRoll}
+        rollingColor={rollingColor}
+        animating={isBoardAnimating}
         disabled={busy || isPaused || isBoardAnimating || rollingColor !== null}
-        onRoll={handleRoll} onMove={handleMoveToken} onAnimationComplete={handleAnimationComplete}
-        onLeave={() => setLeaveConfirmOpen(true)} onStandings={() => setRankingModalOpen(true)}
-        onEmote={handleSendEmote} activeEmotes={activeEmotes} playerAvatars={playerAvatars}
+        onRoll={handleRoll}
+        onMove={handleMoveToken}
+        onAnimationComplete={handleAnimationComplete}
+        onLeave={() => setLeaveConfirmOpen(true)}
+        onStandings={() => setRankingModalOpen(true)}
+        onEmote={handleSendEmote}
+        activeEmotes={activeEmotes}
+        playerAvatars={playerAvatars}
       />
 
       {/* OFFLINE WAIT SCREEN */}
@@ -880,7 +929,9 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
                   </div>
 
                   <div className="flex items-center gap-1.5 text-right font-mono font-bold">
-                    <span className="text-base text-amber-400">{homeCount}</span>
+                    <span className="text-base text-amber-400">
+                      {homeCount}
+                    </span>
                     <span className="text-xs text-slate-400">/ 4 Home</span>
                   </div>
                 </div>

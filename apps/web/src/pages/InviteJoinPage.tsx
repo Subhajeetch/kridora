@@ -7,18 +7,16 @@ import {
   AlertCircle,
   ArrowRight,
   Crown,
-  DoorOpen,
   Loader2,
   LogOut,
   Users,
 } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router";
-import { AuthDialog } from "@/components/AuthDialog";
+import { AuthDialog, GoogleIcon } from "@/components/AuthDialog";
 import { GameThumbnail } from "@/components/games/GameThumbnail";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/input";
-import { usePublicConfig } from "@/hooks/usePublicConfig";
 import { authClient, startGuestSession } from "@/lib/auth-client";
 import { fetchInvitePreview } from "@/lib/room-preview";
 import {
@@ -41,7 +39,6 @@ export default function InviteJoinPage() {
   const navigate = useNavigate();
   const { data: session } = authClient.useSession();
   const { setActiveRoom } = useRealtime();
-  const { googleEnabled } = usePublicConfig();
 
   const [preview, setPreview] = useState<RoomPreview | null>(null);
   const [loading, setLoading] = useState(Boolean(token));
@@ -190,6 +187,7 @@ export default function InviteJoinPage() {
       const res = await authClient.signIn.social({
         provider: "google",
         callbackURL: window.location.href,
+        errorCallbackURL: `${window.location.origin}/?authError=google`,
       });
       if (res.error) {
         setJoinError(
@@ -448,7 +446,7 @@ export default function InviteJoinPage() {
               </div>
             </div>
           ) : (
-            <div className="space-y-3 rounded-2xl border border-white/10 bg-white/5 p-4">
+            <div className="space-y-3 pixel-corners-sm border-2 border-white/15 bg-white/5 p-4">
               <Field label="Your display name" error={nameError}>
                 <Input
                   value={name}
@@ -520,7 +518,7 @@ export default function InviteJoinPage() {
                 </>
               ) : (
                 <>
-                  <DoorOpen className="size-4" />
+                  <Users className="size-4" />
                   <span>
                     {!session
                       ? "Join as Guest"
@@ -545,18 +543,19 @@ export default function InviteJoinPage() {
               </div>
 
               <div className="grid gap-2">
-                {googleEnabled && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="default"
-                    className="w-full h-10 border-white/15 hover:border-primary/50 text-sm"
-                    disabled={busy}
-                    onClick={() => void handleGoogleLogin()}
-                  >
-                    Continue with Google
-                  </Button>
-                )}
+                <button
+                  type="button"
+                  className="w-full filter drop-shadow-[0_4px_0_#000000] active:translate-y-0.5 active:drop-shadow-[0_1px_0_#000000] transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={busy}
+                  onClick={() => void handleGoogleLogin()}
+                >
+                  <div className="pixel-corners-sm bg-black p-[2px]">
+                    <div className="pixel-corners-sm bg-white hover:bg-[#f3f4f6] text-black font-retro text-xs sm:text-sm font-bold uppercase tracking-wider h-10 px-4 flex items-center justify-center gap-2.5 transition-colors">
+                      <GoogleIcon className="size-4.5 shrink-0" />
+                      <span>Continue with Google</span>
+                    </div>
+                  </div>
+                </button>
 
                 <p className="text-center text-xs text-muted-foreground">
                   Already have an account?{" "}

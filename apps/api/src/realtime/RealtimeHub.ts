@@ -31,6 +31,7 @@ export class RealtimeHub extends DurableObject<Env> {
   private readonly usedTicketNonces = new Map<string, number>();
   private readonly wsLimiter = new SlidingWindowLimiter(5_000, 35);
   private readonly nameChangeBuckets = new Map<string, number>();
+  private scheduledAlarmTimestamp: number | null = null;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -64,11 +65,22 @@ export class RealtimeHub extends DurableObject<Env> {
     await this.ctx.storage.put("rooms", this.roomManager.serialize());
     const nextAlarm = this.roomManager.getNextAlarmTimestamp();
     if (nextAlarm !== null) {
-      await this.ctx.storage.setAlarm(Math.max(Date.now() + 250, nextAlarm));
+      const scheduled = Math.max(Date.now() + 250, nextAlarm);
+      if (
+        this.scheduledAlarmTimestamp === null ||
+        Math.abs(this.scheduledAlarmTimestamp - scheduled) > 500
+      ) {
+        this.scheduledAlarmTimestamp = scheduled;
+        await this.ctx.storage.setAlarm(scheduled);
+      }
+    } else if (this.scheduledAlarmTimestamp !== null) {
+      this.scheduledAlarmTimestamp = null;
+      await this.ctx.storage.deleteAlarm();
     }
   }
 
   async alarm(): Promise<void> {
+    this.scheduledAlarmTimestamp = null;
     const now = Date.now();
     for (const [nonce, exp] of this.usedTicketNonces.entries()) {
       if (now > exp) this.usedTicketNonces.delete(nonce);
@@ -81,7 +93,9 @@ export class RealtimeHub extends DurableObject<Env> {
     } else {
       const nextAlarm = this.roomManager.getNextAlarmTimestamp();
       if (nextAlarm !== null) {
-        await this.ctx.storage.setAlarm(Math.max(Date.now() + 250, nextAlarm));
+        const scheduled = Math.max(Date.now() + 250, nextAlarm);
+        this.scheduledAlarmTimestamp = scheduled;
+        await this.ctx.storage.setAlarm(scheduled);
       }
     }
   }
@@ -147,6 +161,22 @@ export class RealtimeHub extends DurableObject<Env> {
         return Response.json({ error: "Not found" }, { status: 404 });
       }
       return Response.json(preview);
+    }
+
+    if (url.pathname === "/internal/evict-user" && request.method === "POST") {
+      const { userId } = (await request.json()) as { userId: string };
+
+      for (const ws of this.ctx.getWebSockets(userId)) {
+        try {
+          ws.close(1000, "Signed out");
+        } catch {
+          // ignore
+        }
+      }
+
+      this.roomManager.leaveRoom(userId);
+      await this.persistAndSchedule();
+      return Response.json({ ok: true });
     }
 
     // 2. WebSocket Upgrade Endpoint (/ws)

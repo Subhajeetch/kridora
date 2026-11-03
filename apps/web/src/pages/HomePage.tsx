@@ -1,168 +1,157 @@
 import { GAME_DEFINITIONS } from "@kridora/shared";
-import { motion, useReducedMotion, type Transition } from "framer-motion";
-import { ArrowRight, DoorOpen, Gamepad2 } from "lucide-react";
+import { ArrowRight, Gamepad2, Users } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router";
 import { JoinRoomDialog } from "@/components/JoinRoomDialog";
 import { Logo } from "@/components/Logo";
-import { FeaturedGames } from "@/components/home/FeaturedGames";
-import { HeroScene } from "@/components/home/HeroScene";
-import { HeroTitle } from "@/components/home/HeroTitle";
-import { HowItWorks } from "@/components/home/HowItWorks";
-import { Marquee } from "@/components/home/Marquee";
-import {
-  ArcadeButton,
-  arcadeButtonVariants,
-} from "@/components/ui/arcade-button";
+import { GameThumbnail } from "@/components/games/GameThumbnail";
+import { enabledGames } from "@/config/games";
 import { useRealtime } from "@/providers/realtime-context";
-
-const subTransition: Transition = {
-  duration: 0.4,
-  delay: 0.8,
-  ease: "easeOut",
-};
-const ctaPopTransition: Transition = {
-  type: "spring",
-  stiffness: 360,
-  damping: 20,
-  delay: 0.95,
-};
 
 export default function HomePage() {
   const { activeRoom } = useRealtime();
   const [joinOpen, setJoinOpen] = useState(false);
-  const reduce = useReducedMotion();
+
+  // Popular games list: use all enabled games, or fallback to all registered definitions
+  const popularGames =
+    enabledGames.length > 0 ? enabledGames : Object.values(GAME_DEFINITIONS);
 
   return (
-    <div>
-      <HeroScene>
-        <HeroTitle />
+    <div className="w-full">
+      {/* ==================================================================== */}
+      {/* HERO SECTION MATCHING ui-ref.png */}
+      {/* ==================================================================== */}
+      <section className="pt-6 sm:pt-14 pb-12 sm:pb-16 w-full">
+        <div className="space-y-1">
+          <h1 className="font-retro text-3xl sm:text-5xl lg:text-6xl font-bold uppercase tracking-tight text-[#facc15] drop-shadow-[0_2px_0_#b45309]">
+            PLAY GAMES
+          </h1>
+          <h2 className="font-retro text-3xl sm:text-5xl lg:text-6xl font-bold uppercase tracking-tight text-white drop-shadow-[0_2px_0_#1f2937] mt-1 sm:mt-2">
+            WITH FRIENDS!
+          </h2>
+        </div>
 
-        <motion.p
-          initial={reduce ? false : { opacity: 0, y: 14 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={subTransition}
-          className="mt-6 max-w-xl text-balance text-lg text-muted-foreground"
-        >
-          Create a room, share the code and start playing in seconds. No
-          download needed.
-        </motion.p>
+        <p className="mt-4 sm:mt-6 max-w-xl text-base sm:text-lg text-gray-300 font-medium leading-relaxed">
+          Create rooms and play retro games online. No downloads, just instant
+          multiplayer fun right in your browser.
+        </p>
 
-        <motion.div
-          initial={reduce ? false : { opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={ctaPopTransition}
-          className="mt-10 flex flex-col items-center gap-4 sm:flex-row"
-        >
-          <span className="cta-ping">
-            <Link
-              to="/games"
-              className={arcadeButtonVariants({
-                variant: "primary",
-                size: "lg",
-              })}
-            >
-              <Gamepad2 /> BROWSE GAMES
-            </Link>
-          </span>
-          <ArcadeButton
-            variant="secondary"
-            size="lg"
-            onClick={() => setJoinOpen(true)}
+        <div className="mt-8 sm:mt-10 flex flex-wrap items-center gap-4">
+          <Link
+            to="/games"
+            className="filter drop-shadow-[0_5px_0_#78350f] hover:drop-shadow-[0_6px_0_#78350f] active:translate-y-1 active:drop-shadow-[0_1px_0_#78350f] transition-all cursor-pointer inline-flex"
           >
-            <DoorOpen /> JOIN A ROOM
-          </ArcadeButton>
-        </motion.div>
+            <div className="pixel-corners-sm bg-black p-[2.5px]">
+              <div className="pixel-corners-sm bg-[#facc15] hover:bg-[#fbbf24] text-black font-retro text-xs sm:text-sm font-bold uppercase tracking-wider px-6 sm:px-8 py-3 sm:py-3.5 flex items-center justify-center gap-2.5">
+                <Gamepad2 className="size-5" />
+                <span>BROWSE GAMES</span>
+              </div>
+            </div>
+          </Link>
 
+          <button
+            type="button"
+            onClick={() => setJoinOpen(true)}
+            className="filter drop-shadow-[0_5px_0_#78350f] hover:drop-shadow-[0_6px_0_#78350f] active:translate-y-1 active:drop-shadow-[0_1px_0_#78350f] transition-all cursor-pointer inline-flex"
+          >
+            <div className="pixel-corners-sm bg-[#facc15] p-[2.5px]">
+              <div className="pixel-corners-sm bg-[#12131a] hover:bg-[#1a1b24] text-[#facc15] font-retro text-xs sm:text-sm font-bold uppercase tracking-wider px-6 sm:px-8 py-3 sm:py-3.5 flex items-center justify-center gap-2.5">
+                <Users className="size-5" />
+                <span>JOIN ROOM</span>
+              </div>
+            </div>
+          </button>
+        </div>
+
+        {/* Active room indicator if user is already participating in an ongoing room */}
         {activeRoom && (
           <Link
             to={`/${activeRoom.gameSlug}/room`}
-            className="mt-8 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-ok/30 bg-ok/5 px-5 py-3 text-sm transition-colors hover:bg-ok/10"
+            className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border-2 border-[#facc15]/40 bg-[#12131a] px-4 py-3 text-xs sm:text-sm text-foreground hover:border-[#facc15] transition-all max-w-xl shadow-[0_4px_0_#b45309]"
           >
-            <span className="inline-flex items-center gap-2 font-semibold uppercase tracking-wider text-ok">
-              <span
-                className="size-2.5 animate-pulse rounded-full bg-ok"
-                aria-hidden="true"
-              />
-              IN PROGRESS
+            <span className="inline-flex items-center gap-2 font-retro text-xs font-bold uppercase text-[#facc15]">
+              <span className="size-2 animate-pulse rounded-full bg-[#facc15]" />
+              ROOM IN PROGRESS
             </span>
-            <span className="text-foreground">
+            <span className="font-medium text-white">
               Room{" "}
-              <strong className="font-display tracking-widest">
+              <strong className="font-mono text-[#facc15] tracking-widest">
                 {activeRoom.code}
               </strong>{" "}
-              · {GAME_DEFINITIONS[activeRoom.gameSlug].name}
+              ·{" "}
+              {GAME_DEFINITIONS[activeRoom.gameSlug]?.name ??
+                activeRoom.gameSlug}
             </span>
-            <span className="inline-flex items-center gap-1 font-display text-xs uppercase tracking-wider text-ok">
-              RETURN <ArrowRight className="size-4" aria-hidden="true" />
+            <span className="inline-flex items-center gap-1 font-retro text-xs text-[#facc15]">
+              RETURN <ArrowRight className="size-3.5" />
             </span>
           </Link>
         )}
-      </HeroScene>
+      </section>
 
-      <Marquee />
-      <HowItWorks />
-      <FeaturedGames />
+      {/* ==================================================================== */}
+      {/* POPULAR GAMES SECTION MATCHING ui-ref.png */}
+      {/* ==================================================================== */}
+      <section className="pt-4 pb-12 sm:pb-20">
+        {/* Section Header: Title & View All link on the same line */}
+        <div className="flex items-center justify-between gap-3 mb-4 sm:mb-6">
+          <h2 className="font-retro text-base sm:text-xl md:text-2xl font-bold uppercase tracking-wider text-white">
+            POPULAR GAMES
+          </h2>
 
-      <section className="mx-auto max-w-5xl px-4 py-20 sm:py-28">
-        <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-linear-to-br from-panel-2 to-panel px-6 py-14 text-center sm:px-12">
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_25%_20%,rgba(255,61,184,0.18),transparent_55%),radial-gradient(circle_at_75%_80%,rgba(34,228,255,0.16),transparent_55%)]"
-          />
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute top-4 left-4 size-5 rounded-tl-lg border-t-2 border-l-2 border-primary/50"
-          />
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute top-4 right-4 size-5 rounded-tr-lg border-t-2 border-r-2 border-primary/50"
-          />
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute bottom-4 left-4 size-5 rounded-bl-lg border-b-2 border-l-2 border-primary/50"
-          />
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute bottom-4 right-4 size-5 rounded-br-lg border-b-2 border-r-2 border-primary/50"
-          />
+          <Link
+            to="/games"
+            className="inline-flex items-center gap-1.5 font-retro text-[10px] sm:text-xs md:text-sm font-bold uppercase tracking-wider text-[#facc15] hover:text-white transition-colors shrink-0 group"
+          >
+            <span>VIEW ALL GAMES</span>
+            <ArrowRight className="size-3.5 sm:size-4 transition-transform group-hover:translate-x-1" />
+          </Link>
+        </div>
 
-          <div className="relative z-10 flex flex-col items-center">
-            <h2 className="font-display text-3xl uppercase tracking-tight sm:text-5xl">
-              READY, PLAYER ONE?
-            </h2>
-            <p className="mt-3 max-w-md text-balance text-muted-foreground">
-              Grab a friend, open a room and let the match begin.
-            </p>
-            <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row">
-              <Link
-                to="/games"
-                className={arcadeButtonVariants({
-                  variant: "primary",
-                  size: "lg",
-                })}
-              >
-                <Gamepad2 /> BROWSE GAMES
-              </Link>
-              <ArcadeButton
-                variant="secondary"
-                size="lg"
-                onClick={() => setJoinOpen(true)}
-              >
-                <DoorOpen /> JOIN A ROOM
-              </ArcadeButton>
-            </div>
-          </div>
+        {/* Game Cards Grid: 2 columns on phone, 3 on tablet, 4 on desktop */}
+        <div className="grid gap-3 sm:gap-4 md:gap-5 lg:gap-6 grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+          {popularGames.map((game) => (
+            <Link
+              to={`/${game.slug}`}
+              key={game.slug}
+              className="group filter drop-shadow-[0_4px_0_#78350f] hover:drop-shadow-[0_7px_0_#78350f] active:translate-y-1 active:drop-shadow-[0_1px_0_#78350f] transition-all hover:-translate-y-1 flex flex-col"
+            >
+              <div className="pixel-corners-md bg-[#facc15] p-[2.5px] sm:p-[3px] group-hover:bg-[#fde047] transition-colors h-full flex flex-col">
+                <div className="pixel-corners-sm bg-[#12131a] p-2 sm:p-2.5 md:p-3 flex flex-col h-full flex-1">
+                  <div className="pixel-corners-sm relative aspect-[16/10] w-full overflow-hidden bg-black/60 border border-white/10">
+                    <GameThumbnail
+                      slug={game.slug}
+                      name={game.name}
+                      className="size-full object-cover transition-transform duration-300 group-hover:scale-105"
+                    />
+                  </div>
+
+                  <div className="mt-2 sm:mt-2.5 flex flex-col">
+                    <h3 className="font-retro text-xs sm:text-sm md:text-base font-bold uppercase tracking-wide text-white truncate group-hover:text-[#facc15] transition-colors">
+                      {game.name}
+                    </h3>
+                    <span className="font-retro text-[9px] sm:text-[10px] md:text-[11px] font-semibold text-gray-400 uppercase tracking-wider mt-0.5 group-hover:text-amber-300 transition-colors">
+                      PLAY NOW
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </Link>
+          ))}
         </div>
       </section>
 
-      <footer className="border-t border-white/10 py-8">
-        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-4 px-4 text-sm text-muted-foreground">
+      {/* Clean lightweight footer */}
+      <footer className="mt-8 border-t border-white/10 py-8">
+        <div className="flex flex-wrap items-center justify-between gap-4 text-xs text-muted-foreground">
           <Logo />
-          <p>Games to play with friends.</p>
+          <p className="font-medium text-gray-400">
+            Instant multiplayer browser retro gaming.
+          </p>
         </div>
       </footer>
 
+      {/* Join room dialog */}
       <JoinRoomDialog open={joinOpen} onOpenChange={setJoinOpen} />
     </div>
   );

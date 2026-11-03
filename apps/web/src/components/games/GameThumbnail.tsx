@@ -1,3 +1,4 @@
+import { Gamepad2, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { getGameThumbnailSrc } from "@/lib/game-art";
 import { cn } from "@/lib/utils";
@@ -18,44 +19,37 @@ export function GameThumbnail({ slug, name, className }: GameThumbnailProps) {
   return (
     <div
       data-game={name}
-      className={cn("thumb-frame relative overflow-hidden", className)}
+      className={cn(
+        "relative overflow-hidden bg-[#0d0e14] select-none",
+        className,
+      )}
     >
       {status !== "loaded" && (
-        <div className="absolute inset-0 grid place-items-center text-white/30">
-          <svg
-            viewBox="0 0 64 64"
-            className="size-14"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <rect
-              x="6"
-              y="10"
-              width="52"
-              height="44"
-              rx="9"
-              strokeDasharray="5 5"
-            />
-            <circle cx="32" cy="32" r="11" />
-            <path d="M24.2 39.8 39.8 24.2" />
-          </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-[radial-gradient(ellipse_at_center,#1c1e2d_0%,#0c0d14_100%)] p-4 text-center">
+          <div className="grid size-12 place-items-center rounded-xl border border-[#facc15]/30 bg-[#facc15]/10 text-[#facc15] shadow-sm">
+            {slug === "fatebyai" ? (
+              <Sparkles className="size-6" />
+            ) : (
+              <Gamepad2 className="size-6" />
+            )}
+          </div>
+          <span className="mt-2 font-retro text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+            {name}
+          </span>
         </div>
       )}
+
       {status !== "error" && (
         <img
           src={src}
-          alt=""
+          alt={name}
           loading="lazy"
           decoding="async"
           draggable={false}
           onLoad={() => setState({ src, status: "loaded" })}
           onError={() => setState({ src, status: "error" })}
           className={cn(
-            "absolute inset-0 size-full object-cover transition-opacity duration-500",
+            "absolute inset-0 size-full object-cover transition-opacity duration-300",
             status === "loaded" ? "opacity-100" : "opacity-0",
           )}
         />

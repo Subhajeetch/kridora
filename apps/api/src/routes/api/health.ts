@@ -15,5 +15,9 @@ healthRoutes.get("/config", (c) => {
   const googleEnabled = Boolean(
     c.env.GOOGLE_CLIENT_ID && c.env.GOOGLE_CLIENT_SECRET,
   );
+  c.header(
+    "Cache-Control",
+    "public, max-age=300, stale-while-revalidate=86400",
+  );
   return c.json({ googleEnabled });
 });

@@ -3,7 +3,11 @@ import { displayNameSchema, levelFromXp } from "@kridora/shared";
 import { Hono } from "hono";
 import { z } from "zod";
 import { ApiError } from "../../lib/errors";
-import { requireAuth, sessionMiddleware } from "../../middleware/security";
+import {
+  invalidateSessionCache,
+  requireAuth,
+  sessionMiddleware,
+} from "../../middleware/security";
 import { checkNameRateLimitAndSyncHub } from "../../realtime/hub-client";
 import type { AppContext } from "../../types";
 
@@ -82,6 +86,8 @@ meRoutes.patch("/me/name", requireAuth, async (c) => {
     .update(schema.user)
     .set({ name: parsed.data.name, updatedAt: new Date() })
     .where(eq(schema.user.id, user.id));
+
+  invalidateSessionCache();
 
   return c.json({ ok: true, name: parsed.data.name });
 });

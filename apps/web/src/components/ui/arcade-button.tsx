@@ -3,19 +3,20 @@ import type { ComponentProps } from "react";
 import { cn } from "@/lib/utils";
 
 const arcadeButtonVariants = cva(
-  "relative inline-flex shrink-0 select-none items-center justify-center gap-2 whitespace-nowrap font-display uppercase tracking-wide transition-[transform,box-shadow,filter,background-color] duration-150 outline-none focus-visible:ring-4 focus-visible:ring-primary/50 active:translate-y-[3px] disabled:pointer-events-none disabled:opacity-50 disabled:grayscale [&_svg]:size-5 [&_svg]:shrink-0",
+  "relative inline-flex shrink-0 select-none items-center justify-center gap-2.5 whitespace-nowrap font-retro uppercase tracking-wider transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-[#facc15] disabled:pointer-events-none disabled:opacity-50 disabled:grayscale [&_svg]:size-5 [&_svg]:shrink-0 cursor-pointer",
   {
     variants: {
       variant: {
         primary:
-          "btn-shine bg-linear-to-b from-[#ffe27a] to-coin text-[#1a1033] shadow-[0_5px_0_0_#b86e00,0_14px_28px_-8px_rgba(255,210,63,0.55)] hover:brightness-110 active:shadow-[0_2px_0_0_#b86e00,0_8px_18px_-8px_rgba(255,210,63,0.45)]",
+          "pixel-corners-sm bg-[#facc15] hover:bg-[#fbbf24] text-black font-bold border-2 border-black filter drop-shadow-[0_4px_0_#78350f] active:translate-y-1 active:drop-shadow-[0_1px_0_#78350f]",
         secondary:
-          "border-2 border-neon-cyan bg-neon-cyan/5 text-neon-cyan shadow-[0_4px_0_0_#0b7285,0_0_28px_-8px_rgba(34,228,255,0.6)] hover:bg-neon-cyan/15 active:shadow-[0_1px_0_0_#0b7285,0_0_18px_-8px_rgba(34,228,255,0.5)]",
+          "pixel-corners-sm bg-[#12131a] hover:bg-[#1a1b24] text-[#facc15] font-bold border-2 border-[#facc15] filter drop-shadow-[0_4px_0_#78350f] active:translate-y-1 active:drop-shadow-[0_1px_0_#78350f]",
         ghost: "text-foreground hover:bg-white/5",
       },
       size: {
-        md: "h-11 rounded-xl px-5 text-sm",
-        lg: "h-14 rounded-2xl px-8 text-lg",
+        sm: "h-9 px-4 text-xs",
+        md: "h-11 px-5 text-xs sm:text-sm",
+        lg: "h-12 sm:h-13 px-6 sm:px-7 text-xs sm:text-sm",
       },
     },
     defaultVariants: {

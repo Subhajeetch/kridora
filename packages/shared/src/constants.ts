@@ -4,10 +4,10 @@ export const ROOM_CODE_LENGTH = 4;
 
 /** How long the room waits before handing ownership to the next player after the owner goes offline. */
 export const OWNER_TRANSFER_DELAY_MS = 40_000;
-/** How long a disconnected (non-owner) player keeps their seat in a lobby before being removed. */
-export const PLAYER_DISCONNECT_GRACE_MS = 60_000;
-/** A room with nobody connected is closed after this long. */
-export const EMPTY_ROOM_CLOSE_DELAY_MS = 5 * 60_000;
+/** How long a disconnected player keeps their seat before being removed (3 minutes for poor network recovery). */
+export const PLAYER_DISCONNECT_GRACE_MS = 3 * 60_000;
+/** A room with nobody connected is closed after this long (3 minutes for reconnection). */
+export const EMPTY_ROOM_CLOSE_DELAY_MS = 3 * 60_000;
 
 export const DISPLAY_NAME_MIN_LENGTH = 2;
 export const DISPLAY_NAME_MAX_LENGTH = 20;

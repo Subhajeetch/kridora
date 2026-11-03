@@ -3,17 +3,16 @@ import {
   emailSchema,
   passwordSchema,
 } from "@kridora/shared";
-import { AlertCircle, Loader2, X } from "lucide-react";
+import { AlertCircle, Loader2 } from "lucide-react";
 import { useState, type FormEvent } from "react";
-import { Button } from "@/components/ui/button";
 import {
   Dialog,
+  DialogCloseButton,
   DialogContent,
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Field, Input } from "@/components/ui/input";
-import { usePublicConfig } from "@/hooks/usePublicConfig";
 import { authClient, startGuestSession } from "@/lib/auth-client";
 
 type Mode =
@@ -36,13 +35,14 @@ const TITLES: Record<Mode, string> = {
   "reset-sent": "Check your email",
 };
 
-function GoogleIcon({ className = "size-4" }: { className?: string }) {
+export function GoogleIcon({ className = "size-5" }: { className?: string }) {
   return (
     <svg
       viewBox="0 0 24 24"
       className={className}
       aria-hidden="true"
       fill="none"
+      xmlns="http://www.w3.org/2000/svg"
     >
       <path
         d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -91,7 +91,6 @@ export function AuthDialog({
   onSuccess,
   initialMode = "guest",
 }: AuthDialogProps) {
-  const { googleEnabled } = usePublicConfig();
   const { data: rawSession } = authClient.useSession();
   const isGuest = Boolean(rawSession?.user?.isAnonymous);
 
@@ -225,6 +224,7 @@ export function AuthDialog({
       const res = await authClient.signIn.social({
         provider: "google",
         callbackURL: window.location.href,
+        errorCallbackURL: `${window.location.origin}/?authError=google`,
       });
       if (res.error) throw new Error(messageFor(res.error));
     } catch (err) {
@@ -244,21 +244,12 @@ export function AuthDialog({
 
   return (
     <Dialog open={open} {...(onOpenChange ? { onOpenChange } : {})}>
-      <DialogContent className="max-w-md p-6 sm:p-7">
+      <DialogContent className="max-w-md">
         {onOpenChange && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-xs"
-            aria-label="Close"
-            className="absolute top-4 right-4 rounded-xl text-muted-foreground hover:text-foreground"
-            onClick={() => onOpenChange(false)}
-          >
-            <X className="size-4" />
-          </Button>
+          <DialogCloseButton onClick={() => onOpenChange(false)} />
         )}
 
-        <DialogTitle className="text-xl sm:text-2xl font-bold tracking-tight">
+        <DialogTitle className="font-retro text-lg sm:text-xl font-bold uppercase tracking-wide text-white">
           {dialogTitle}
         </DialogTitle>
 
@@ -306,36 +297,42 @@ export function AuthDialog({
         {showForm && (
           <div className="mt-5 space-y-4">
             {/* Google Authentication Option */}
-            {googleEnabled && (mode === "login" || mode === "signup") && (
+            {(mode === "login" || mode === "signup" || mode === "guest") && (
               <div className="space-y-4">
-                <Button
+                <button
                   type="button"
-                  variant="outline"
-                  size="lg"
-                  className="w-full h-11 gap-3 rounded-2xl border-white/15 bg-white/5 hover:border-white/30 hover:bg-white/10 font-medium text-foreground transition-all active:scale-[0.99] shadow-sm"
+                  className="w-full filter drop-shadow-[0_4px_0_#000000] active:translate-y-0.5 active:drop-shadow-[0_1px_0_#000000] transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   disabled={busy || googleBusy}
                   onClick={() => void continueWithGoogle()}
                 >
-                  {googleBusy ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    <GoogleIcon className="size-4 shrink-0" />
-                  )}
-                  <span>
-                    {googleBusy
-                      ? "Connecting to Google..."
-                      : mode === "login"
-                        ? "Continue with Google"
-                        : "Sign up with Google"}
-                  </span>
-                </Button>
+                  <div className="pixel-corners-sm bg-black p-[2px]">
+                    <div className="pixel-corners-sm bg-white hover:bg-[#f3f4f6] text-black font-retro text-xs sm:text-sm font-bold uppercase tracking-wider h-11 flex items-center justify-center gap-2.5 transition-colors">
+                      {googleBusy ? (
+                        <Loader2 className="size-4 animate-spin text-black" />
+                      ) : (
+                        <GoogleIcon className="size-5 shrink-0" />
+                      )}
+                      <span>
+                        {googleBusy
+                          ? "Connecting to Google..."
+                          : mode === "login"
+                            ? "Log in with Google"
+                            : mode === "signup"
+                              ? "Sign up with Google"
+                              : "Sign in with Google"}
+                      </span>
+                    </div>
+                  </div>
+                </button>
 
                 <div className="relative flex items-center justify-center">
                   <div className="absolute inset-0 flex items-center">
                     <div className="w-full border-t border-white/10" />
                   </div>
-                  <span className="relative bg-card px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                    or continue with email
+                  <span className="relative bg-[#12131a] px-3 font-retro text-[10px] sm:text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    {mode === "guest"
+                      ? "or play as guest"
+                      : "or continue with email"}
                   </span>
                 </div>
               </div>
@@ -414,40 +411,42 @@ export function AuthDialog({
               )}
 
               {error && (
-                <div
-                  role="alert"
-                  className="flex items-start gap-2 rounded-2xl border border-destructive/30 bg-destructive/10 px-3.5 py-2.5 text-xs text-destructive"
-                >
-                  <AlertCircle className="size-4 shrink-0 mt-0.5" />
-                  <span className="leading-relaxed">{error}</span>
+                <div className="pixel-corners-sm bg-destructive p-[2px] filter drop-shadow-[0_2px_0_#881337]">
+                  <div className="flex items-start gap-2.5 pixel-corners-sm bg-[#1a0a0d] px-3.5 py-2.5 text-xs text-destructive">
+                    <AlertCircle className="size-4 shrink-0 mt-0.5" />
+                    <span className="leading-relaxed">{error}</span>
+                  </div>
                 </div>
               )}
 
-              <Button
+              <button
                 type="submit"
-                size="lg"
-                className="w-full h-11 rounded-2xl font-semibold gap-2 transition-all active:scale-[0.99]"
+                className="w-full filter drop-shadow-[0_4px_0_#78350f] active:translate-y-0.5 active:drop-shadow-[0_1px_0_#78350f] transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={busy || googleBusy}
               >
-                {busy ? (
-                  <>
-                    <Loader2 className="size-4 animate-spin" />
-                    <span>Please wait...</span>
-                  </>
-                ) : mode === "guest" ? (
-                  "Play as guest"
-                ) : mode === "login" ? (
-                  "Log in"
-                ) : mode === "signup" ? (
-                  isGuest ? (
-                    "Create account & keep stats"
-                  ) : (
-                    "Create account"
-                  )
-                ) : (
-                  "Send reset link"
-                )}
-              </Button>
+                <div className="pixel-corners-sm bg-black p-[2px]">
+                  <div className="pixel-corners-sm bg-[#facc15] hover:bg-[#fbbf24] text-black font-retro text-xs sm:text-sm font-bold uppercase tracking-wider h-11 flex items-center justify-center gap-2">
+                    {busy ? (
+                      <>
+                        <Loader2 className="size-4 animate-spin text-black" />
+                        <span>Please wait...</span>
+                      </>
+                    ) : mode === "guest" ? (
+                      "Play as guest"
+                    ) : mode === "login" ? (
+                      "Log in"
+                    ) : mode === "signup" ? (
+                      isGuest ? (
+                        "Create account & keep stats"
+                      ) : (
+                        "Create account"
+                      )
+                    ) : (
+                      "Send reset link"
+                    )}
+                  </div>
+                </div>
+              </button>
             </form>
           </div>
         )}
