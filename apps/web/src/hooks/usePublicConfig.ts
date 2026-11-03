@@ -34,7 +34,7 @@ async function fetchPublicConfig(): Promise<PublicConfig | null> {
 /** Server-side feature flags that decide which buttons we show (e.g. Google sign-in). Cached globally. */
 export function usePublicConfig(): PublicConfig {
   const [config, setConfig] = useState<PublicConfig>(
-    () => cachedConfig ?? { googleEnabled: false },
+    () => cachedConfig ?? { googleEnabled: true },
   );
 
   useEffect(() => {

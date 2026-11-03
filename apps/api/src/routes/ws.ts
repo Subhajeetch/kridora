@@ -7,7 +7,11 @@ import {
   verifyWsTicket,
 } from "../lib/crypto";
 import { ApiError } from "../lib/errors";
-import { requireAuth, sessionMiddleware } from "../middleware/security";
+import {
+  requireAuth,
+  resolveSessionFromRequest,
+  sessionMiddleware,
+} from "../middleware/security";
 import {
   consumeWsTicketNonce,
   upgradeWebSocketInHub,
@@ -62,7 +66,7 @@ wsRoutes.post("/api/ws-ticket", sessionMiddleware, requireAuth, async (c) => {
   return c.json({ ticket });
 });
 
-wsRoutes.get("/ws", sessionMiddleware, async (c) => {
+wsRoutes.get("/ws", async (c) => {
   if (c.req.header("Upgrade")?.toLowerCase() !== "websocket") {
     throw new ApiError(
       "VALIDATION_ERROR",
@@ -73,7 +77,7 @@ wsRoutes.get("/ws", sessionMiddleware, async (c) => {
   let socketUser: SocketUser | null = null;
   const ticketParam = c.req.query("ticket");
 
-  // 1. Primary: Verify single-use HMAC ticket bound to client IP hash
+  // 1. Primary: Verify single-use HMAC ticket bound to client IP hash (0 DB calls, microseconds speed)
   if (ticketParam) {
     const claims = await verifyWsTicket(ticketParam, c.env.BETTER_AUTH_SECRET);
     if (claims) {
@@ -100,15 +104,15 @@ wsRoutes.get("/ws", sessionMiddleware, async (c) => {
     }
   }
 
-  // 2. Fallback: Verified Better Auth session cookie
+  // 2. Fallback: Check session cookie only if ticket is absent or invalid
   if (!socketUser) {
-    const sessionUser = c.get("user");
-    if (sessionUser) {
+    const resolved = await resolveSessionFromRequest(c);
+    if (resolved?.user) {
       socketUser = {
-        id: sessionUser.id,
-        name: sessionUser.name,
-        image: sessionUser.image,
-        isAnonymous: sessionUser.isAnonymous,
+        id: resolved.user.id,
+        name: resolved.user.name,
+        image: resolved.user.image,
+        isAnonymous: resolved.user.isAnonymous,
       };
     }
   }

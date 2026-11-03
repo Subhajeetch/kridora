@@ -16,6 +16,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
+  DialogCloseButton,
   DialogContent,
   DialogDescription,
   DialogTitle,
@@ -183,36 +184,29 @@ export function ProfileDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-md border border-white/15 bg-card/95 p-6 backdrop-blur-2xl shadow-2xl sm:p-7">
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-xs"
-          aria-label="Close"
-          className="absolute top-4 right-4 rounded-xl text-muted-foreground hover:bg-white/10 hover:text-foreground z-20"
-          onClick={() => handleOpenChange(false)}
-        >
-          <X className="size-4" />
-        </Button>
+      <DialogContent className="max-w-md">
+        <DialogCloseButton onClick={() => handleOpenChange(false)} />
 
         {/* Profile Card Header */}
         <div className="flex items-center gap-4 pr-6">
           <div className="relative shrink-0">
-            {session.user.image ? (
-              <img
-                src={session.user.image}
-                alt={currentName}
-                className="size-16 rounded-2xl object-cover border border-white/20 shadow-md"
-              />
-            ) : (
-              <div className="grid size-16 place-items-center rounded-2xl bg-linear-to-br from-neon-violet to-neon-pink font-display text-2xl font-bold text-white shadow-lg shadow-violet-500/25">
-                {getInitial(currentName)}
-              </div>
-            )}
+            <div className="pixel-corners-sm bg-[#facc15] p-[2px] filter drop-shadow-[0_3px_0_#78350f]">
+              {session.user.image ? (
+                <img
+                  src={session.user.image}
+                  alt={currentName}
+                  className="size-16 pixel-corners-sm object-cover bg-black"
+                />
+              ) : (
+                <div className="grid size-16 place-items-center pixel-corners-sm bg-linear-to-br from-amber-400 to-amber-600 font-display text-2xl font-bold text-black">
+                  {getInitial(currentName)}
+                </div>
+              )}
+            </div>
             {isVerified && (
               <span
                 title="Verified Player"
-                className="absolute -bottom-1 -right-1 grid size-5 place-items-center rounded-full bg-emerald-400 text-black shadow-xs"
+                className="absolute -bottom-1 -right-1 grid size-5 place-items-center pixel-corners-sm bg-emerald-400 text-black shadow-xs"
               >
                 <ShieldCheck className="size-3.5 fill-current" />
               </span>
@@ -238,13 +232,13 @@ export function ProfileDialog({
                     disabled={savingName}
                     autoFocus
                     placeholder="Enter name"
-                    className="h-8 rounded-xl bg-white/5 border-white/20 focus-visible:ring-primary px-2.5 py-1 text-sm font-semibold text-foreground placeholder:text-muted-foreground/60"
+                    className="h-8 text-sm font-semibold text-foreground placeholder:text-muted-foreground/60"
                   />
                   <Button
                     type="submit"
                     size="sm"
                     disabled={savingName || !nameInput.trim()}
-                    className="h-8 px-3 rounded-xl text-xs font-semibold gap-1 shrink-0 bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm active:scale-95 transition-all"
+                    className="h-8 px-3 pixel-corners-sm text-xs font-semibold gap-1 shrink-0 bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm active:scale-95 transition-all"
                   >
                     {savingName ? (
                       <>
@@ -263,7 +257,7 @@ export function ProfileDialog({
                     onClick={handleCancelEdit}
                     title="Cancel"
                     aria-label="Cancel"
-                    className="size-8 rounded-xl text-muted-foreground hover:bg-white/10 hover:text-foreground shrink-0"
+                    className="size-8 pixel-corners-sm text-muted-foreground hover:bg-white/10 hover:text-foreground shrink-0"
                   >
                     <X className="size-4" />
                   </Button>
@@ -276,7 +270,7 @@ export function ProfileDialog({
               </form>
             ) : (
               <div className="flex items-center gap-2 min-w-0">
-                <DialogTitle className="text-xl font-bold tracking-tight text-foreground truncate">
+                <DialogTitle className="font-retro text-base sm:text-lg font-bold uppercase tracking-wide text-white truncate">
                   {currentName}
                 </DialogTitle>
                 <button
@@ -284,7 +278,7 @@ export function ProfileDialog({
                   onClick={handleStartEdit}
                   title="Edit display name"
                   aria-label="Edit display name"
-                  className="inline-flex items-center justify-center size-7 rounded-lg text-muted-foreground hover:text-primary hover:bg-white/10 active:scale-95 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary shrink-0"
+                  className="inline-flex items-center justify-center size-7 pixel-corners-sm text-muted-foreground hover:text-[#facc15] hover:bg-white/10 active:scale-95 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#facc15] shrink-0"
                 >
                   <Pencil className="size-3.5" />
                 </button>
@@ -307,106 +301,126 @@ export function ProfileDialog({
         </div>
 
         {/* User ID Box (Numeric ID for Friends) */}
-        <div className="mt-5 rounded-2xl border border-white/10 bg-panel/75 p-4 shadow-inner">
-          <div className="flex items-center justify-between gap-2">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Player User ID
-              </p>
-              <p className="mt-1 font-mono text-2xl font-bold tracking-[0.2em] text-foreground">
-                {numericId ?? "------"}
-              </p>
+        <div className="mt-5 pixel-corners-sm bg-white/20 p-[2px] filter drop-shadow-[0_2px_0_#000000]">
+          <div className="pixel-corners-sm bg-[#12131a] p-4">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <p className="text-xs font-retro font-bold uppercase tracking-wider text-muted-foreground">
+                  Player User ID
+                </p>
+                <p className="mt-1 font-mono text-2xl font-bold tracking-[0.2em] text-[#facc15]">
+                  {numericId ?? "------"}
+                </p>
+              </div>
+              {numericId && (
+                <button
+                  type="button"
+                  onClick={handleCopyId}
+                  className="filter drop-shadow-[0_3px_0_#78350f] active:translate-y-0.5 active:drop-shadow-[0_1px_0_#78350f] transition-all cursor-pointer"
+                >
+                  <div className="pixel-corners-sm bg-[#facc15] hover:bg-[#fbbf24] p-[1.5px]">
+                    <div className="pixel-corners-sm bg-[#12131a] hover:bg-[#1a1b24] text-[#facc15] font-retro text-[10px] font-bold uppercase tracking-wider h-8 px-3 flex items-center gap-1.5 transition-colors">
+                      {copied ? (
+                        <Check className="size-3.5 text-emerald-400" />
+                      ) : (
+                        <Copy className="size-3.5" />
+                      )}
+                      <span>{copied ? "Copied!" : "Copy ID"}</span>
+                    </div>
+                  </div>
+                </button>
+              )}
             </div>
-            {numericId && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-9 gap-1.5 rounded-xl border-white/15 bg-white/5 hover:border-primary/60 hover:text-primary transition-all active:scale-95"
-                onClick={handleCopyId}
-              >
-                {copied ? (
-                  <Check className="size-3.5 text-emerald-400" />
-                ) : (
-                  <Copy className="size-3.5" />
-                )}
-                <span>{copied ? "Copied!" : "Copy ID"}</span>
-              </Button>
-            )}
+            <p className="mt-2 text-xs text-muted-foreground">
+              Share this numeric ID with your friends so they can invite you
+              directly from any game room.
+            </p>
           </div>
-          <p className="mt-2 text-xs text-muted-foreground">
-            Share this numeric ID with your friends so they can invite you
-            directly from any game room.
-          </p>
         </div>
 
         {/* Player Stats Grid */}
         <div className="mt-4 grid grid-cols-3 gap-2.5">
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-3 text-center">
-            <Coins className="mx-auto size-4 text-coin mb-1" />
-            <p className="text-lg font-bold tabular-nums text-foreground">
-              {me?.profile.rings ?? 0}
-            </p>
-            <p className="text-[10px] uppercase font-semibold text-muted-foreground">
-              Rings
-            </p>
+          <div className="pixel-corners-sm bg-white/20 hover:bg-[#facc15]/60 p-[2px] transition-colors filter drop-shadow-[0_2px_0_#000000]">
+            <div className="pixel-corners-sm bg-[#12131a] p-3 text-center h-full">
+              <Coins className="mx-auto size-4 text-coin mb-1" />
+              <p className="text-lg font-bold tabular-nums text-foreground">
+                {me?.profile.rings ?? 0}
+              </p>
+              <p className="text-[10px] uppercase font-semibold text-muted-foreground">
+                Rings
+              </p>
+            </div>
           </div>
 
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-3 text-center">
-            <Trophy className="mx-auto size-4 text-neon-pink mb-1" />
-            <p className="text-lg font-bold tabular-nums text-foreground">
-              {gamesWon}
-            </p>
-            <p className="text-[10px] uppercase font-semibold text-muted-foreground">
-              Victories
-            </p>
+          <div className="pixel-corners-sm bg-white/20 hover:bg-[#facc15]/60 p-[2px] transition-colors filter drop-shadow-[0_2px_0_#000000]">
+            <div className="pixel-corners-sm bg-[#12131a] p-3 text-center h-full">
+              <Trophy className="mx-auto size-4 text-neon-pink mb-1" />
+              <p className="text-lg font-bold tabular-nums text-foreground">
+                {gamesWon}
+              </p>
+              <p className="text-[10px] uppercase font-semibold text-muted-foreground">
+                Victories
+              </p>
+            </div>
           </div>
 
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-3 text-center">
-            <Crown className="mx-auto size-4 text-neon-cyan mb-1" />
-            <p className="text-lg font-bold tabular-nums text-foreground">
-              {winRate}%
-            </p>
-            <p className="text-[10px] uppercase font-semibold text-muted-foreground">
-              Win Rate
-            </p>
+          <div className="pixel-corners-sm bg-white/20 hover:bg-[#facc15]/60 p-[2px] transition-colors filter drop-shadow-[0_2px_0_#000000]">
+            <div className="pixel-corners-sm bg-[#12131a] p-3 text-center h-full">
+              <Crown className="mx-auto size-4 text-neon-cyan mb-1" />
+              <p className="text-lg font-bold tabular-nums text-foreground">
+                {winRate}%
+              </p>
+              <p className="text-[10px] uppercase font-semibold text-muted-foreground">
+                Win Rate
+              </p>
+            </div>
           </div>
         </div>
 
         {/* Guest Warning / Upgrade Button */}
         {isGuest && (
-          <div className="mt-4 rounded-2xl border border-amber-400/20 bg-amber-400/10 p-3.5 text-xs text-amber-200">
-            <p className="font-semibold text-amber-300">
-              Guest sessions are temporary
-            </p>
-            <p className="mt-0.5 text-muted-foreground">
-              Guest profiles inactive for 5 days are automatically removed.
-            </p>
-            <Button
-              type="button"
-              size="sm"
-              className="mt-3 w-full font-medium"
-              onClick={() => {
-                handleOpenChange(false);
-                onOpenAuth?.("signup");
-              }}
-            >
-              <UserIcon className="size-3.5" /> Create account to keep stats
-            </Button>
+          <div className="mt-4 pixel-corners-sm bg-amber-400/40 p-[2px] filter drop-shadow-[0_3px_0_#78350f]">
+            <div className="pixel-corners-sm bg-[#161208] p-3.5 text-xs text-amber-200">
+              <p className="font-retro font-bold text-amber-300 uppercase tracking-wide">
+                Guest sessions are temporary
+              </p>
+              <p className="mt-1 text-muted-foreground">
+                Guest profiles inactive for 5 days are automatically removed.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  handleOpenChange(false);
+                  onOpenAuth?.("signup");
+                }}
+                className="mt-3 w-full filter drop-shadow-[0_4px_0_#78350f] hover:drop-shadow-[0_5px_0_#78350f] active:translate-y-0.5 active:drop-shadow-[0_1px_0_#78350f] transition-all cursor-pointer"
+              >
+                <div className="pixel-corners-sm bg-black p-[2px]">
+                  <div className="pixel-corners-sm bg-[#facc15] hover:bg-[#fbbf24] text-black font-retro text-xs font-bold uppercase tracking-wider h-10 px-4 flex items-center justify-center gap-2">
+                    <UserIcon className="size-4" />
+                    <span>Create account to keep stats</span>
+                  </div>
+                </div>
+              </button>
+            </div>
           </div>
         )}
 
         {/* Footer Actions */}
         <div className="mt-6 flex justify-end border-t border-white/10 pt-4">
-          <Button
-            variant="ghost"
-            size="sm"
+          <button
+            type="button"
             disabled={loggingOut}
-            className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive gap-1.5"
             onClick={handleSignOut}
+            className="filter drop-shadow-[0_3px_0_#881337] active:translate-y-0.5 active:drop-shadow-[0_1px_0_#881337] transition-all cursor-pointer disabled:opacity-50"
           >
-            <LogOut className="size-4" />
-            <span>{loggingOut ? "Signing out..." : "Sign Out"}</span>
-          </Button>
+            <div className="pixel-corners-sm bg-rose-500 p-[1.5px]">
+              <div className="pixel-corners-sm bg-[#12131a] hover:bg-rose-950/40 text-rose-300 hover:text-white font-retro text-xs font-bold uppercase tracking-wider h-8 px-3.5 flex items-center gap-1.5 transition-colors">
+                <LogOut className="size-3.5" />
+                <span>{loggingOut ? "Signing out..." : "Sign Out"}</span>
+              </div>
+            </div>
+          </button>
         </div>
       </DialogContent>
     </Dialog>

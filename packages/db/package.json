@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Drizzle ORM schema, client and data services for PostgreSQL.",
+  "description": "Drizzle ORM schema, client and data services for Cloudflare D1 (SQLite).",
   "exports": {
     ".": "./src/index.ts",
     "./schema": "./src/schema/index.ts"
@@ -11,17 +11,15 @@
   "scripts": {
     "check-types": "tsc",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "tsx src/migrate.ts",
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
-    "drizzle-orm": "^0.45.4",
-    "pg": "^8.23.1"
+    "drizzle-orm": "^0.45.4"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260401.0",
     "@kridora/typescript-config": "workspace:*",
     "@types/node": "^24.19.2",
-    "@types/pg": "^8.15.0",
     "drizzle-kit": "^0.31.11",
     "tsx": "^4.23.15",
     "typescript": "7.0.2"

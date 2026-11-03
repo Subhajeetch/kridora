@@ -1,4 +1,12 @@
-import { and, eq, grantRings, grantXp, schema, sql } from "@kridora/db";
+import {
+  and,
+  ensureProfile,
+  eq,
+  grantRings,
+  grantXp,
+  schema,
+  sql,
+} from "@kridora/db";
 import type { GameSlug, RoomPlayer } from "@kridora/shared";
 import { withDb } from "../lib/db";
 import type { Env } from "../types";
@@ -24,6 +32,8 @@ export async function recordMatchRewards(
     for (let i = 0; i < players.length; i++) {
       const player = players[i];
       if (!player) continue;
+
+      await ensureProfile(db, player.userId);
 
       const custom = outcome.placements?.find(
         (p) => p.userId === player.userId,

@@ -36,7 +36,11 @@ export function LeaveConfirmDialog({
         </div>
 
         <DialogDescription className="mt-3 text-sm text-slate-300 leading-relaxed">
-          If you intentionally leave the room now, <strong className="font-bold text-white">all your game pieces and progress will be permanently removed</strong> from this match.
+          If you intentionally leave the room now,{" "}
+          <strong className="font-bold text-white">
+            all your game pieces and progress will be permanently removed
+          </strong>{" "}
+          from this match.
         </DialogDescription>
 
         <div className="mt-6 flex items-center justify-end gap-2.5">

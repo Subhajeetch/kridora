@@ -41,8 +41,19 @@ export interface RingTransactionResult {
 }
 
 function isUniqueViolation(err: unknown): boolean {
-  const anyErr = err as { code?: string; cause?: { code?: string } } | null;
-  return anyErr?.code === "23505" || anyErr?.cause?.code === "23505";
+  const anyErr = err as {
+    code?: string;
+    message?: string;
+    cause?: { code?: string; message?: string };
+  } | null;
+  return (
+    anyErr?.code === "23505" ||
+    anyErr?.cause?.code === "23505" ||
+    anyErr?.code === "SQLITE_CONSTRAINT" ||
+    anyErr?.cause?.code === "SQLITE_CONSTRAINT" ||
+    Boolean(anyErr?.message?.includes("UNIQUE constraint failed")) ||
+    Boolean(anyErr?.cause?.message?.includes("UNIQUE constraint failed"))
+  );
 }
 
 async function findByIdempotencyKey(
@@ -83,54 +94,53 @@ export async function applyRingTransaction(
   }
 
   try {
-    return await db.transaction(async (tx) => {
-      const [profile] = await tx
-        .select()
-        .from(playerProfiles)
-        .where(eq(playerProfiles.userId, input.userId))
-        .for("update");
-      if (!profile)
-        throw new RingsError("PROFILE_NOT_FOUND", "Player profile not found");
+    const [profile] = await db
+      .select()
+      .from(playerProfiles)
+      .where(eq(playerProfiles.userId, input.userId));
+    if (!profile)
+      throw new RingsError("PROFILE_NOT_FOUND", "Player profile not found");
 
-      const newBalance = profile.ringsBalance + input.amount;
-      if (newBalance < 0)
-        throw new RingsError("INSUFFICIENT_RINGS", "Not enough Rings");
-      if (!Number.isSafeInteger(newBalance))
-        throw new RingsError("INVALID_AMOUNT", "Balance out of range");
+    const newBalance = profile.ringsBalance + input.amount;
+    if (newBalance < 0)
+      throw new RingsError("INSUFFICIENT_RINGS", "Not enough Rings");
+    if (!Number.isSafeInteger(newBalance))
+      throw new RingsError("INVALID_AMOUNT", "Balance out of range");
 
-      const [transaction] = await tx
-        .insert(ringTransactions)
-        .values({
-          userId: input.userId,
-          amount: input.amount,
-          balanceAfter: newBalance,
-          type: input.type,
-          reason: input.reason,
-          referenceType: input.referenceType,
-          referenceId: input.referenceId,
-          idempotencyKey: input.idempotencyKey,
-          metadata: input.metadata ?? {},
-        })
-        .returning();
-      if (!transaction) throw new Error("Ledger insert returned no row");
+    const insertStmt = db
+      .insert(ringTransactions)
+      .values({
+        userId: input.userId,
+        amount: input.amount,
+        balanceAfter: newBalance,
+        type: input.type,
+        reason: input.reason,
+        referenceType: input.referenceType,
+        referenceId: input.referenceId,
+        idempotencyKey: input.idempotencyKey,
+        metadata: input.metadata ?? {},
+      })
+      .returning();
 
-      await tx
-        .update(playerProfiles)
-        .set({
-          ringsBalance: newBalance,
-          lifetimeRingsEarned:
-            input.amount > 0
-              ? profile.lifetimeRingsEarned + input.amount
-              : profile.lifetimeRingsEarned,
-          lifetimeRingsSpent:
-            input.amount < 0
-              ? profile.lifetimeRingsSpent - input.amount
-              : profile.lifetimeRingsSpent,
-        })
-        .where(eq(playerProfiles.userId, input.userId));
+    const updateStmt = db
+      .update(playerProfiles)
+      .set({
+        ringsBalance: newBalance,
+        lifetimeRingsEarned:
+          input.amount > 0
+            ? profile.lifetimeRingsEarned + input.amount
+            : profile.lifetimeRingsEarned,
+        lifetimeRingsSpent:
+          input.amount < 0
+            ? profile.lifetimeRingsSpent - input.amount
+            : profile.lifetimeRingsSpent,
+      })
+      .where(eq(playerProfiles.userId, input.userId));
 
-      return { transaction, balance: newBalance, duplicate: false };
-    });
+    const [[transaction]] = await db.batch([insertStmt, updateStmt]);
+    if (!transaction) throw new Error("Ledger insert returned no row");
+
+    return { transaction, balance: newBalance, duplicate: false };
   } catch (err) {
     // Two requests with the same idempotency key raced: the loser reads the winner's result.
     if (input.idempotencyKey && isUniqueViolation(err)) {

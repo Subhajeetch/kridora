@@ -1,5 +1,4 @@
 NODE_ENV=development
-DATABASE_URL=postgres://kridora:kridora@localhost:5432/kridora
 BETTER_AUTH_SECRET=replace-with-at-least-32-bytes-of-random-hex-secret
 BETTER_AUTH_URL=http://localhost:2020
 WEB_URL=http://localhost:5173

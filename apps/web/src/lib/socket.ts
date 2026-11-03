@@ -88,7 +88,6 @@ export class NativeRealtimeSocket {
   private reconnectAttempts = 0;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
-  private readyFallbackTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
     if (typeof window !== "undefined") {
@@ -202,10 +201,6 @@ export class NativeRealtimeSocket {
   }
 
   private markReady(): void {
-    if (this.readyFallbackTimer) {
-      clearTimeout(this.readyFallbackTimer);
-      this.readyFallbackTimer = null;
-    }
     if (this.status !== "connected") {
       this.setStatus("connected");
       this.emitLocal("connect");
@@ -237,12 +232,8 @@ export class NativeRealtimeSocket {
         this.connecting = false;
         this.reconnectAttempts = 0;
         this.startHeartbeat();
-        // Wait briefly for server's initial room:state + ready frame before marking connected
-        this.readyFallbackTimer = setTimeout(() => {
-          if (this.ws === ws && ws.readyState === WebSocket.OPEN) {
-            this.markReady();
-          }
-        }, 1500);
+        // Socket connection is established, mark ready immediately to avoid any lag
+        this.markReady();
       };
 
       ws.onmessage = (event) => {
@@ -338,10 +329,6 @@ export class NativeRealtimeSocket {
     if (this.heartbeatTimer) {
       clearInterval(this.heartbeatTimer);
       this.heartbeatTimer = null;
-    }
-    if (this.readyFallbackTimer) {
-      clearTimeout(this.readyFallbackTimer);
-      this.readyFallbackTimer = null;
     }
   }
 

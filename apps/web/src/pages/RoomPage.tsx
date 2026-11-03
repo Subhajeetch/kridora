@@ -36,6 +36,7 @@ import { InviteUserDialog } from "@/components/InviteUserDialog";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Dialog,
+  DialogCloseButton,
   DialogContent,
   DialogDescription,
   DialogTitle,
@@ -886,21 +887,32 @@ function RoomView({ room, userId }: { room: RoomSnapshot; userId: string }) {
       />
 
       <Dialog open={leaveConfirmOpen} onOpenChange={setLeaveConfirmOpen}>
-        <DialogContent className="max-w-md border-rose-500/30 bg-card text-card-foreground">
-          <div className="flex items-center gap-3">
-            <div className="grid size-11 place-items-center rounded-2xl bg-rose-500/15 text-rose-400 border border-rose-500/30">
-              <LogOut className="size-5" />
+        <DialogContent className="max-w-md border-rose-500">
+          <DialogCloseButton onClick={() => setLeaveConfirmOpen(false)} />
+
+          <div className="flex items-center gap-3 pr-6">
+            <div className="pixel-corners-sm bg-rose-500 p-[2px] shrink-0 filter drop-shadow-[0_2px_0_#881337]">
+              <div className="grid size-10 place-items-center pixel-corners-sm bg-[#12131a] text-rose-400">
+                <LogOut className="size-5" />
+              </div>
             </div>
             <div>
-              <DialogTitle className="text-lg font-bold">
+              <DialogTitle className="font-retro text-base sm:text-lg font-bold uppercase tracking-wide text-white">
                 Leave Match & Room?
               </DialogTitle>
-              <p className="text-xs text-rose-400">Match in progress</p>
+              <p className="text-xs text-rose-400 font-semibold uppercase tracking-wider">
+                Match in progress
+              </p>
             </div>
           </div>
 
-          <DialogDescription className="mt-3 text-sm leading-relaxed">
-            If you intentionally leave the room now, <strong className="font-bold text-foreground">all your game pieces and match progress will be permanently removed</strong>.
+          <DialogDescription className="mt-3 text-sm leading-relaxed text-gray-300">
+            If you intentionally leave the room now,{" "}
+            <strong className="font-bold text-white">
+              all your game pieces and match progress will be permanently
+              removed
+            </strong>
+            .
           </DialogDescription>
 
           <div className="mt-6 flex items-center justify-end gap-2.5">
@@ -909,22 +921,25 @@ function RoomView({ room, userId }: { room: RoomSnapshot; userId: string }) {
               size="sm"
               onClick={() => setLeaveConfirmOpen(false)}
               disabled={busy}
-              className="rounded-xl"
+              className="pixel-corners-sm"
             >
               Cancel
             </Button>
-            <Button
-              variant="destructive"
-              size="sm"
+            <button
+              type="button"
               onClick={() => {
                 setLeaveConfirmOpen(false);
                 void leave();
               }}
               disabled={busy}
-              className="rounded-xl font-bold bg-rose-600 hover:bg-rose-500 text-white"
+              className="filter drop-shadow-[0_4px_0_#881337] active:translate-y-0.5 active:drop-shadow-[0_1px_0_#881337] transition-all cursor-pointer disabled:opacity-50"
             >
-              Leave Match
-            </Button>
+              <div className="pixel-corners-sm bg-black p-[2px]">
+                <div className="pixel-corners-sm bg-rose-600 hover:bg-rose-500 text-white font-retro text-xs font-bold uppercase tracking-wider h-9 px-4 flex items-center justify-center">
+                  Leave Match
+                </div>
+              </div>
+            </button>
           </div>
         </DialogContent>
       </Dialog>

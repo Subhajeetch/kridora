@@ -164,7 +164,9 @@ export const MobileNocturneDrawer = memo(function MobileNocturneDrawer({
     ? SEAT_DEFINITIONS[activePlayer.color]
     : SEAT_DEFINITIONS.coral;
   const rotation =
-    DICE_ROTATIONS[diceValue] ?? DICE_ROTATIONS[1] ?? "rotateX(0deg) rotateY(0deg)";
+    DICE_ROTATIONS[diceValue] ??
+    DICE_ROTATIONS[1] ??
+    "rotateX(0deg) rotateY(0deg)";
 
   const winnerPlayer = state.winnerId
     ? state.players.find((p) => p.userId === state.winnerId)
@@ -193,7 +195,8 @@ export const MobileNocturneDrawer = memo(function MobileNocturneDrawer({
     if (winnerPlayer) return "All 4 pieces safely reached home.";
     if (isRolling) return "Tumbling the die...";
     if (state.dice !== null) {
-      if (state.movableTokens.length === 0) return "No valid moves — passing turn";
+      if (state.movableTokens.length === 0)
+        return "No valid moves — passing turn";
       if (isMyTurn) {
         if (isAutoMoving) return "Moving piece automatically...";
         return state.dice === 6

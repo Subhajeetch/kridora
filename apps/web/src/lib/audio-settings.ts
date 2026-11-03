@@ -57,3 +57,53 @@ export function updateAudioSettings(patch: Partial<AudioSettings>) {
 export function useAudioSettings(): AudioSettings {
   return useSyncExternalStore(subscribe, () => current);
 }
+
+/** Play a gentle, pleasant 2-tone arcade notification chime. */
+export function playNotificationSound(settings?: AudioSettings) {
+  if (typeof window === "undefined") return;
+  const audioSettings = settings ?? current;
+  if (audioSettings.muted || audioSettings.sfxVolume <= 0) return;
+
+  try {
+    const AudioCtx =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext?: typeof AudioContext })
+        .webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    if (ctx.state === "suspended") {
+      void ctx.resume();
+    }
+    const now = ctx.currentTime;
+    const volume = Math.min(1, Math.max(0, audioSettings.sfxVolume * 0.18));
+
+    // A pleasant 2-tone retro arcade notification chime (D5 587Hz -> A5 880Hz)
+    const notes = [
+      { freq: 587.33, start: 0, duration: 0.12 },
+      { freq: 880.0, start: 0.08, duration: 0.22 },
+    ];
+
+    notes.forEach(({ freq, start, duration }) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq, now + start);
+
+      gain.gain.setValueAtTime(0.0001, now + start);
+      gain.gain.exponentialRampToValueAtTime(volume, now + start + 0.012);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + start + duration);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(now + start);
+      osc.stop(now + start + duration);
+    });
+
+    setTimeout(() => {
+      void ctx.close();
+    }, 800);
+  } catch {
+    // Fail silently if browser blocks autoplay before user gesture
+  }
+}

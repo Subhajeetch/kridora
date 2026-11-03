@@ -7,6 +7,14 @@
   "observability": {
     "enabled": true
   },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "kridora",
+      "database_id": "e2805504-460e-4bce-b8b8-3dc7d0594872",
+      "migrations_dir": "../../packages/db/drizzle"
+    }
+  ],
   "durable_objects": {
     "bindings": [
       {
@@ -20,5 +28,5 @@
       "tag": "v1",
       "new_sqlite_classes": ["RealtimeHub"]
     }
-  ],
+  ]
 }

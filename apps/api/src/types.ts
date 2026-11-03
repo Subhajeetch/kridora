@@ -6,7 +6,8 @@ export interface HyperdriveBinding {
 
 export interface Env {
   REALTIME_HUB: DurableObjectNamespace;
-  DATABASE_URL: string;
+  DB: D1Database;
+  DATABASE_URL?: string;
   HYPERDRIVE?: HyperdriveBinding;
   BETTER_AUTH_SECRET: string;
   BETTER_AUTH_URL: string;

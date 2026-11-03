@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
+  DialogCloseButton,
   DialogContent,
   DialogDescription,
   DialogTitle,
@@ -62,13 +63,17 @@ export function InviteUserDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-md p-6 sm:p-7">
-        <div className="flex items-center gap-3">
-          <div className="grid size-10 place-items-center rounded-2xl bg-primary/15 text-primary shadow-sm">
-            <UserPlus className="size-5" />
+      <DialogContent className="max-w-md">
+        <DialogCloseButton onClick={() => handleOpenChange(false)} />
+
+        <div className="flex items-center gap-3 pr-6">
+          <div className="pixel-corners-sm bg-[#facc15] p-[2px] shrink-0 filter drop-shadow-[0_2px_0_#78350f]">
+            <div className="grid size-10 place-items-center pixel-corners-sm bg-[#12131a] text-[#facc15]">
+              <UserPlus className="size-5" />
+            </div>
           </div>
           <div>
-            <DialogTitle className="text-xl font-bold tracking-tight">
+            <DialogTitle className="font-retro text-base sm:text-lg font-bold uppercase tracking-wide text-white">
               Invite with User ID
             </DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground mt-0.5">
@@ -78,22 +83,20 @@ export function InviteUserDialog({
         </div>
 
         {error && (
-          <div
-            role="alert"
-            className="mt-4 flex items-start gap-2.5 rounded-2xl border border-destructive/30 bg-destructive/10 px-3.5 py-2.5 text-xs text-destructive"
-          >
-            <AlertCircle className="size-4 shrink-0 mt-0.5" />
-            <span className="leading-relaxed">{error}</span>
+          <div className="mt-4 pixel-corners-sm bg-destructive p-[2px] filter drop-shadow-[0_2px_0_#881337]">
+            <div className="flex items-start gap-2.5 pixel-corners-sm bg-[#1a0a0d] px-3.5 py-2.5 text-xs text-destructive">
+              <AlertCircle className="size-4 shrink-0 mt-0.5" />
+              <span className="leading-relaxed">{error}</span>
+            </div>
           </div>
         )}
 
         {success && (
-          <div
-            role="status"
-            className="mt-4 flex items-start gap-2.5 rounded-2xl border border-emerald-400/30 bg-emerald-400/10 px-3.5 py-2.5 text-xs text-emerald-300"
-          >
-            <Check className="size-4 shrink-0 mt-0.5" />
-            <span className="leading-relaxed">{success}</span>
+          <div className="mt-4 pixel-corners-sm bg-emerald-400 p-[2px] filter drop-shadow-[0_2px_0_#065f46]">
+            <div className="flex items-start gap-2.5 pixel-corners-sm bg-[#062014] px-3.5 py-2.5 text-xs text-emerald-300">
+              <Check className="size-4 shrink-0 mt-0.5" />
+              <span className="leading-relaxed">{success}</span>
+            </div>
           </div>
         )}
 
@@ -101,7 +104,7 @@ export function InviteUserDialog({
           <div>
             <label
               htmlFor="target-user-id"
-              className="block text-xs font-medium text-foreground mb-1.5"
+              className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5"
             >
               Numeric User ID
             </label>
@@ -117,7 +120,7 @@ export function InviteUserDialog({
                 if (error) setError(null);
               }}
               maxLength={10}
-              className="h-10 rounded-xl font-mono text-sm tracking-wider"
+              className="h-12 font-mono text-xl tracking-[0.25em] text-center text-[#facc15] font-bold"
               disabled={inviting}
               autoFocus
             />
@@ -127,34 +130,38 @@ export function InviteUserDialog({
             </p>
           </div>
 
-          <div className="flex items-center justify-end gap-2 pt-2">
+          <div className="flex items-center justify-end gap-2.5 pt-2">
             <Button
               type="button"
               variant="ghost"
               size="sm"
               onClick={() => handleOpenChange(false)}
               disabled={inviting}
+              className="pixel-corners-sm"
             >
               Cancel
             </Button>
-            <Button
+            <button
               type="submit"
-              size="sm"
-              className="gap-1.5 rounded-xl px-4"
+              className="filter drop-shadow-[0_4px_0_#78350f] active:translate-y-0.5 active:drop-shadow-[0_1px_0_#78350f] transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
               disabled={inviting || targetId.length < 4}
             >
-              {inviting ? (
-                <>
-                  <Loader2 className="size-3.5 animate-spin" />
-                  <span>Inviting...</span>
-                </>
-              ) : (
-                <>
-                  <Send className="size-3.5" />
-                  <span>Send Invite</span>
-                </>
-              )}
-            </Button>
+              <div className="pixel-corners-sm bg-black p-[2px]">
+                <div className="pixel-corners-sm bg-[#facc15] hover:bg-[#fbbf24] text-black font-retro text-xs font-bold uppercase tracking-wider h-9 px-4 flex items-center justify-center gap-1.5">
+                  {inviting ? (
+                    <>
+                      <Loader2 className="size-3.5 animate-spin text-black" />
+                      <span>Inviting...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Send className="size-3.5" />
+                      <span>Send Invite</span>
+                    </>
+                  )}
+                </div>
+              </div>
+            </button>
           </div>
         </form>
       </DialogContent>
