@@ -8,7 +8,7 @@ const popSpring: Transition = { type: "spring", stiffness: 320, damping: 22 };
 export function SplashScreen() {
   const reduce = useReducedMotion();
   return (
-    <div className="grid min-h-dvh place-items-center">
+    <div className="relative grid min-h-dvh place-items-center">
       <Background />
       <motion.div
         className="flex flex-col items-center gap-4"

@@ -6,6 +6,23 @@ export interface StartContext {
   players: readonly RoomPlayer[];
 }
 
+export interface GameScreenshot {
+  url: string;
+  title: string;
+  caption: string;
+}
+
+export interface GameHowToPlayStep {
+  step: number;
+  title: string;
+  description: string;
+}
+
+export interface GameControlHint {
+  key: string;
+  action: string;
+}
+
 /**
  * Everything the platform needs to know about a game. The lobby, the "Start game" button,
  * the server-side validation and the Browse Games page are all driven by this object.
@@ -30,4 +47,19 @@ export interface GameDefinition {
   };
   /** Optional game-specific rules (team balance, chosen map, ...). Runs on both client and server. */
   extraRequirements?: (ctx: StartContext) => UnmetRequirement[];
+
+  /** In-depth overview paragraphs describing the gameplay, lore and experience. */
+  overview?: string[];
+  /** Categorization tags / genre. */
+  genre?: string[];
+  /** Gameplay complexity / difficulty rating. */
+  difficulty?: string;
+  /** Step-by-step rules and how-to-play guide. */
+  howToPlay?: GameHowToPlayStep[];
+  /** Quick bullet rules summary. */
+  rulesSummary?: string[];
+  /** Control scheme hints. */
+  controls?: GameControlHint[];
+  /** Visual screenshots & gallery previews. */
+  screenshots?: GameScreenshot[];
 }

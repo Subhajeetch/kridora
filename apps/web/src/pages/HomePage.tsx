@@ -32,7 +32,7 @@ export default function HomePage() {
         </div>
 
         <p className="mt-4 sm:mt-6 max-w-xl text-base sm:text-lg text-gray-300 font-medium leading-relaxed">
-          Create rooms and play retro games online. No downloads, just instant
+          Create rooms and play games online. No downloads, just instant
           multiplayer fun right in your browser.
         </p>
 

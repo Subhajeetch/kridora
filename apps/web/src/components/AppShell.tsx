@@ -168,7 +168,7 @@ export function AppShell() {
   if (isPending && !isAuthInitialized) return <SplashScreen />;
 
   return (
-    <div className="min-h-dvh">
+    <div className="relative min-h-dvh">
       <Background />
       <MusicController />
 

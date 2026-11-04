@@ -20,6 +20,74 @@ export const GAME_DEFINITIONS = {
     minPlayers: 2,
     maxPlayers: 6,
     requirements: { allPlayersReady: true, allPlayersConnected: true },
+    genre: [
+      "Economic Strategy",
+      "Property Trading",
+      "Turn-Based",
+      "Competitive",
+    ],
+    difficulty: "Strategic & Cutthroat",
+    overview: [
+      "Monopoly is the classic board game of empire building, shrewd trading, and merciless bankruptcies. Navigate the 40-square perimeter board acquiring iconic properties, railroads, and utilities while forcing competitors to pay escalating rents.",
+      "Assemble full color property groups to construct houses and towering skyscrapers. Negotiate live trades directly with rivals, manage mortgages when cash runs tight, and leverage Chance and Community Chest cards to flip the game on its head.",
+      "With automated banking, live trading consoles, and real-time turn synchronization, Kridora Monopoly eliminates manual bookkeeping so you can focus entirely on financial domination.",
+    ],
+    howToPlay: [
+      {
+        step: 1,
+        title: "Roll & Traverse",
+        description:
+          "Roll the dice pair to navigate clock-wise around the 40-tile perimeter board.",
+      },
+      {
+        step: 2,
+        title: "Acquire Deeds",
+        description:
+          "Purchase unowned properties you land on or send them to an open player auction.",
+      },
+      {
+        step: 3,
+        title: "Develop & Build",
+        description:
+          "Once you own all properties of a color group, construct houses and hotels to escalate rent.",
+      },
+      {
+        step: 4,
+        title: "Bankrupt Opponents",
+        description:
+          "Deplete opponents' cash and mortgages until you stand as the sole surviving tycoon.",
+      },
+    ],
+    rulesSummary: [
+      "Passing 'GO' awards a recurring salary bonus to fund your real estate expansion.",
+      "Rolling doubles grants an extra roll; 3 consecutive doubles sends you straight to Jail.",
+      "Mortgaged properties cannot collect rent until the mortgage loan is repaid with interest.",
+      "Unpayable debt transfers all remaining assets directly to the creditor upon bankruptcy.",
+    ],
+    controls: [
+      {
+        key: "Click / Tap",
+        action: "Roll dice, purchase deeds, or configure trade offers",
+      },
+      {
+        key: "Drag & Drop",
+        action: "Organize deed cards in trade negotiation screens",
+      },
+    ],
+    screenshots: [
+      {
+        url: "/games/thumbs/monopoly.webp",
+        title: "Retro Tycoon Cover",
+        caption:
+          "Iconic retro board layout with deed cards, tokens, and city properties.",
+      },
+      {
+        url: "/games/ss/monopoly-gameplay.webp",
+        title: "Live Match Action Deck",
+        caption:
+          "Real-time bank balances, mini houses, deed portfolios, and active turn controls.",
+      },
+    ],
   },
   fatebyai: {
     slug: "fatebyai",
@@ -32,6 +100,75 @@ export const GAME_DEFINITIONS = {
     minPlayers: 2,
     maxPlayers: 8,
     requirements: { allPlayersReady: true, allPlayersConnected: true },
+    genre: [
+      "AI Narrative",
+      "Interactive Story",
+      "Role-Playing",
+      "Social Party",
+      "Sci-Fi / Fantasy",
+    ],
+    difficulty: "Imaginative & Accessible",
+    overview: [
+      "Fate by AI is an experimental multiplayer narrative game where an artificial intelligence dungeon master scripts an unpredictable cinematic journey tailored specifically to your room's decisions.",
+      "Every turn presents an emergent dilemma: moral quandaries, sci-fi expeditions, or high-fantasy combat. Each player secretly votes or submits their action, and the neural storyteller synthesizes your chaotic choices into an illustrated branching saga.",
+      "Will your party work in unison to overcome impossible cosmic odds, or will betrayal and rogue choices splinter your crew? No two games are ever identical.",
+    ],
+    howToPlay: [
+      {
+        step: 1,
+        title: "Hear the Scenario",
+        description:
+          "The AI Narrator presents a new chapter predicament to the entire party.",
+      },
+      {
+        step: 2,
+        title: "Lock In Your Choice",
+        description:
+          "Select your tactical or moral path before the round timer expires.",
+      },
+      {
+        step: 3,
+        title: "Witness the Verdict",
+        description:
+          "The AI resolves the group's actions, determining survival, loot, or unforeseen disasters.",
+      },
+      {
+        step: 4,
+        title: "Reach the Finale",
+        description:
+          "Survive multiple narrative arcs to receive your personalized group legacy epilogue.",
+      },
+    ],
+    rulesSummary: [
+      "Player votes are revealed simultaneously once all decisions are locked in.",
+      "Ties or contradictory decisions force high-risk chaotic fate rolls.",
+      "Player character stats and inventory persist across chapters until match completion.",
+      "Rogue individual actions can either save the team or drag everyone into peril.",
+    ],
+    controls: [
+      {
+        key: "Click / Tap",
+        action: "Select story choices or submit custom player actions",
+      },
+      {
+        key: "Number Keys 1-4",
+        action: "Quickly vote on available choices from your keyboard",
+      },
+    ],
+    screenshots: [
+      {
+        url: "/games/thumbs/fatebyai.webp",
+        title: "The AI Oracle Monolith",
+        caption:
+          "Mystic 16-bit terminal channeling cosmic narrative intelligence.",
+      },
+      {
+        url: "/games/ss/fatebyai-gameplay.webp",
+        title: "Encounter & Voting Deck",
+        caption:
+          "Live scenario exposition, real-time player votes, and interactive decision branches.",
+      },
+    ],
   },
   ludo: {
     slug: "ludo",
@@ -44,6 +181,74 @@ export const GAME_DEFINITIONS = {
     minPlayers: 2,
     maxPlayers: 4,
     requirements: { allPlayersReady: true, allPlayersConnected: true },
+    genre: [
+      "Classic Board Game",
+      "Turn-Based",
+      "Dice Rolling",
+      "Multiplayer Battle",
+    ],
+    difficulty: "Casual & Fast-Paced",
+    overview: [
+      "Ludo is the legendary cross-and-circle strategy board game originating from the ancient Indian game Pachisi. In this turbocharged arcade edition, players roll the dice to bring their four tokens onto the battlefield, navigating treacherous tracks where one wrong step sends your token crashing back home.",
+      "Compete against your friends in high-stakes multiplayer rooms. Roll a six to launch your tokens into action, form safe alliances on starred sanctuary tiles, and hunt down your rivals to knock them out just squares away from victory.",
+      "Featuring authentic retro sound effects, animated dice throws, dynamic board cameras, and real-time turn synchronization, Kridora Ludo brings board night directly to your browser with zero latency.",
+    ],
+    howToPlay: [
+      {
+        step: 1,
+        title: "Roll a Six to Deploy",
+        description:
+          "Roll the lucky number six to move a token from your yard onto the starting square.",
+      },
+      {
+        step: 2,
+        title: "Circle the Track",
+        description:
+          "Navigate clock-wise around the main perimeter path based on your dice roll values.",
+      },
+      {
+        step: 3,
+        title: "Strike Rival Tokens",
+        description:
+          "Land directly on an opponent's token to capture it and banish it back to their yard!",
+      },
+      {
+        step: 4,
+        title: "Enter the Home Column",
+        description:
+          "Guide all 4 of your tokens into the colored center triangle to claim first place.",
+      },
+    ],
+    rulesSummary: [
+      "Rolling a 6 grants a bonus turn and allows releasing a token from your yard.",
+      "Three consecutive rolls of 6 will forfeit your turn.",
+      "Landing on a tile occupied by an opponent sends their token back to base (except on starred safe tiles).",
+      "Exact roll count is required to enter the home triangle finish line.",
+    ],
+    controls: [
+      {
+        key: "Click / Tap",
+        action: "Roll dice or select eligible token to move",
+      },
+      {
+        key: "Spacebar",
+        action: "Quick roll dice when it is your turn",
+      },
+    ],
+    screenshots: [
+      {
+        url: "/games/thumbs/ludo.webp",
+        title: "Classic Quad-Color Board",
+        caption:
+          "Authentic retro colors with red, green, yellow, and blue starting yards.",
+      },
+      {
+        url: "/games/ss/ludo-gameplay.webp",
+        title: "In-Game Isometric Action",
+        caption:
+          "Live dice roll action, token hops, and multiplayer HUD indicators.",
+      },
+    ],
   },
 } satisfies Record<string, GameDefinition>;
 

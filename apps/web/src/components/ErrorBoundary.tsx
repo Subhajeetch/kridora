@@ -37,7 +37,7 @@ export class ErrorBoundary extends Component<Props, State> {
   override render() {
     if (this.state.hasError) {
       return (
-        <div className="grid min-h-dvh place-items-center px-4">
+        <div className="relative grid min-h-dvh place-items-center px-4">
           <Background />
           <div className="relative z-10 flex max-w-md flex-col items-center gap-4 rounded-3xl border border-white/10 bg-panel/85 p-8 text-center backdrop-blur-xl shadow-2xl">
             <LogoMark className="size-14 object-contain" />
