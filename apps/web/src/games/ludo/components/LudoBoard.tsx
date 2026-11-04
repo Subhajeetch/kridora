@@ -64,18 +64,18 @@ const STACK_OFFSETS: Record<1 | 2 | 3 | 4, ReadonlyArray<BoardCoordinate>> = {
   1: [[0, 0]],
   2: [
     [-0.13, -0.11],
-    [0.10, 0.11],
+    [0.1, 0.11],
   ],
   3: [
     [-0.13, 0],
-    [0.10, -0.13],
-    [0.10, 0.13],
+    [0.1, -0.13],
+    [0.1, 0.13],
   ],
   4: [
     [-0.13, -0.13],
     [-0.13, 0.13],
-    [0.10, -0.13],
-    [0.10, 0.13],
+    [0.1, -0.13],
+    [0.1, 0.13],
   ],
 };
 
@@ -398,8 +398,7 @@ export function LudoBoard({
       }
       if (step <= LUDO_MAX_SHARED_PROGRESS) {
         const trackIdx = getLudoTrackSquare(color, step);
-        const trackCell =
-          trackIdx !== null ? BOARD_TRACK[trackIdx] : undefined;
+        const trackCell = trackIdx !== null ? BOARD_TRACK[trackIdx] : undefined;
         if (trackCell) {
           return [trackCell[0] + 0.5, trackCell[1] + 0.5];
         }
@@ -430,9 +429,7 @@ export function LudoBoard({
 
     const isFreshReset =
       state.dice === null &&
-      state.players.every((p) =>
-        p.tokens.every((t) => t === LUDO_YARD_STEP),
-      ) &&
+      state.players.every((p) => p.tokens.every((t) => t === LUDO_YARD_STEP)) &&
       state.lastAction.includes("ready");
 
     if (isFreshReset) return;
@@ -471,8 +468,7 @@ export function LudoBoard({
         movementTimers.current.get(key)?.forEach((t) => window.clearTimeout(t));
         returnTimers.current.get(key)?.forEach((t) => window.clearTimeout(t));
 
-        const arrivalMs =
-          Math.max(0, pathPoints.length - 1) * HOP_STEP_MS + 95;
+        const arrivalMs = Math.max(0, pathPoints.length - 1) * HOP_STEP_MS + 95;
         if (arrivalMs > attackerArrivalMs) {
           attackerArrivalMs = arrivalMs;
         }
@@ -665,8 +661,7 @@ export function LudoBoard({
           );
         }
 
-        const totalDoneMs =
-          rewindStartMs + reversePoints.length * stepMs + 60;
+        const totalDoneMs = rewindStartMs + reversePoints.length * stepMs + 60;
         timers.push(
           window.setTimeout(() => {
             setReturnPaths((paths) => {
@@ -682,7 +677,15 @@ export function LudoBoard({
         returnTimers.current.set(key, timers);
       });
     }
-  }, [state.players, state.updatedAt, state.dice, state.lastAction, state.winnerId, getTokenCoord, spawnBoardFx]);
+  }, [
+    state.players,
+    state.updatedAt,
+    state.dice,
+    state.lastAction,
+    state.winnerId,
+    getTokenCoord,
+    spawnBoardFx,
+  ]);
 
   useEffect(() => {
     const moveTimersMap = movementTimers.current;
@@ -690,9 +693,13 @@ export function LudoBoard({
     const activeFxSet = fxTimers.current;
 
     return () => {
-      moveTimersMap.forEach((list) => list.forEach((t) => window.clearTimeout(t)));
+      moveTimersMap.forEach((list) =>
+        list.forEach((t) => window.clearTimeout(t)),
+      );
       moveTimersMap.clear();
-      retTimersMap.forEach((list) => list.forEach((t) => window.clearTimeout(t)));
+      retTimersMap.forEach((list) =>
+        list.forEach((t) => window.clearTimeout(t)),
+      );
       retTimersMap.clear();
       activeFxSet.forEach((t) => window.clearTimeout(t));
       activeFxSet.clear();
@@ -801,8 +808,11 @@ export function LudoBoard({
       });
     }
 
-    const badges: Array<{ key: string; coord: BoardCoordinate; count: number }> =
-      [];
+    const badges: Array<{
+      key: string;
+      coord: BoardCoordinate;
+      count: number;
+    }> = [];
     const cellSelectable = new Map<string, number>();
 
     stationaryGroups.forEach((group, groupKey) => {
@@ -840,7 +850,7 @@ export function LudoBoard({
         let scale = 1;
 
         if (tok.step >= 0 && tok.step < LUDO_HOME_STEP && count > 1) {
-          scale = count === 2 ? 0.76 : count === 3 ? 0.70 : 0.65;
+          scale = count === 2 ? 0.76 : count === 3 ? 0.7 : 0.65;
           const pattern = STACK_OFFSETS[Math.min(count, 4) as 1 | 2 | 3 | 4];
           const offset = pattern[idx];
           if (offset) {

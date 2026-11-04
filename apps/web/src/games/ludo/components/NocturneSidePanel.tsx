@@ -52,7 +52,9 @@ export const NocturneSidePanel = memo(function NocturneSidePanel({
     ? SEAT_DEFINITIONS[activePlayer.color]
     : SEAT_DEFINITIONS.coral;
   const rotation =
-    DICE_ROTATIONS[diceValue] ?? DICE_ROTATIONS[1] ?? "rotateX(0deg) rotateY(0deg)";
+    DICE_ROTATIONS[diceValue] ??
+    DICE_ROTATIONS[1] ??
+    "rotateX(0deg) rotateY(0deg)";
 
   const winnerPlayer = state.winnerId
     ? state.players.find((p) => p.userId === state.winnerId)
@@ -82,7 +84,8 @@ export const NocturneSidePanel = memo(function NocturneSidePanel({
     if (winnerPlayer) return "All 4 pieces safely reached home.";
     if (isRolling) return "Tumbling the die...";
     if (state.dice !== null) {
-      if (state.movableTokens.length === 0) return "No valid moves — passing turn";
+      if (state.movableTokens.length === 0)
+        return "No valid moves — passing turn";
       if (isMyTurn) {
         return state.dice === 6
           ? "Tap a highlighted pawn · Bonus roll!"
@@ -92,8 +95,9 @@ export const NocturneSidePanel = memo(function NocturneSidePanel({
         ? "A six gives an extra turn!"
         : `${activePlayer?.name ?? "Player"} is choosing a piece`;
     }
-    if (canRoll) return "A six unlocks a piece & gives an extra roll.";
-    return "A six starts a piece.";
+    if (canRoll)
+      return "A 1 or 6 starts a piece; only a 6 gives an extra roll.";
+    return "Roll a 1 or 6 to start a piece.";
   };
 
   return (
@@ -252,9 +256,7 @@ export const NocturneSidePanel = memo(function NocturneSidePanel({
           const seat = SEAT_DEFINITIONS[p.color];
           const isActive = !winnerPlayer && activePlayer?.userId === p.userId;
           const isMe = p.userId === userId;
-          const homeCount = p.tokens.filter(
-            (s) => s === LUDO_HOME_STEP,
-          ).length;
+          const homeCount = p.tokens.filter((s) => s === LUDO_HOME_STEP).length;
           const runningCount = p.tokens.filter(
             (s) => s >= 0 && s < LUDO_HOME_STEP,
           ).length;

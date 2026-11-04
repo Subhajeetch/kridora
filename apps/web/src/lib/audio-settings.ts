@@ -11,8 +11,8 @@ export interface AudioSettings {
 const STORAGE_KEY = "kridora:audio-settings";
 const DEFAULTS: AudioSettings = {
   muted: false,
-  musicVolume: 0.4,
-  sfxVolume: 0.7,
+  musicVolume: 0.5,
+  sfxVolume: 0.9,
 };
 
 function clamp01(value: unknown, fallback: number): number {

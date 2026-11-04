@@ -2,16 +2,22 @@ import {
   AlertCircle,
   ArrowLeft,
   Crown,
-  DoorOpen,
   Gamepad2,
   LogOut,
-  Sparkles,
   Trophy,
   Volume2,
   VolumeX,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useNavigate } from "react-router";
 import {
   getLudoAutoMoveToken,
@@ -34,14 +40,20 @@ import { cn } from "@/lib/utils";
 import { useRealtime } from "@/providers/realtime-context";
 import type { GameComponentProps } from "../types";
 import { ludoAudio } from "./audio";
+import { AudioSettingsDialog } from "./components/AudioSettingsDialog";
 import { LeaveConfirmDialog } from "./components/LeaveConfirmDialog";
 import { LudoBoard } from "./components/LudoBoard";
 import { MobileNocturneDrawer } from "./components/MobileNocturneDrawer";
 import { NocturneSidePanel } from "./components/NocturneSidePanel";
 import { OfflineWaitScreen } from "./components/OfflineWaitScreen";
 import { RoomToast } from "./components/RoomToast";
+import { VictoryScreen } from "./components/VictoryScreen";
 import { SEAT_DEFINITIONS } from "./constants";
+import { useDebugKeySequence } from "./debug/useDebugKeySequence";
 import styles from "./ludo.module.css";
+
+// Lazy-loaded so zero debug assets/code are fetched until debug mode is enabled
+const DebugPanel = lazy(() => import("./debug/DebugPanel"));
 
 const ROLL_TUMBLE_MS = 460;
 const HOP_STEP_MS = 130;
@@ -53,7 +65,7 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
   const { setActiveRoom } = useRealtime();
   const { onBackToRoom, playerCount, maxPlayers, roomCode, game } =
     useInGameRoom();
-  const { isMuted, toggleMute } = useGameAudio();
+  const { isMuted, toggleMute, setSfxVolume } = useGameAudio();
 
   const [state, setState] = useState<LudoGameState | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -65,6 +77,7 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
   const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
   const [isLeaving, setIsLeaving] = useState(false);
   const [rankingModalOpen, setRankingModalOpen] = useState(false);
+  const [audioDialogOpen, setAudioDialogOpen] = useState(false);
   const [dismissedWinnerKey, setDismissedWinnerKey] = useState<string | null>(
     null,
   );
@@ -73,6 +86,25 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
   const [activeEmotes, setActiveEmotes] = useState<
     Record<string, { emoji: string; timestamp: number }>
   >({});
+
+  // Debug Console (enabled by room owner via secret key sequence: hold X + d-e-b-u-g)
+  const [debugEnabled, setDebugEnabled] = useState(false);
+  const [debugBoxVisible, setDebugBoxVisible] = useState(false);
+
+  useDebugKeySequence({
+    onTrigger: () => {
+      // User rule: "only the room owner can enable debug mode and when it's enabled, everyone can use it.. if anyone else does, it'll be ignored & wont show any message at all..."
+      if (room.ownerId !== userId) {
+        return;
+      }
+      setDebugEnabled((prev) => {
+        const next = !prev;
+        setDebugBoxVisible(next);
+        void request("ludo:debug-enable", { enabled: next }).catch(() => {});
+        return next;
+      });
+    },
+  });
 
   // Floating HUD Room Code copy feedback
   const [copiedCode, setCopiedCode] = useState(false);
@@ -184,6 +216,16 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
         lastLandedRollKeyRef.current = rollKey;
         ludoAudio.diceLand(next.dice, audioRef.current);
       }
+    }
+
+    if (next.debugMode !== undefined) {
+      setDebugEnabled((curr) => {
+        if (curr !== next.debugMode) {
+          if (next.debugMode) setDebugBoxVisible(true);
+          return Boolean(next.debugMode);
+        }
+        return curr;
+      });
     }
 
     setState(next);
@@ -302,9 +344,17 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
       emoteTimers.set(payload.userId, timer);
     }
 
+    function onDebugEnabled(payload: { enabled: boolean }) {
+      setDebugEnabled(payload.enabled);
+      if (payload.enabled) {
+        setDebugBoxVisible(true);
+      }
+    }
+
     socket.on("ludo:state", onState);
     socket.on("ludo:rolling", onRolling);
     socket.on("ludo:emote", onEmoteReceived);
+    socket.on("ludo:debug-enabled", onDebugEnabled);
     socket.on("connect", fetchState);
 
     return () => {
@@ -312,6 +362,7 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
       socket.off("ludo:state", onState);
       socket.off("ludo:rolling", onRolling);
       socket.off("ludo:emote", onEmoteReceived);
+      socket.off("ludo:debug-enabled", onDebugEnabled);
       socket.off("connect", fetchState);
 
       if (rollClearTimerRef.current)
@@ -327,8 +378,7 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
         window.clearTimeout(manualPassTimerRef.current);
       if (autoMoveTimerRef.current)
         window.clearTimeout(autoMoveTimerRef.current);
-      if (copyTimerRef.current)
-        window.clearTimeout(copyTimerRef.current);
+      if (copyTimerRef.current) window.clearTimeout(copyTimerRef.current);
       emoteTimers.forEach((t) => window.clearTimeout(t));
       emoteTimers.clear();
       setActiveEmotes({});
@@ -338,7 +388,8 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
   // Subtle turn-start notification chime & light haptic tap when turn rotates to local player
   useEffect(() => {
     if (!state || state.winnerId || isBoardAnimating) return;
-    const activeTurnUser = state.players[state.currentPlayerIndex]?.userId ?? null;
+    const activeTurnUser =
+      state.players[state.currentPlayerIndex]?.userId ?? null;
     const prevTurnUser = prevTurnUserIdRef.current;
     prevTurnUserIdRef.current = activeTurnUser;
 
@@ -467,7 +518,9 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
     [isPaused, state, act],
   );
 
-  const activePlayer = state ? state.players[state.currentPlayerIndex] : undefined;
+  const activePlayer = state
+    ? state.players[state.currentPlayerIndex]
+    : undefined;
   const isMyTurn = activePlayer?.userId === userId;
   const canRoll =
     Boolean(isMyTurn) &&
@@ -721,8 +774,6 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
     );
   }
 
-
-
   const getPlayerDiceValue = (color: LudoColor) => {
     if (state.dice !== null && activePlayer?.color === color) {
       return state.dice;
@@ -741,15 +792,6 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
     Boolean(winnerPlayer && winnerKey) &&
     !isBoardAnimating &&
     dismissedWinnerKey !== winnerKey;
-
-  const sortedStandings = [...state.players].sort((a, b) => {
-    const aHome = a.tokens.filter((s) => s === LUDO_HOME_STEP).length;
-    const bHome = b.tokens.filter((s) => s === LUDO_HOME_STEP).length;
-    if (bHome !== aHome) return bHome - aHome;
-    const aProgress = a.tokens.reduce((acc, s) => acc + Math.max(0, s), 0);
-    const bProgress = b.tokens.reduce((acc, s) => acc + Math.max(0, s), 0);
-    return bProgress - aProgress;
-  });
 
   return (
     <div
@@ -811,9 +853,9 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
         <div className="flex items-center gap-1.5">
           <button
             type="button"
-            onClick={toggleMute}
-            aria-label={isMuted ? "Unmute game audio" : "Mute game audio"}
-            title={isMuted ? "Unmute audio" : "Mute audio"}
+            onClick={() => setAudioDialogOpen(true)}
+            aria-label="Open game audio settings"
+            title="Game audio settings"
             className="flex size-7 sm:size-8 cursor-pointer items-center justify-center rounded-xl border border-white/10 bg-white/5 text-slate-300 shadow-sm transition-all hover:border-white/20 hover:bg-white/10 hover:text-amber-400 active:scale-95 touch-manipulation"
           >
             {isMuted ? (
@@ -834,6 +876,16 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
           </button>
         </div>
       </header>
+
+      {/* Dedicated Ludo Audio & Sound Effects Settings Dialog */}
+      <AudioSettingsDialog
+        open={audioDialogOpen}
+        onOpenChange={setAudioDialogOpen}
+        audioSettings={audio}
+        isMuted={isMuted}
+        toggleMute={toggleMute}
+        setSfxVolume={setSfxVolume}
+      />
 
       {/* Realtime Toasts for Room Joins / Leaves */}
       <RoomToast players={room.players} audioSettings={audio} />
@@ -950,132 +1002,21 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
         />
       )}
 
-      {/* VICTORY / MATCH COMPLETE DIALOG */}
-      <Dialog
-        open={showVictoryModal}
-        onOpenChange={(open) => {
-          if (!open && winnerKey) setDismissedWinnerKey(winnerKey);
-        }}
-      >
-        <DialogContent className="max-w-md border-amber-400/40 bg-slate-900 text-slate-100">
-          <div className="flex flex-col items-center text-center">
-            <div className="grid size-14 place-items-center rounded-2xl border border-amber-400/40 bg-amber-400/15 text-amber-300 shadow-lg">
-              <Trophy className="size-7" />
-            </div>
-            <p className="mt-3 inline-flex items-center gap-1 text-[11px] font-black uppercase tracking-widest text-amber-300">
-              <Sparkles className="size-3.5" /> Match Complete
-            </p>
-            <DialogTitle className="mt-1 text-2xl font-black text-white">
-              {winnerPlayer?.userId === userId
-                ? "Victory! You Won!"
-                : `${winnerPlayer?.name ?? "Player"} Wins!`}
-            </DialogTitle>
-            <DialogDescription className="mt-1 text-xs text-slate-400">
-              All 4 pieces safely reached the center home triangle.
-            </DialogDescription>
-          </div>
-
-          <div className="mt-5 space-y-2">
-            {sortedStandings.map((p, rankIdx) => {
-              const seat = SEAT_DEFINITIONS[p.color];
-              const homeCount = p.tokens.filter(
-                (s) => s === LUDO_HOME_STEP,
-              ).length;
-              const avatar = playerAvatars[p.userId];
-              const isWinner = p.userId === state.winnerId;
-
-              return (
-                <div
-                  key={p.userId}
-                  className={cn(
-                    "flex items-center justify-between rounded-xl border p-2.5",
-                    isWinner
-                      ? "border-amber-400/70 bg-amber-400/10 text-white"
-                      : "border-white/10 bg-slate-800/60 text-slate-200",
-                  )}
-                >
-                  <div className="flex min-w-0 items-center gap-2.5">
-                    <span
-                      className={cn(
-                        "grid size-6 shrink-0 place-items-center rounded-lg text-xs font-black",
-                        rankIdx === 0
-                          ? "bg-amber-400 text-slate-950"
-                          : "bg-white/10 text-slate-300",
-                      )}
-                    >
-                      #{rankIdx + 1}
-                    </span>
-                    <div className="size-8 shrink-0 overflow-hidden rounded-full border border-white/40 bg-slate-700">
-                      {avatar ? (
-                        <img
-                          src={avatar}
-                          alt=""
-                          className="size-full object-cover"
-                        />
-                      ) : (
-                        <span
-                          className="grid size-full place-items-center text-xs font-bold text-white"
-                          style={{ backgroundColor: seat.boardHex }}
-                        >
-                          {p.name.charAt(0).toUpperCase()}
-                        </span>
-                      )}
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <span className="truncate text-sm font-bold text-white">
-                          {p.name}
-                        </span>
-                        {p.userId === userId && (
-                          <span className="rounded bg-white/15 px-1 text-[9px] font-bold text-slate-200">
-                            YOU
-                          </span>
-                        )}
-                      </div>
-                      <span
-                        className="rounded px-1 text-[10px] font-bold uppercase"
-                        style={{
-                          backgroundColor: `${seat.boardHex}33`,
-                          color: seat.boardHex,
-                        }}
-                      >
-                        {seat.name}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-1 font-mono text-xs font-bold">
-                    <span className="text-sm text-amber-300">{homeCount}</span>
-                    <span className="text-slate-400">/ 4</span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          <div className="mt-6 flex flex-wrap justify-end gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                if (winnerKey) setDismissedWinnerKey(winnerKey);
-              }}
-              className="rounded-xl border-white/20 text-slate-200"
-            >
-              View Board
-            </Button>
-            {isRoomOwner && (
-              <Button
-                size="sm"
-                onClick={() => void handleEndGame()}
-                className="gap-1.5 rounded-xl bg-amber-400 font-bold text-slate-950 hover:bg-amber-300"
-              >
-                <DoorOpen className="size-4" /> Return to Lobby
-              </Button>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* VICTORY / MATCH COMPLETE SCREEN */}
+      {showVictoryModal && state && (
+        <VictoryScreen
+          open={showVictoryModal}
+          onOpenChange={(open) => {
+            if (!open && winnerKey) setDismissedWinnerKey(winnerKey);
+          }}
+          state={state}
+          userId={userId}
+          isRoomOwner={isRoomOwner}
+          playerAvatars={playerAvatars}
+          audioSettings={audio}
+          onEndGame={handleEndGame}
+        />
+      )}
 
       {/* LEAVE CONFIRMATION DIALOG */}
       <LeaveConfirmDialog
@@ -1161,7 +1102,9 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
                   </div>
 
                   <div className="flex items-center gap-1.5 text-right font-mono font-bold">
-                    <span className="text-base text-amber-400">{homeCount}</span>
+                    <span className="text-base text-amber-400">
+                      {homeCount}
+                    </span>
                     <span className="text-xs text-slate-400">/ 4 Home</span>
                   </div>
                 </div>
@@ -1181,6 +1124,58 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* FLOATING DEBUG CONSOLE (Lazy-loaded on demand only when debug mode is enabled) */}
+      {debugEnabled && debugBoxVisible && (
+        <Suspense fallback={null}>
+          <DebugPanel
+            state={state}
+            room={room}
+            userId={userId}
+            isRoomOwner={isRoomOwner}
+            audioSettings={audio}
+            onClose={() => setDebugBoxVisible(false)}
+            onDisableDebug={() => {
+              setDebugBoxVisible(false);
+              if (isRoomOwner) {
+                setDebugEnabled(false);
+                void request("ludo:debug-enable", { enabled: false }).catch(
+                  () => {},
+                );
+              }
+            }}
+            onApplyStateOverride={applyCommittedState}
+          />
+        </Suspense>
+      )}
+
+      {/* Floating pill to reopen Debug Panel when minimized/closed during active debug mode */}
+      {debugEnabled && !debugBoxVisible && (
+        <button
+          type="button"
+          onClick={() => setDebugBoxVisible(true)}
+          title="Open Debug Console"
+          className="fixed bottom-4 right-4 z-40 flex items-center gap-2 rounded-full border border-sky-400/40 bg-[#0d1322]/90 px-3 py-1.5 text-xs font-bold text-sky-300 shadow-xl backdrop-blur-md hover:bg-sky-500/20 active:scale-95 transition-all cursor-pointer select-none"
+        >
+          <span className="size-2 rounded-full bg-emerald-400 animate-ping" />
+          <span>DEBUG</span>
+        </button>
+      )}
+
+      {/* Floating pill to reopen Victory Screen when dismissed during match completion */}
+      {Boolean(
+        winnerPlayer && winnerKey && dismissedWinnerKey === winnerKey,
+      ) && (
+        <button
+          type="button"
+          onClick={() => setDismissedWinnerKey(null)}
+          title="View Match Results"
+          className="fixed bottom-4 left-4 z-40 flex items-center gap-2 rounded-full border border-amber-400/50 bg-[#121422]/95 px-3.5 py-2 text-xs font-bold text-amber-300 shadow-2xl backdrop-blur-md hover:bg-amber-400/20 active:scale-95 transition-all cursor-pointer select-none"
+        >
+          <Trophy className="size-4 text-amber-400" />
+          <span>View Results</span>
+        </button>
+      )}
     </div>
   );
 }

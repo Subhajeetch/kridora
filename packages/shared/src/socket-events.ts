@@ -27,6 +27,36 @@ export const ludoMoveSchema = z.object({
 export const ludoEmoteSchema = z.object({
   emoji: z.string().min(1).max(10),
 });
+export const ludoDebugEnableSchema = z.object({
+  enabled: z.boolean(),
+});
+export const ludoDebugSetDiceSchema = z.object({
+  dice: z.number().int().min(1).max(6),
+});
+export const ludoDebugSetPieceSchema = z.object({
+  playerIndex: z.number().int().min(0).max(3),
+  tokenIndex: z.number().int().min(0).max(3),
+  step: z.number().int().min(-1).max(56),
+});
+export const ludoDebugSetTurnSchema = z.object({
+  playerIndex: z.number().int().min(0).max(3),
+});
+export const ludoDebugSetupCutSchema = z.object({
+  attackerPlayerIndex: z.number().int().min(0).max(3),
+  attackerTokenIndex: z.number().int().min(0).max(3),
+  defenderPlayerIndex: z.number().int().min(0).max(3),
+  defenderTokenIndex: z.number().int().min(0).max(3),
+  distance: z.number().int().min(1).max(6),
+});
+export const ludoDebugScenarioSchema = z.object({
+  scenario: z.enum([
+    "all_yard",
+    "all_track",
+    "near_win",
+    "instant_win",
+    "scatter",
+  ]),
+});
 export const inviteUserSchema = z.object({
   targetNumericId: z
     .string()
@@ -45,6 +75,12 @@ export type SetReadyPayload = z.input<typeof setReadySchema>;
 export type TargetPlayerPayload = z.input<typeof targetPlayerSchema>;
 export type LudoMovePayload = z.input<typeof ludoMoveSchema>;
 export type LudoEmotePayload = z.input<typeof ludoEmoteSchema>;
+export type LudoDebugEnablePayload = z.input<typeof ludoDebugEnableSchema>;
+export type LudoDebugSetDicePayload = z.input<typeof ludoDebugSetDiceSchema>;
+export type LudoDebugSetPiecePayload = z.input<typeof ludoDebugSetPieceSchema>;
+export type LudoDebugSetTurnPayload = z.input<typeof ludoDebugSetTurnSchema>;
+export type LudoDebugSetupCutPayload = z.input<typeof ludoDebugSetupCutSchema>;
+export type LudoDebugScenarioPayload = z.input<typeof ludoDebugScenarioSchema>;
 export type InviteUserPayload = z.input<typeof inviteUserSchema>;
 export type ChangeGamePayload = z.input<typeof changeGameSchema>;
 export type EmptyPayload = z.input<typeof emptySchema>;
@@ -92,6 +128,30 @@ export interface ClientToServerEvents {
     payload: LudoEmotePayload,
     ack: AckFn<{ ok: boolean }>,
   ) => void;
+  "ludo:debug-enable": (
+    payload: LudoDebugEnablePayload,
+    ack: AckFn<LudoGameState>,
+  ) => void;
+  "ludo:debug-set-dice": (
+    payload: LudoDebugSetDicePayload,
+    ack: AckFn<LudoGameState>,
+  ) => void;
+  "ludo:debug-set-piece": (
+    payload: LudoDebugSetPiecePayload,
+    ack: AckFn<LudoGameState>,
+  ) => void;
+  "ludo:debug-set-turn": (
+    payload: LudoDebugSetTurnPayload,
+    ack: AckFn<LudoGameState>,
+  ) => void;
+  "ludo:debug-setup-cut": (
+    payload: LudoDebugSetupCutPayload,
+    ack: AckFn<LudoGameState>,
+  ) => void;
+  "ludo:debug-scenario": (
+    payload: LudoDebugScenarioPayload,
+    ack: AckFn<LudoGameState>,
+  ) => void;
 }
 
 export type ClientToServerEventName = keyof ClientToServerEvents;
@@ -113,6 +173,7 @@ export interface ServerToClientEvents {
   "ludo:state": (state: LudoGameState) => void;
   "ludo:rolling": (payload: { color: LudoColor; userId: string }) => void;
   "ludo:emote": (payload: { userId: string; emoji: string }) => void;
+  "ludo:debug-enabled": (payload: { enabled: boolean }) => void;
 }
 
 export type InterServerEvents = Record<never, never>;

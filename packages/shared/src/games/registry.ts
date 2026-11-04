@@ -196,9 +196,9 @@ export const GAME_DEFINITIONS = {
     howToPlay: [
       {
         step: 1,
-        title: "Roll a Six to Deploy",
+        title: "Roll a 1 or 6 to Deploy",
         description:
-          "Roll the lucky number six to move a token from your yard onto the starting square.",
+          "Roll a 1 or 6 to move a token from your yard onto the starting square.",
       },
       {
         step: 2,
@@ -220,7 +220,7 @@ export const GAME_DEFINITIONS = {
       },
     ],
     rulesSummary: [
-      "Rolling a 6 grants a bonus turn and allows releasing a token from your yard.",
+      "Rolling a 6 grants a bonus turn. Rolling a 1 or 6 allows releasing a token from your yard.",
       "Three consecutive rolls of 6 will forfeit your turn.",
       "Landing on a tile occupied by an opponent sends their token back to base (except on starred safe tiles).",
       "Exact roll count is required to enter the home triangle finish line.",

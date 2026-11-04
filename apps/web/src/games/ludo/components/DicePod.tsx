@@ -51,7 +51,14 @@ export function DicePod({
     >
       <svg className="size-8 sm:size-9" viewBox="0 0 36 36" fill="none">
         <defs>
-          <linearGradient id="goldArrowGrad" x1="4" y1="7" x2="32" y2="29" gradientUnits="userSpaceOnUse">
+          <linearGradient
+            id="goldArrowGrad"
+            x1="4"
+            y1="7"
+            x2="32"
+            y2="29"
+            gradientUnits="userSpaceOnUse"
+          >
             <stop offset="0%" stopColor="#fef08a" />
             <stop offset="50%" stopColor="#f59e0b" />
             <stop offset="100%" stopColor="#b45309" />
@@ -100,7 +107,12 @@ export function DicePod({
           )}
         </div>
 
-        <div className={cn("min-w-0 flex flex-col", arrowSide === "right" && "items-end")}>
+        <div
+          className={cn(
+            "min-w-0 flex flex-col",
+            arrowSide === "right" && "items-end",
+          )}
+        >
           <span className="truncate text-xs font-black text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
             {player ? player.name : "(Empty)"}
           </span>
@@ -136,7 +148,8 @@ export function DicePod({
             styles.dicePod,
             isActive && styles.podActive,
             dimmed && styles.dicePodDimmed,
-            canRoll && "hover:scale-105 active:scale-95 cursor-pointer ring-2 ring-white/60",
+            canRoll &&
+              "hover:scale-105 active:scale-95 cursor-pointer ring-2 ring-white/60",
           )}
         >
           <div className={styles.dicePodWell}>
@@ -146,44 +159,80 @@ export function DicePod({
             >
               {/* Face 1 */}
               <div className={cn(styles.podDieFace, styles.pface1)}>
-                <div /><div /><div />
-                <div /><div className={cn(styles.podPip, styles.pipCenterRed)} /><div />
-                <div /><div /><div />
+                <div />
+                <div />
+                <div />
+                <div />
+                <div className={cn(styles.podPip, styles.pipCenterRed)} />
+                <div />
+                <div />
+                <div />
+                <div />
               </div>
 
               {/* Face 6 */}
               <div className={cn(styles.podDieFace, styles.pface6)}>
-                <div className={styles.podPip} /><div /><div className={styles.podPip} />
-                <div className={styles.podPip} /><div /><div className={styles.podPip} />
-                <div className={styles.podPip} /><div /><div className={styles.podPip} />
+                <div className={styles.podPip} />
+                <div />
+                <div className={styles.podPip} />
+                <div className={styles.podPip} />
+                <div />
+                <div className={styles.podPip} />
+                <div className={styles.podPip} />
+                <div />
+                <div className={styles.podPip} />
               </div>
 
               {/* Face 3 */}
               <div className={cn(styles.podDieFace, styles.pface3)}>
-                <div className={styles.podPip} /><div /><div />
-                <div /><div className={styles.podPip} /><div />
-                <div /><div /><div className={styles.podPip} />
+                <div className={styles.podPip} />
+                <div />
+                <div />
+                <div />
+                <div className={styles.podPip} />
+                <div />
+                <div />
+                <div />
+                <div className={styles.podPip} />
               </div>
 
               {/* Face 4 */}
               <div className={cn(styles.podDieFace, styles.pface4)}>
-                <div className={styles.podPip} /><div /><div className={styles.podPip} />
-                <div /><div /><div />
-                <div className={styles.podPip} /><div /><div className={styles.podPip} />
+                <div className={styles.podPip} />
+                <div />
+                <div className={styles.podPip} />
+                <div />
+                <div />
+                <div />
+                <div className={styles.podPip} />
+                <div />
+                <div className={styles.podPip} />
               </div>
 
               {/* Face 2 */}
               <div className={cn(styles.podDieFace, styles.pface2)}>
-                <div className={styles.podPip} /><div /><div />
-                <div /><div /><div />
-                <div /><div /><div className={styles.podPip} />
+                <div className={styles.podPip} />
+                <div />
+                <div />
+                <div />
+                <div />
+                <div />
+                <div />
+                <div />
+                <div className={styles.podPip} />
               </div>
 
               {/* Face 5 */}
               <div className={cn(styles.podDieFace, styles.pface5)}>
-                <div className={styles.podPip} /><div /><div className={styles.podPip} />
-                <div /><div className={styles.podPip} /><div />
-                <div className={styles.podPip} /><div /><div className={styles.podPip} />
+                <div className={styles.podPip} />
+                <div />
+                <div className={styles.podPip} />
+                <div />
+                <div className={styles.podPip} />
+                <div />
+                <div className={styles.podPip} />
+                <div />
+                <div className={styles.podPip} />
               </div>
             </div>
           </div>
@@ -199,7 +248,9 @@ export function DicePod({
           arrowSide === "right" && "flex-row-reverse",
         )}
       >
-        <span className="text-xs" title="Pieces Home">🏆</span>
+        <span className="text-xs" title="Pieces Home">
+          🏆
+        </span>
         <span className="text-xs font-black text-amber-300 drop-shadow">
           {homeCount}/4
         </span>
