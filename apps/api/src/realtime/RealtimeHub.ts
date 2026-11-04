@@ -377,6 +377,7 @@ export class RealtimeHub extends DurableObject<Env> {
       env: this.env,
       user,
       roomCode: room.code,
+      ownerId: room.ownerId,
       matchId: room.matchId,
       players: room.players,
       state: room.gameState,

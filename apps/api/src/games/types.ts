@@ -17,6 +17,7 @@ export interface GameActionContext<TState> {
   readonly env: Env;
   readonly user: SocketUser;
   readonly roomCode: string;
+  readonly ownerId?: string;
   readonly matchId: string | null;
   readonly players: readonly RoomPlayer[];
   readonly state: TState;

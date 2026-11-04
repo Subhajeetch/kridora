@@ -114,6 +114,8 @@ export interface LudoGameState {
   updatedAt: number;
   /** Optional per-player roll history for balanced commercial Ludo dice probability. */
   rollStats?: LudoPlayerRollStats[];
+  /** Whether debug mode is active in this room. */
+  debugMode?: boolean;
 }
 
 export function createInitialRollStats(count: number): LudoPlayerRollStats[] {
@@ -148,7 +150,7 @@ export function createLudoGameState(
     dice: null,
     movableTokens: [],
     winnerId: null,
-    lastAction: `${players[0]?.name ?? "Players"} are ready. Roll a 6 to leave your yard.`,
+    lastAction: `${players[0]?.name ?? "Players"} are ready. Roll a 1 or 6 to leave your yard.`,
     updatedAt: Date.now(),
     rollStats: createInitialRollStats(players.length),
   };
@@ -197,7 +199,8 @@ export function getLudoMovableTokens(
   if (!Number.isInteger(dice) || dice < 1 || dice > 6) return [];
 
   return player.tokens.flatMap((progress, tokenIndex) => {
-    if (progress === LUDO_YARD_STEP) return dice === 6 ? [tokenIndex] : [];
+    if (progress === LUDO_YARD_STEP)
+      return dice === 1 || dice === 6 ? [tokenIndex] : [];
     if (progress >= LUDO_HOME_STEP) return [];
     return progress + dice <= LUDO_HOME_STEP ? [tokenIndex] : [];
   });
@@ -207,7 +210,7 @@ export function getLudoMovableTokens(
  * Returns the tokenIndex to auto-move when the player has zero real strategic choice:
  * - Exactly 1 token is movable, OR
  * - Multiple tokens are movable, but ALL of them sit on the exact same progress
- *   (e.g., rolling a 6 when only yard tokens can move, or 2+ stacked tokens on one square
+ *   (e.g., rolling a 1 or 6 when only yard tokens can move, or 2+ stacked tokens on one square
  *   with no other movable pieces).
  */
 export function getLudoAutoMoveToken(
