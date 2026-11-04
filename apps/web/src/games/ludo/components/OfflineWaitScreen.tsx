@@ -35,9 +35,7 @@ export function OfflineWaitScreen({
   const [isBusy, setIsBusy] = useState(false);
 
   const primaryOffline = offlinePlayers[0];
-  const avatarUrl = primaryOffline
-    ? (playerAvatars[primaryOffline.userId] ?? primaryOffline.image)
-    : null;
+  const avatarUrl = primaryOffline ? playerAvatars[primaryOffline.userId] ?? primaryOffline.image : null;
 
   // 5-minute countdown timer
   useEffect(() => {
@@ -127,11 +125,7 @@ export function OfflineWaitScreen({
           <div className="mt-4 flex items-center justify-center gap-3 rounded-2xl border border-white/10 bg-slate-800/60 p-3">
             <div className="size-11 shrink-0 overflow-hidden rounded-full border-2 border-amber-400 bg-slate-700">
               {avatarUrl ? (
-                <img
-                  src={avatarUrl}
-                  alt=""
-                  className="size-full object-cover"
-                />
+                <img src={avatarUrl} alt="" className="size-full object-cover" />
               ) : (
                 <span className="grid size-full place-items-center font-black text-amber-300">
                   {primaryOffline.name.charAt(0).toUpperCase()}
@@ -167,8 +161,7 @@ export function OfflineWaitScreen({
             </div>
 
             <p className="mt-2.5 text-[11px] text-slate-400">
-              Waiting for player to reconnect. If they do not return in 5
-              minutes, their pieces will automatically be removed.
+              Waiting for player to reconnect. If they do not return in 5 minutes, their pieces will automatically be removed.
             </p>
           </div>
 
@@ -213,11 +206,7 @@ export function OfflineWaitScreen({
           <div className="flex items-center gap-3">
             <div className="size-11 shrink-0 overflow-hidden rounded-full border-2 border-rose-400 bg-slate-800">
               {avatarUrl ? (
-                <img
-                  src={avatarUrl}
-                  alt=""
-                  className="size-full object-cover"
-                />
+                <img src={avatarUrl} alt="" className="size-full object-cover" />
               ) : (
                 <span className="grid size-full place-items-center font-black text-rose-300">
                   {primaryOffline.name.charAt(0).toUpperCase()}
@@ -233,12 +222,8 @@ export function OfflineWaitScreen({
           </div>
 
           <DialogDescription className="mt-3 text-sm text-slate-300 leading-relaxed">
-            If you kick the player,{" "}
-            <strong className="font-bold text-white">
-              all the pieces will be removed
-            </strong>
-            . He might join back in 5 min; if he doesn't, their pieces will
-            automatically be removed.
+            If you kick the player, <strong className="font-bold text-white">all the pieces will be removed</strong>.
+            {" "}He might join back in 5 min; if he doesn't, their pieces will automatically be removed.
           </DialogDescription>
 
           <div className="mt-6 flex items-center justify-end gap-2.5">
@@ -275,15 +260,12 @@ export function OfflineWaitScreen({
               <DialogTitle className="text-lg font-bold text-white">
                 End Match Early?
               </DialogTitle>
-              <p className="text-xs text-amber-300">
-                Return all players to lobby
-              </p>
+              <p className="text-xs text-amber-300">Return all players to lobby</p>
             </div>
           </div>
 
           <DialogDescription className="mt-3 text-sm text-slate-300 leading-relaxed">
-            If you end game, all the progress of this game will be removed and
-            you'll return to lobby.
+            If you end game, all the progress of this game will be removed and you'll return to lobby.
           </DialogDescription>
 
           <div className="mt-6 flex items-center justify-end gap-2.5">

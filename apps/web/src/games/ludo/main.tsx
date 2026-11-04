@@ -1,9 +1,14 @@
 import {
   AlertCircle,
+  ArrowLeft,
   Crown,
   DoorOpen,
+  Gamepad2,
+  LogOut,
   Sparkles,
   Trophy,
+  Volume2,
+  VolumeX,
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -11,6 +16,7 @@ import { useNavigate } from "react-router";
 import {
   getLudoAutoMoveToken,
   LUDO_HOME_STEP,
+  LUDO_YARD_STEP,
   type LudoColor,
   type LudoGameState,
 } from "@kridora/shared";
@@ -21,6 +27,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useInGameRoom, useGameAudio } from "@/games/hooks";
 import { useAudioSettings } from "@/lib/audio-settings";
 import { describeError, request, socket } from "@/lib/socket";
 import { cn } from "@/lib/utils";
@@ -28,18 +35,25 @@ import { useRealtime } from "@/providers/realtime-context";
 import type { GameComponentProps } from "../types";
 import { ludoAudio } from "./audio";
 import { LeaveConfirmDialog } from "./components/LeaveConfirmDialog";
-import { LudoTable } from "./components/LudoTable";
+import { LudoBoard } from "./components/LudoBoard";
+import { MobileNocturneDrawer } from "./components/MobileNocturneDrawer";
+import { NocturneSidePanel } from "./components/NocturneSidePanel";
 import { OfflineWaitScreen } from "./components/OfflineWaitScreen";
 import { RoomToast } from "./components/RoomToast";
 import { SEAT_DEFINITIONS } from "./constants";
-import { ROLL_MS } from "./motion";
+import styles from "./ludo.module.css";
 
-const ROLL_TUMBLE_MS = ROLL_MS;
+const ROLL_TUMBLE_MS = 460;
+const HOP_STEP_MS = 130;
+const EMOTE_DURATION_MS = 2000;
 
 export default function LudoGame({ room, userId }: GameComponentProps) {
   const navigate = useNavigate();
   const audio = useAudioSettings();
   const { setActiveRoom } = useRealtime();
+  const { onBackToRoom, playerCount, maxPlayers, roomCode, game } =
+    useInGameRoom();
+  const { isMuted, toggleMute } = useGameAudio();
 
   const [state, setState] = useState<LudoGameState | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -60,6 +74,28 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
     Record<string, { emoji: string; timestamp: number }>
   >({});
 
+  // Floating HUD Room Code copy feedback
+  const [copiedCode, setCopiedCode] = useState(false);
+  const copyTimerRef = useRef<number | null>(null);
+
+  const handleCopyRoomCode = useCallback(() => {
+    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+      void navigator.clipboard.writeText(roomCode);
+      setCopiedCode(true);
+      if (copyTimerRef.current) {
+        window.clearTimeout(copyTimerRef.current);
+      }
+      copyTimerRef.current = window.setTimeout(() => {
+        setCopiedCode(false);
+        copyTimerRef.current = null;
+      }, 1500);
+    }
+  }, [roomCode]);
+
+  // Failsafe manual pass button (only visible if auto-pass somehow stalls > 2.5s)
+  const [showManualPass, setShowManualPass] = useState(false);
+  const manualPassTimerRef = useRef<number | null>(null);
+
   // Mutable refs to avoid re-subscribing WebSocket listeners or firing duplicate requests
   const audioRef = useRef(audio);
   useEffect(() => {
@@ -70,15 +106,17 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
   const rollingUntilRef = useRef(0);
   const rollClearTimerRef = useRef<number | null>(null);
   const delayedStateTimerRef = useRef<number | null>(null);
-  const animationLockedRef = useRef(false);
-  const committedRef = useRef<LudoGameState | null>(null);
-  const pendingStatesRef = useRef<LudoGameState[]>([]);
+  const animLockTimerRef = useRef<number | null>(null);
   const errorTimerRef = useRef<number | null>(null);
   const emoteTimersRef = useRef<Map<string, number>>(new Map());
 
-  const autoMoveTriggeredRef = useRef<string | null>(null);
-  const autoPassTriggeredRef = useRef<string | null>(null);
+  const stateRef = useRef<LudoGameState | null>(null);
+  stateRef.current = state;
+
+  const autoMoveTimerRef = useRef<number | null>(null);
+  const autoPassTimerRef = useRef<number | null>(null);
   const lastLandedRollKeyRef = useRef<string | null>(null);
+  const prevTokensRef = useRef<Map<string, number> | null>(null);
   const prevTurnUserIdRef = useRef<string | null>(null);
 
   const showTransientError = useCallback((msg: string) => {
@@ -91,56 +129,85 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
     }, 4500);
   }, []);
 
-  // Hold authoritative snapshots until the visible move completes. Both the
-  // socket broadcast and request response can deliver the same snapshot.
+  /** Computes board animation duration from token deltas so rolls/modals wait for hops & rewinds. */
   const applyCommittedState = useCallback((next: LudoGameState) => {
-    const last = pendingStatesRef.current.at(-1) ?? committedRef.current;
-    if (
-      last &&
-      (next.updatedAt < last.updatedAt ||
-        JSON.stringify(next) === JSON.stringify(last))
-    )
-      return;
-    if (animationLockedRef.current) {
-      pendingStatesRef.current.push(next);
-      return;
-    }
-    const previous = committedRef.current;
-    const moves =
-      previous &&
-      next.players.some((player) => {
-        const before = previous.players.find((p) => p.userId === player.userId);
-        return (
-          before && player.tokens.some((step, i) => step !== before.tokens[i])
-        );
+    const nextMap = new Map<string, number>();
+    for (const p of next.players) {
+      p.tokens.forEach((step, idx) => {
+        nextMap.set(`${p.userId}:${idx}`, step);
       });
-    if (moves) {
-      animationLockedRef.current = true;
-      setIsBoardAnimating(true);
     }
-    if (
-      previous &&
-      next.dice !== null &&
-      (previous.dice === null ||
-        previous.currentPlayerIndex !== next.currentPlayerIndex)
-    ) {
-      const rollKey = [next.updatedAt, next.dice, next.currentPlayerIndex].join(
-        ":",
-      );
+
+    const prevMap = prevTokensRef.current;
+    prevTokensRef.current = nextMap;
+
+    if (prevMap) {
+      let forwardMs = 0;
+      let rewindMs = 0;
+
+      for (const p of next.players) {
+        p.tokens.forEach((step, idx) => {
+          const oldStep = prevMap.get(`${p.userId}:${idx}`);
+          if (oldStep === undefined || oldStep === step) return;
+
+          if (step > oldStep) {
+            const hops = oldStep < 0 ? 1 : step - oldStep;
+            forwardMs = Math.max(forwardMs, hops * HOP_STEP_MS + 90);
+          } else if (oldStep >= 0 && step === LUDO_YARD_STEP) {
+            const stepCount = oldStep + 2;
+            const perStep = Math.max(
+              18,
+              Math.min(42, Math.floor(680 / stepCount)),
+            );
+            rewindMs = Math.max(rewindMs, 80 + stepCount * perStep + 90);
+          }
+        });
+      }
+
+      const totalAnimMs = forwardMs + rewindMs;
+      if (totalAnimMs > 0) {
+        setIsBoardAnimating(true);
+        if (animLockTimerRef.current) {
+          window.clearTimeout(animLockTimerRef.current);
+        }
+        animLockTimerRef.current = window.setTimeout(() => {
+          setIsBoardAnimating(false);
+          animLockTimerRef.current = null;
+        }, totalAnimMs);
+      }
+    }
+
+    // Play dice landing sound once per unique roll
+    if (next.dice !== null) {
+      const rollKey = `${next.updatedAt}:${next.dice}:${next.currentPlayerIndex}`;
       if (lastLandedRollKeyRef.current !== rollKey) {
         lastLandedRollKeyRef.current = rollKey;
         ludoAudio.diceLand(next.dice, audioRef.current);
       }
     }
-    committedRef.current = next;
+
     setState(next);
   }, []);
 
-  const handleAnimationComplete = useCallback(() => {
-    animationLockedRef.current = false;
-    setIsBoardAnimating(false);
-    const pending = pendingStatesRef.current.splice(0);
-    for (const next of pending) applyCommittedState(next);
+  const handlePass = useCallback(async () => {
+    const curr = stateRef.current;
+    if (
+      !curr ||
+      curr.winnerId !== null ||
+      curr.dice === null ||
+      curr.movableTokens.length > 0
+    ) {
+      return;
+    }
+
+    try {
+      const next = await request("ludo:pass", {});
+      applyCommittedState(next);
+    } catch {
+      void request("ludo:get-state", {})
+        .then(applyCommittedState)
+        .catch(() => {});
+    }
   }, [applyCommittedState]);
 
   const startRollVisuals = useCallback((color: LudoColor) => {
@@ -192,13 +259,13 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
       );
 
       // Keep 3D cube tumbling until finish if this state is a newly rolled die
-      if (next.dice !== null && remainingTumbleMs > 16) {
+      if (next.dice !== null && remainingTumbleMs > 16 && !busyRef.current) {
         delayedStateTimerRef.current = window.setTimeout(() => {
           delayedStateTimerRef.current = null;
           setRollingColor(null);
           applyCommittedState(next);
         }, remainingTumbleMs);
-      } else {
+      } else if (!busyRef.current) {
         if (next.dice === null) {
           setRollingColor(null);
         }
@@ -213,7 +280,6 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
     }
 
     function onEmoteReceived(payload: { userId: string; emoji: string }) {
-      if (payload.userId === userId) return;
       ludoAudio.emotePop(audioRef.current);
       const ts = Date.now();
       setActiveEmotes((prev) => ({
@@ -232,7 +298,7 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
           delete next[payload.userId];
           return next;
         });
-      }, 2500);
+      }, EMOTE_DURATION_MS);
       emoteTimers.set(payload.userId, timer);
     }
 
@@ -252,17 +318,27 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
         window.clearTimeout(rollClearTimerRef.current);
       if (delayedStateTimerRef.current)
         window.clearTimeout(delayedStateTimerRef.current);
+      if (animLockTimerRef.current)
+        window.clearTimeout(animLockTimerRef.current);
       if (errorTimerRef.current) window.clearTimeout(errorTimerRef.current);
+      if (autoPassTimerRef.current)
+        window.clearTimeout(autoPassTimerRef.current);
+      if (manualPassTimerRef.current)
+        window.clearTimeout(manualPassTimerRef.current);
+      if (autoMoveTimerRef.current)
+        window.clearTimeout(autoMoveTimerRef.current);
+      if (copyTimerRef.current)
+        window.clearTimeout(copyTimerRef.current);
       emoteTimers.forEach((t) => window.clearTimeout(t));
       emoteTimers.clear();
+      setActiveEmotes({});
     };
   }, [userId, applyCommittedState, startRollVisuals]);
 
   // Subtle turn-start notification chime & light haptic tap when turn rotates to local player
   useEffect(() => {
     if (!state || state.winnerId || isBoardAnimating) return;
-    const activeTurnUser =
-      state.players[state.currentPlayerIndex]?.userId ?? null;
+    const activeTurnUser = state.players[state.currentPlayerIndex]?.userId ?? null;
     const prevTurnUser = prevTurnUserIdRef.current;
     prevTurnUserIdRef.current = activeTurnUser;
 
@@ -272,7 +348,7 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
       activeTurnUser === userId &&
       state.dice === null
     ) {
-      ludoAudio.yourTurn(audioRef.current);
+      ludoAudio.hoverTick(audioRef.current);
       if (typeof navigator !== "undefined" && "vibrate" in navigator) {
         try {
           navigator.vibrate(18);
@@ -299,13 +375,18 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
     );
   }, [state, room.players]);
 
+  const occupiedColors = useMemo(
+    () => new Set(state?.players.map((p) => p.color) ?? []),
+    [state?.players],
+  );
+
   const isPaused = offlinePlayers.length > 0;
   const isRoomOwner = room.ownerId === userId;
 
   // Synchronous + React state action guard preventing double-tap race conditions
   const act = useCallback(
     async (fn: () => Promise<LudoGameState>) => {
-      if (busyRef.current || isPaused || animationLockedRef.current) return;
+      if (busyRef.current || isPaused) return;
       busyRef.current = true;
       setBusy(true);
       setError(null);
@@ -326,7 +407,7 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
     [isPaused, applyCommittedState, showTransientError],
   );
 
-  // Give the die time to settle before presenting the authoritative roll.
+  // Dice Roll Handler with authentic 460ms 3D tumble
   const handleRoll = useCallback(() => {
     if (
       busyRef.current ||
@@ -371,12 +452,9 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
       if (
         busyRef.current ||
         isPaused ||
-        animationLockedRef.current ||
-        rollingUntilRef.current > performance.now() ||
         !state ||
         state.winnerId !== null ||
-        state.dice === null ||
-        state.players[state.currentPlayerIndex]?.userId !== userId
+        state.dice === null
       ) {
         return;
       }
@@ -386,23 +464,36 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
       }
       void act(() => request("ludo:move", { tokenIndex }));
     },
-    [isPaused, state, act, userId],
+    [isPaused, state, act],
   );
 
-  // Desktop Spacebar convenience shortcut to roll when it's your turn
-  useEffect(() => {
-    const active = state?.players[state.currentPlayerIndex];
-    const canRollNow =
-      Boolean(state) &&
-      !state?.winnerId &&
-      active?.userId === userId &&
-      state?.dice === null &&
-      !busy &&
-      !isPaused &&
-      !isBoardAnimating &&
-      rollingColor === null;
+  const activePlayer = state ? state.players[state.currentPlayerIndex] : undefined;
+  const isMyTurn = activePlayer?.userId === userId;
+  const canRoll =
+    Boolean(isMyTurn) &&
+    Boolean(state) &&
+    state!.winnerId === null &&
+    state!.dice === null &&
+    !busy &&
+    !isPaused &&
+    !isBoardAnimating &&
+    rollingColor === null;
 
-    if (!canRollNow) return;
+  const canPass =
+    showManualPass &&
+    Boolean(isMyTurn) &&
+    Boolean(state) &&
+    state!.winnerId === null &&
+    state!.dice !== null &&
+    state!.movableTokens.length === 0 &&
+    !isPaused &&
+    !isBoardAnimating &&
+    rollingColor === null;
+
+  // Desktop Spacebar convenience shortcut to roll or pass when it's your turn
+  useEffect(() => {
+    const canActNow = canRoll || canPass;
+    if (!canActNow) return;
 
     function onKeyDown(e: KeyboardEvent) {
       if (e.code !== "Space" || e.repeat) return;
@@ -417,100 +508,122 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
         return;
       }
       e.preventDefault();
-      handleRoll();
+      if (canRoll) {
+        handleRoll();
+      } else if (canPass) {
+        void handlePass();
+      }
     }
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [
-    state,
-    userId,
-    busy,
-    isPaused,
-    isBoardAnimating,
-    rollingColor,
-    handleRoll,
-  ]);
+  }, [canRoll, canPass, handleRoll, handlePass]);
 
   // Smart Auto-Move:
   // 1) Only 1 movable piece, OR
   // 2) Rolled a 6 with all movable pieces in yard, OR
   // 3) 2+ movable pieces stacked on the exact same square and no other movable options
-  useEffect(() => {
+  const autoMoveTokenIdx = useMemo(() => {
     if (
       !state ||
       state.winnerId !== null ||
       isPaused ||
       isBoardAnimating ||
       rollingColor !== null ||
-      state.dice === null
+      state.dice === null ||
+      !isMyTurn ||
+      !activePlayer
     ) {
+      return null;
+    }
+    return getLudoAutoMoveToken(activePlayer, state.movableTokens);
+  }, [state, isPaused, isBoardAnimating, rollingColor, isMyTurn, activePlayer]);
+
+  const autoMoveKey =
+    autoMoveTokenIdx !== null && state
+      ? `${state.updatedAt}:${state.dice}:${state.currentPlayerIndex}:${autoMoveTokenIdx}`
+      : null;
+
+  useEffect(() => {
+    if (!autoMoveKey || autoMoveTokenIdx === null) {
+      if (autoMoveTimerRef.current) {
+        window.clearTimeout(autoMoveTimerRef.current);
+        autoMoveTimerRef.current = null;
+      }
+      return;
+    }
+
+    autoMoveTimerRef.current = window.setTimeout(() => {
+      autoMoveTimerRef.current = null;
+      handleMoveToken(autoMoveTokenIdx);
+    }, 380);
+
+    return () => {
+      if (autoMoveTimerRef.current) {
+        window.clearTimeout(autoMoveTimerRef.current);
+        autoMoveTimerRef.current = null;
+      }
+    };
+  }, [autoMoveKey, autoMoveTokenIdx, handleMoveToken]);
+
+  // Automatic turn pass when zero legal moves exist (with peer fallback)
+  const isPassState =
+    Boolean(state) &&
+    state!.winnerId === null &&
+    !isPaused &&
+    !isBoardAnimating &&
+    rollingColor === null &&
+    state!.dice !== null &&
+    state!.movableTokens.length === 0;
+
+  const passKey =
+    isPassState && state
+      ? `${state.updatedAt}:${state.dice}:${state.currentPlayerIndex}`
+      : null;
+
+  useEffect(() => {
+    if (!passKey || !state) {
+      setShowManualPass(false);
+      if (autoPassTimerRef.current) {
+        window.clearTimeout(autoPassTimerRef.current);
+        autoPassTimerRef.current = null;
+      }
+      if (manualPassTimerRef.current) {
+        window.clearTimeout(manualPassTimerRef.current);
+        manualPassTimerRef.current = null;
+      }
       return;
     }
 
     const active = state.players[state.currentPlayerIndex];
-    if (!active || active.userId !== userId) return;
+    const isMe = active?.userId === userId;
+    const delay = isMe ? 900 : 1800;
 
-    const autoTokenIdx = getLudoAutoMoveToken(active, state.movableTokens);
-    if (autoTokenIdx === null) return;
+    // 1. Automatic turn pass (900ms for active player, 1800ms peer fallback)
+    autoPassTimerRef.current = window.setTimeout(() => {
+      autoPassTimerRef.current = null;
+      void handlePass();
+    }, delay);
 
-    const rollKey = `${state.updatedAt}:${state.dice}:${state.currentPlayerIndex}`;
-    if (autoMoveTriggeredRef.current === rollKey) return;
-    const timer = window.setTimeout(() => {
-      if (busyRef.current || animationLockedRef.current) return;
-      autoMoveTriggeredRef.current = rollKey;
-      handleMoveToken(autoTokenIdx);
-    }, 380);
-
-    return () => window.clearTimeout(timer);
-  }, [
-    state,
-    isPaused,
-    isBoardAnimating,
-    rollingColor,
-    userId,
-    handleMoveToken,
-  ]);
-
-  // Automatic turn pass when zero legal moves exist
-  useEffect(() => {
-    if (
-      !state ||
-      state.winnerId !== null ||
-      isPaused ||
-      isBoardAnimating ||
-      rollingColor !== null ||
-      state.dice === null
-    ) {
-      return;
+    // 2. Failsafe manual pass button: only appears if auto-pass stalls past 2.5s
+    if (isMe) {
+      manualPassTimerRef.current = window.setTimeout(() => {
+        manualPassTimerRef.current = null;
+        setShowManualPass(true);
+      }, 2500);
     }
 
-    if (state.movableTokens.length === 0) {
-      const passKey = `${state.updatedAt}:${state.dice}:${state.currentPlayerIndex}`;
-      if (autoPassTriggeredRef.current === passKey) return;
-
-      const active = state.players[state.currentPlayerIndex];
-      const isMe = active?.userId === userId;
-      const delay = isMe ? 900 : isRoomOwner ? 2200 : 0;
-
-      if (delay > 0) {
-        const timer = window.setTimeout(() => {
-          if (busyRef.current || animationLockedRef.current) return;
-          autoPassTriggeredRef.current = passKey;
-          void act(() => request("ludo:pass", {}));
-        }, delay);
-        return () => window.clearTimeout(timer);
+    return () => {
+      if (autoPassTimerRef.current) {
+        window.clearTimeout(autoPassTimerRef.current);
+        autoPassTimerRef.current = null;
       }
-    }
-  }, [
-    state,
-    isPaused,
-    isBoardAnimating,
-    rollingColor,
-    userId,
-    isRoomOwner,
-    act,
-  ]);
+      if (manualPassTimerRef.current) {
+        window.clearTimeout(manualPassTimerRef.current);
+        manualPassTimerRef.current = null;
+      }
+    };
+  }, [passKey, userId, handlePass]);
 
   const handleConfirmLeave = useCallback(async () => {
     setIsLeaving(true);
@@ -545,7 +658,7 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
           delete next[userId];
           return next;
         });
-      }, 2500);
+      }, EMOTE_DURATION_MS);
       emoteTimersRef.current.set(userId, timer);
 
       void request("ludo:emote", { emoji }).catch(() => {});
@@ -608,16 +721,15 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
     );
   }
 
-  const activePlayer = state.players[state.currentPlayerIndex];
-  const isMyTurn = activePlayer?.userId === userId;
-  const canRoll =
-    Boolean(isMyTurn) &&
-    state.winnerId === null &&
-    state.dice === null &&
-    !busy &&
-    !isPaused &&
-    !isBoardAnimating &&
-    rollingColor === null;
+
+
+  const getPlayerDiceValue = (color: LudoColor) => {
+    if (state.dice !== null && activePlayer?.color === color) {
+      return state.dice;
+    }
+    const idx = state.players.findIndex((p) => p.color === color);
+    return idx !== -1 ? (state.lastRolls[idx] ?? 1) : 1;
+  };
 
   const winnerPlayer = state.winnerId
     ? state.players.find((p) => p.userId === state.winnerId)
@@ -640,7 +752,89 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
   });
 
   return (
-    <div className="relative mx-auto w-full max-w-[780px]">
+    <div
+      className={cn(
+        styles.nocturneBg,
+        "relative flex h-full w-full min-w-full flex-1 flex-col items-center justify-start min-h-0 overflow-hidden pt-16 sm:pt-20 pb-2 select-none",
+      )}
+    >
+      {/* Full-bleed 16:9 Ludo Game Background */}
+      <img
+        src="/games/ludo/bg.webp"
+        alt=""
+        aria-hidden="true"
+        fetchPriority="high"
+        decoding="async"
+        className={styles.gameBackground}
+      />
+
+      {/* Floating In-Game HUD Bar (Floating capsule - does not take space on the game canvas) */}
+      <header
+        role="region"
+        aria-label="In-Game Controls"
+        className="absolute top-2.5 sm:top-3.5 left-1/2 -translate-x-1/2 z-30 flex w-[calc(100%-1.25rem)] max-w-2xl items-center justify-between gap-2 rounded-2xl border border-white/12 bg-[#141624]/85 px-3 py-1.5 sm:px-4 sm:py-2 backdrop-blur-md shadow-[0_8px_32px_rgba(0,0,0,0.65)] select-none pointer-events-auto"
+      >
+        {/* Left: Back to Room Roster */}
+        <button
+          type="button"
+          onClick={onBackToRoom}
+          aria-label="View room players and settings"
+          className="flex items-center gap-1.5 sm:gap-2 rounded-xl border border-white/10 bg-white/5 px-2.5 py-1 sm:px-3 sm:py-1.5 text-xs font-bold text-slate-300 shadow-sm transition-all hover:border-white/20 hover:bg-white/10 hover:text-white active:scale-95 touch-manipulation cursor-pointer"
+        >
+          <ArrowLeft className="size-3.5 text-amber-400 shrink-0" />
+          <span className="hidden sm:inline">Room</span>
+          <span className="rounded-md bg-amber-400/15 border border-amber-400/30 px-1.5 py-0.5 font-mono text-[10px] font-bold text-amber-300">
+            {playerCount}/{maxPlayers}
+          </span>
+        </button>
+
+        {/* Center: Game Name & Room Code */}
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          <div className="hidden sm:flex items-center gap-1.5 text-xs font-black uppercase tracking-wider text-slate-200">
+            <Gamepad2 className="size-3.5 text-amber-400 shrink-0" />
+            <span>{game.name}</span>
+          </div>
+          <button
+            type="button"
+            onClick={handleCopyRoomCode}
+            title="Click to copy Room Code"
+            className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-black/40 px-2.5 py-1 text-xs font-bold font-mono tracking-widest text-amber-400 shadow-inner transition-colors hover:border-amber-400/30 active:scale-95 cursor-pointer touch-manipulation"
+          >
+            <span className="hidden xs:inline text-[10px] uppercase font-sans text-slate-400 font-semibold tracking-normal">
+              Code:
+            </span>
+            <span>{copiedCode ? "COPIED!" : roomCode}</span>
+          </button>
+        </div>
+
+        {/* Right: Audio Mute & Leave Game */}
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={toggleMute}
+            aria-label={isMuted ? "Unmute game audio" : "Mute game audio"}
+            title={isMuted ? "Unmute audio" : "Mute audio"}
+            className="flex size-7 sm:size-8 cursor-pointer items-center justify-center rounded-xl border border-white/10 bg-white/5 text-slate-300 shadow-sm transition-all hover:border-white/20 hover:bg-white/10 hover:text-amber-400 active:scale-95 touch-manipulation"
+          >
+            {isMuted ? (
+              <VolumeX className="size-3.5" />
+            ) : (
+              <Volume2 className="size-3.5" />
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setLeaveConfirmOpen(true)}
+            aria-label="Leave match"
+            title="Leave match"
+            className="flex size-7 sm:size-8 cursor-pointer items-center justify-center rounded-xl border border-rose-500/30 bg-rose-950/40 text-rose-300 shadow-sm transition-all hover:border-rose-500/50 hover:bg-rose-900/60 hover:text-rose-200 active:scale-95 touch-manipulation"
+          >
+            <LogOut className="size-3.5" />
+          </button>
+        </div>
+      </header>
+
       {/* Realtime Toasts for Room Joins / Leaves */}
       <RoomToast players={room.players} audioSettings={audio} />
 
@@ -682,20 +876,58 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
         </div>
       )}
 
-      <LudoTable
+      {/* MAIN LAYOUT: 15x15 LUDO BOARD + NOCTURNE SIDE PANEL */}
+      <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-1 flex-col items-center justify-start gap-3 md:flex-row md:items-start md:justify-center md:gap-6 lg:gap-8 min-h-0 px-2 mt-[40px] md:mt-[80px]">
+        <div className="flex shrink-0 items-center justify-center">
+          <LudoBoard
+            state={state}
+            userId={userId}
+            onMoveToken={handleMoveToken}
+            audioSettings={audio}
+            occupiedColors={occupiedColors}
+            playerAvatars={playerAvatars}
+          />
+        </div>
+
+        <NocturneSidePanel
+          state={state}
+          room={room}
+          userId={userId}
+          activePlayer={activePlayer}
+          isMyTurn={Boolean(isMyTurn)}
+          canRoll={canRoll}
+          canPass={canPass}
+          rollingColor={rollingColor}
+          diceValue={
+            activePlayer
+              ? getPlayerDiceValue(activePlayer.color)
+              : (state.dice ?? 1)
+          }
+          onRoll={handleRoll}
+          onPass={handlePass}
+          onEmote={handleSendEmote}
+          activeEmotes={activeEmotes}
+          playerAvatars={playerAvatars}
+        />
+      </div>
+
+      {/* MOBILE: Nocturne Bottom Drawer (< md) */}
+      <MobileNocturneDrawer
         state={state}
+        room={room}
         userId={userId}
-        roomCode={room.code}
-        audio={audio}
+        activePlayer={activePlayer}
+        isMyTurn={Boolean(isMyTurn)}
         canRoll={canRoll}
+        canPass={canPass}
         rollingColor={rollingColor}
-        animating={isBoardAnimating}
-        disabled={busy || isPaused || isBoardAnimating || rollingColor !== null}
+        diceValue={
+          activePlayer
+            ? getPlayerDiceValue(activePlayer.color)
+            : (state.dice ?? 1)
+        }
         onRoll={handleRoll}
-        onMove={handleMoveToken}
-        onAnimationComplete={handleAnimationComplete}
-        onLeave={() => setLeaveConfirmOpen(true)}
-        onStandings={() => setRankingModalOpen(true)}
+        onPass={handlePass}
         onEmote={handleSendEmote}
         activeEmotes={activeEmotes}
         playerAvatars={playerAvatars}
@@ -929,9 +1161,7 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
                   </div>
 
                   <div className="flex items-center gap-1.5 text-right font-mono font-bold">
-                    <span className="text-base text-amber-400">
-                      {homeCount}
-                    </span>
+                    <span className="text-base text-amber-400">{homeCount}</span>
                     <span className="text-xs text-slate-400">/ 4 Home</span>
                   </div>
                 </div>

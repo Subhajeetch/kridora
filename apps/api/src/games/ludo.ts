@@ -245,7 +245,7 @@ export const ludoGameModule: ServerGameModule<LudoGameState> = {
           if (
             !isCurrentTurnCaller &&
             activeRoomMember?.connected &&
-            elapsedSinceRoll < 1500
+            elapsedSinceRoll < 1200
           ) {
             return toClientState(state);
           }

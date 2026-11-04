@@ -79,7 +79,9 @@ export function MobileDiceDrawer({
                   <span>Rolling...</span>
                 )
               ) : (
-                <span className="text-slate-400">Waiting for roll...</span>
+                <span className="text-slate-400">
+                  Waiting for roll...
+                </span>
               )}
             </p>
           </div>
@@ -91,9 +93,7 @@ export function MobileDiceDrawer({
             type="button"
             onClick={canRoll ? onRoll : undefined}
             disabled={!canRoll}
-            aria-label={
-              canRoll ? "Tap to roll dice" : `Dice value ${currentDice}`
-            }
+            aria-label={canRoll ? "Tap to roll dice" : `Dice value ${currentDice}`}
             className={cn(
               "relative size-12 rounded-xl p-1 transition-all flex items-center justify-center",
               styles.dicePod,
@@ -111,75 +111,39 @@ export function MobileDiceDrawer({
               >
                 {/* Face 1 */}
                 <div className={cn(styles.podDieFace, styles.pface1)}>
-                  <div />
-                  <div />
-                  <div />
-                  <div />
-                  <div className={cn(styles.podPip, styles.pipCenterRed)} />
-                  <div />
-                  <div />
-                  <div />
-                  <div />
+                  <div /><div /><div />
+                  <div /><div className={cn(styles.podPip, styles.pipCenterRed)} /><div />
+                  <div /><div /><div />
                 </div>
                 {/* Face 6 */}
                 <div className={cn(styles.podDieFace, styles.pface6)}>
-                  <div className={styles.podPip} />
-                  <div />
-                  <div className={styles.podPip} />
-                  <div className={styles.podPip} />
-                  <div />
-                  <div className={styles.podPip} />
-                  <div className={styles.podPip} />
-                  <div />
-                  <div className={styles.podPip} />
+                  <div className={styles.podPip} /><div /><div className={styles.podPip} />
+                  <div className={styles.podPip} /><div /><div className={styles.podPip} />
+                  <div className={styles.podPip} /><div /><div className={styles.podPip} />
                 </div>
                 {/* Face 3 */}
                 <div className={cn(styles.podDieFace, styles.pface3)}>
-                  <div className={styles.podPip} />
-                  <div />
-                  <div />
-                  <div />
-                  <div className={styles.podPip} />
-                  <div />
-                  <div />
-                  <div />
-                  <div className={styles.podPip} />
+                  <div className={styles.podPip} /><div /><div />
+                  <div /><div className={styles.podPip} /><div />
+                  <div /><div /><div className={styles.podPip} />
                 </div>
                 {/* Face 4 */}
                 <div className={cn(styles.podDieFace, styles.pface4)}>
-                  <div className={styles.podPip} />
-                  <div />
-                  <div className={styles.podPip} />
-                  <div />
-                  <div />
-                  <div />
-                  <div className={styles.podPip} />
-                  <div />
-                  <div className={styles.podPip} />
+                  <div className={styles.podPip} /><div /><div className={styles.podPip} />
+                  <div /><div /><div />
+                  <div className={styles.podPip} /><div /><div className={styles.podPip} />
                 </div>
                 {/* Face 2 */}
                 <div className={cn(styles.podDieFace, styles.pface2)}>
-                  <div className={styles.podPip} />
-                  <div />
-                  <div />
-                  <div />
-                  <div />
-                  <div />
-                  <div />
-                  <div />
-                  <div className={styles.podPip} />
+                  <div className={styles.podPip} /><div /><div />
+                  <div /><div /><div />
+                  <div /><div /><div className={styles.podPip} />
                 </div>
                 {/* Face 5 */}
                 <div className={cn(styles.podDieFace, styles.pface5)}>
-                  <div className={styles.podPip} />
-                  <div />
-                  <div className={styles.podPip} />
-                  <div />
-                  <div className={styles.podPip} />
-                  <div />
-                  <div className={styles.podPip} />
-                  <div />
-                  <div className={styles.podPip} />
+                  <div className={styles.podPip} /><div /><div className={styles.podPip} />
+                  <div /><div className={styles.podPip} /><div />
+                  <div className={styles.podPip} /><div /><div className={styles.podPip} />
                 </div>
               </div>
             </div>
