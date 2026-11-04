@@ -68,7 +68,7 @@ export function PageTransition() {
         className={cn(
           "w-full",
           inGameMode
-            ? "flex-1 flex flex-col max-w-none px-0 pb-0 h-full max-h-full min-h-0 overflow-hidden"
+            ? "flex-1 flex flex-col max-w-none px-0 pb-0 h-full max-h-full min-h-0 overflow-hidden w-full min-w-full"
             : "mx-auto max-w-5xl px-4 pb-16",
         )}
       >

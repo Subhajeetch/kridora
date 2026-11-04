@@ -47,12 +47,56 @@ These two files decide what appears on `/games` and whether rooms for that game 
 Default-export a component that takes `GameComponentProps`:
 
 ```tsx
-const Monopoly = ({ room, userId }: GameComponentProps) => { ... }
-export default Monopoly
+import type { GameComponentProps } from "../types";
+import { useInGameRoom, useGameAudio } from "@/games/hooks";
+
+const Monopoly = ({ room, userId }: GameComponentProps) => {
+  // Use in-game room hooks to build your custom HUD & controls
+  const { onBackToRoom, playerCount, maxPlayers, roomCode, game } = useInGameRoom();
+  const { isMuted, toggleMute } = useGameAudio();
+
+  return (
+    <div className="flex h-full w-full flex-col items-center justify-between overflow-hidden">
+      {/* Custom Game HUD */}
+      <header className="flex w-full items-center justify-between p-3">
+        <button onClick={onBackToRoom} className="text-xs font-bold">
+          ← Room ({playerCount}/{maxPlayers})
+        </button>
+        <span className="font-mono text-xs font-bold">Code: {roomCode}</span>
+        <button onClick={toggleMute} className="text-xs">
+          {isMuted ? "Unmute" : "Mute"}
+        </button>
+      </header>
+
+      {/* Game Board */}
+      <main className="flex-1">
+        {/* Your game board goes here */}
+      </main>
+    </div>
+  );
+};
+
+export default Monopoly;
 ```
 
 Register it in `apps/web/src/games/registry.ts`. The registry is typed as `Record<GameSlug, ...>`, so forgetting
 this step is a compile error.
+
+## In-Game Room Hooks (`@/games/hooks`)
+
+Games have 100% full viewport ownership without an external platform header forced over the screen.
+To build your in-game navigation, player badges, audio controls, or pause menu, import hooks from `@/games/hooks`:
+
+| Hook | Returns | Description |
+| --- | --- | --- |
+| `useInGameRoom()` | `InGameRoomContextValue` | Full in-game context: `{ room, userId, game, roomCode, playerCount, maxPlayers, onBackToRoom, onLeaveRoom, isLeaving, secondsLeft, owner, successor }` |
+| `useBackToRoom()` | `() => void` | Switches the view mode from the active game back to the room roster/settings lobby |
+| `useRoomCode()` | `string` | The 4-letter room join code (e.g. `"ABCD"`) |
+| `useRoomPlayers()` | `{ playerCount, maxPlayers, players }` | Room player counts and the array of `RoomPlayer` objects |
+| `useCurrentGame()` | `GameDefinition` | Selected game definition (`name`, `slug`, `accent`, etc.) |
+| `useLeaveRoom()` | `{ onLeaveRoom, isLeaving }` | Handler to leave the room and return to the game lobby |
+| `useHostCountdown()` | `{ secondsLeft, owner, successor }` | Host disconnect countdown: seconds left until host migration if owner goes offline |
+| `useGameAudio()` | `{ audio, isMuted, toggleMute, setSfxVolume, setMusicVolume }` | Game audio controller: mute/unmute and volume adjustment |
 
 ## What the platform does for you
 
@@ -62,7 +106,7 @@ this step is a compile error.
 | Room code, private/public toggle, player list, ready-up, kick, make owner, Start | `apps/web/src/pages/RoomPage.tsx`                   |
 | Start button disabled until requirements are met, reasons listed                 | `evaluateStartRequirements`                         |
 | Owner offline 40s -> ownership goes to the earliest-joined online player         | `apps/api/src/rooms/service.ts` (`processDeadline`) |
-| Game screen is shown once `room.status === "in_progress"`                        | `RoomPage.tsx` -> your component                    |
+| Game screen is shown once `room.status === "in_progress"`                        | `RoomPage.tsx` -> your component with `InGameRoomProvider` |
 | A `matches` row + `match_players` rows are created on start (`room.matchId`)     | `createMatch` in `@kridora/db`                      |
 
 ## Building the actual gameplay (next step)

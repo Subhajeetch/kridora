@@ -54,12 +54,12 @@ export function AppShell() {
     authStore.getSnapshot,
     () => false,
   );
+  const [splashFinished, setSplashFinished] = useState(() => isAuthInitialized);
 
-  useEffect(() => {
-    if (!isPending) {
-      authStore.setInitialized();
-    }
-  }, [isPending]);
+  const handleSplashComplete = () => {
+    authStore.setInitialized();
+    setSplashFinished(true);
+  };
 
   const session =
     rawSession &&
@@ -165,13 +165,20 @@ export function AppShell() {
     };
   }, []);
 
-  if (isPending && !isAuthInitialized) return <SplashScreen />;
+  if (!splashFinished && !isAuthInitialized) {
+    return (
+      <SplashScreen
+        isReady={!isPending}
+        onComplete={handleSplashComplete}
+      />
+    );
+  }
 
   return (
     <div
       className={cn(
-        "relative flex flex-col",
-        inGameMode ? "h-dvh max-h-dvh overflow-hidden" : "min-h-dvh",
+        "relative flex flex-col w-full min-w-full",
+        inGameMode ? "h-dvh max-h-dvh overflow-hidden w-screen max-w-full" : "min-h-dvh",
       )}
     >
       {!inGameMode && <Background />}
@@ -340,7 +347,7 @@ export function AppShell() {
 
       <main
         className={cn(
-          "w-full flex-1 flex flex-col",
+          "w-full min-w-full flex-1 flex flex-col",
           inGameMode && "min-h-0 overflow-hidden",
         )}
       >

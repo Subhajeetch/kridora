@@ -1,4 +1,16 @@
-import { AlertCircle, Crown, DoorOpen, Sparkles, Trophy, X } from "lucide-react";
+import {
+  AlertCircle,
+  ArrowLeft,
+  Crown,
+  DoorOpen,
+  Gamepad2,
+  LogOut,
+  Sparkles,
+  Trophy,
+  Volume2,
+  VolumeX,
+  X,
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import {
@@ -15,6 +27,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useInGameRoom, useGameAudio } from "@/games/hooks";
 import { useAudioSettings } from "@/lib/audio-settings";
 import { describeError, request, socket } from "@/lib/socket";
 import { cn } from "@/lib/utils";
@@ -38,6 +51,9 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
   const navigate = useNavigate();
   const audio = useAudioSettings();
   const { setActiveRoom } = useRealtime();
+  const { onBackToRoom, playerCount, maxPlayers, roomCode, game } =
+    useInGameRoom();
+  const { isMuted, toggleMute } = useGameAudio();
 
   const [state, setState] = useState<LudoGameState | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -57,6 +73,24 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
   const [activeEmotes, setActiveEmotes] = useState<
     Record<string, { emoji: string; timestamp: number }>
   >({});
+
+  // Floating HUD Room Code copy feedback
+  const [copiedCode, setCopiedCode] = useState(false);
+  const copyTimerRef = useRef<number | null>(null);
+
+  const handleCopyRoomCode = useCallback(() => {
+    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+      void navigator.clipboard.writeText(roomCode);
+      setCopiedCode(true);
+      if (copyTimerRef.current) {
+        window.clearTimeout(copyTimerRef.current);
+      }
+      copyTimerRef.current = window.setTimeout(() => {
+        setCopiedCode(false);
+        copyTimerRef.current = null;
+      }, 1500);
+    }
+  }, [roomCode]);
 
   // Failsafe manual pass button (only visible if auto-pass somehow stalls > 2.5s)
   const [showManualPass, setShowManualPass] = useState(false);
@@ -293,6 +327,8 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
         window.clearTimeout(manualPassTimerRef.current);
       if (autoMoveTimerRef.current)
         window.clearTimeout(autoMoveTimerRef.current);
+      if (copyTimerRef.current)
+        window.clearTimeout(copyTimerRef.current);
       emoteTimers.forEach((t) => window.clearTimeout(t));
       emoteTimers.clear();
       setActiveEmotes({});
@@ -719,14 +755,85 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
     <div
       className={cn(
         styles.nocturneBg,
-        "relative flex h-full w-full flex-1 flex-col items-center justify-center min-h-0 overflow-hidden p-1 sm:p-2 md:p-3 select-none",
+        "relative flex h-full w-full min-w-full flex-1 flex-col items-center justify-start min-h-0 overflow-hidden pt-16 sm:pt-20 pb-2 select-none",
       )}
     >
-      {/* Ambient Nocturne background radial layers */}
-      <div className={styles.ambientBlob1} />
-      <div className={styles.ambientBlob2} />
-      <div className={styles.ambientBlob3} />
-      <div className={styles.ambientBlob4} />
+      {/* Full-bleed 16:9 Ludo Game Background */}
+      <img
+        src="/games/ludo/bg.webp"
+        alt=""
+        aria-hidden="true"
+        fetchPriority="high"
+        decoding="async"
+        className={styles.gameBackground}
+      />
+
+      {/* Floating In-Game HUD Bar (Floating capsule - does not take space on the game canvas) */}
+      <header
+        role="region"
+        aria-label="In-Game Controls"
+        className="absolute top-2.5 sm:top-3.5 left-1/2 -translate-x-1/2 z-30 flex w-[calc(100%-1.25rem)] max-w-2xl items-center justify-between gap-2 rounded-2xl border border-white/12 bg-[#141624]/85 px-3 py-1.5 sm:px-4 sm:py-2 backdrop-blur-md shadow-[0_8px_32px_rgba(0,0,0,0.65)] select-none pointer-events-auto"
+      >
+        {/* Left: Back to Room Roster */}
+        <button
+          type="button"
+          onClick={onBackToRoom}
+          aria-label="View room players and settings"
+          className="flex items-center gap-1.5 sm:gap-2 rounded-xl border border-white/10 bg-white/5 px-2.5 py-1 sm:px-3 sm:py-1.5 text-xs font-bold text-slate-300 shadow-sm transition-all hover:border-white/20 hover:bg-white/10 hover:text-white active:scale-95 touch-manipulation cursor-pointer"
+        >
+          <ArrowLeft className="size-3.5 text-amber-400 shrink-0" />
+          <span className="hidden sm:inline">Room</span>
+          <span className="rounded-md bg-amber-400/15 border border-amber-400/30 px-1.5 py-0.5 font-mono text-[10px] font-bold text-amber-300">
+            {playerCount}/{maxPlayers}
+          </span>
+        </button>
+
+        {/* Center: Game Name & Room Code */}
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          <div className="hidden sm:flex items-center gap-1.5 text-xs font-black uppercase tracking-wider text-slate-200">
+            <Gamepad2 className="size-3.5 text-amber-400 shrink-0" />
+            <span>{game.name}</span>
+          </div>
+          <button
+            type="button"
+            onClick={handleCopyRoomCode}
+            title="Click to copy Room Code"
+            className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-black/40 px-2.5 py-1 text-xs font-bold font-mono tracking-widest text-amber-400 shadow-inner transition-colors hover:border-amber-400/30 active:scale-95 cursor-pointer touch-manipulation"
+          >
+            <span className="hidden xs:inline text-[10px] uppercase font-sans text-slate-400 font-semibold tracking-normal">
+              Code:
+            </span>
+            <span>{copiedCode ? "COPIED!" : roomCode}</span>
+          </button>
+        </div>
+
+        {/* Right: Audio Mute & Leave Game */}
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={toggleMute}
+            aria-label={isMuted ? "Unmute game audio" : "Mute game audio"}
+            title={isMuted ? "Unmute audio" : "Mute audio"}
+            className="flex size-7 sm:size-8 cursor-pointer items-center justify-center rounded-xl border border-white/10 bg-white/5 text-slate-300 shadow-sm transition-all hover:border-white/20 hover:bg-white/10 hover:text-amber-400 active:scale-95 touch-manipulation"
+          >
+            {isMuted ? (
+              <VolumeX className="size-3.5" />
+            ) : (
+              <Volume2 className="size-3.5" />
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setLeaveConfirmOpen(true)}
+            aria-label="Leave match"
+            title="Leave match"
+            className="flex size-7 sm:size-8 cursor-pointer items-center justify-center rounded-xl border border-rose-500/30 bg-rose-950/40 text-rose-300 shadow-sm transition-all hover:border-rose-500/50 hover:bg-rose-900/60 hover:text-rose-200 active:scale-95 touch-manipulation"
+          >
+            <LogOut className="size-3.5" />
+          </button>
+        </div>
+      </header>
 
       {/* Realtime Toasts for Room Joins / Leaves */}
       <RoomToast players={room.players} audioSettings={audio} />
@@ -770,7 +877,7 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
       )}
 
       {/* MAIN LAYOUT: 15x15 LUDO BOARD + NOCTURNE SIDE PANEL */}
-      <div className="relative z-10 mx-auto flex h-fit w-fit max-w-full flex-col items-center justify-center gap-3 md:flex-row md:items-center md:gap-5 lg:gap-8">
+      <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-1 flex-col items-center justify-start gap-3 md:flex-row md:items-start md:justify-center md:gap-6 lg:gap-8 min-h-0 px-2 mt-[40px] md:mt-[80px]">
         <div className="flex shrink-0 items-center justify-center">
           <LudoBoard
             state={state}

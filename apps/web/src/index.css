@@ -134,6 +134,16 @@
     @apply border-border outline-ring/50;
   }
 
+  html,
+  body,
+  #root {
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+  }
+
   body {
     @apply font-sans bg-background text-foreground antialiased selection:bg-amber-400/30 selection:text-amber-200;
   }
