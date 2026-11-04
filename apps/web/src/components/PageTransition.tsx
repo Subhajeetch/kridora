@@ -5,6 +5,8 @@ import {
   type Variants,
 } from "framer-motion";
 import { useLocation, useOutlet } from "react-router";
+import { cn } from "@/lib/utils";
+import { useGameLayout } from "@/providers/game-layout-context";
 
 /**
  * Ultra-lightweight Motion Blur Page Transition.
@@ -49,6 +51,7 @@ export function PageTransition() {
   const location = useLocation();
   const outlet = useOutlet();
   const reduce = useReducedMotion();
+  const { inGameMode } = useGameLayout();
 
   return (
     <AnimatePresence
@@ -62,7 +65,12 @@ export function PageTransition() {
         initial="enter"
         animate="center"
         exit="exit"
-        className="mx-auto w-full max-w-5xl px-4 pb-16"
+        className={cn(
+          "w-full",
+          inGameMode
+            ? "flex-1 flex flex-col max-w-none px-0 pb-0 h-full max-h-full min-h-0 overflow-hidden"
+            : "mx-auto max-w-5xl px-4 pb-16",
+        )}
       >
         {outlet}
       </motion.div>

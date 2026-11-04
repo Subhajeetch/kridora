@@ -363,77 +363,79 @@ function InGameContainer({
   }, []);
 
   return (
-    <section className="relative w-full py-1 sm:py-2">
+    <section className="relative w-full h-full max-h-full flex-1 flex flex-col min-h-0 overflow-hidden bg-[#0c0e14]">
       {/* Low-profile In-Game Top Bar */}
-      <header className="sticky top-2 z-30 mb-2 mx-auto w-full max-w-[2000px] filter drop-shadow-[0_3px_0_#000000]">
-        <div className="pixel-corners-md bg-white/15 p-[1.5px] w-full">
-          <div className="pixel-corners-sm bg-[#12131a] px-2.5 py-1.5 sm:px-3.5 sm:py-2 flex items-center justify-between gap-3">
-            {/* Back to Room Roster */}
-            <div className="pixel-corners-sm bg-white/15 hover:bg-white/25 p-[1px] transition-colors inline-flex">
-              <button
-                type="button"
-                onClick={onBackToRoom}
-                aria-label="View room players and settings"
-                className="pixel-corners-sm bg-[#181922] hover:bg-[#222432] text-gray-200 hover:text-white font-retro text-[10px] sm:text-xs font-bold uppercase tracking-wider px-2.5 py-1.5 flex items-center gap-2 transition-colors cursor-pointer"
-              >
-                <ArrowLeft className="size-3.5 text-[#facc15]" />
-                <span>Room</span>
-                <span className="pixel-corners-sm bg-white/15 p-[1px] inline-flex">
-                  <span className="pixel-corners-sm bg-[#0a0b10] px-1.5 py-0.5 font-mono text-[10px] text-[#facc15]">
-                    {room.players.length}/{room.maxPlayers}
-                  </span>
-                </span>
-              </button>
-            </div>
-
-            {/* Center: Game & Room Code */}
-            <div className="flex items-center gap-2.5">
-              <span className="hidden sm:inline-flex items-center gap-1.5 font-retro text-xs font-bold uppercase tracking-wide text-white">
-                <Gamepad2 className="size-3.5 text-[#facc15]" />
-                <span>{game.name}</span>
-              </span>
-              <span className="pixel-corners-sm bg-white/15 p-[1px] inline-flex">
-                <span className="pixel-corners-sm bg-[#0a0b10] px-2 py-0.5 font-mono text-xs font-bold tracking-widest text-[#facc15]">
-                  {room.code}
-                </span>
-              </span>
-            </div>
-
-            {/* Right: Audio & Leave */}
-            <div className="flex items-center gap-1.5">
+      <header className="shrink-0 z-30 w-full px-2 py-1.5 sm:px-4 sm:py-2">
+        <div className="mx-auto w-full max-w-5xl filter drop-shadow-[0_3px_0_#000000]">
+          <div className="pixel-corners-md bg-white/15 p-[1.5px] w-full">
+            <div className="pixel-corners-sm bg-[#12131a] px-2.5 py-1.5 sm:px-3.5 sm:py-2 flex items-center justify-between gap-3">
+              {/* Back to Room Roster */}
               <div className="pixel-corners-sm bg-white/15 hover:bg-white/25 p-[1px] transition-colors inline-flex">
                 <button
                   type="button"
-                  aria-label={
-                    audio.muted ? "Unmute game audio" : "Mute game audio"
-                  }
-                  onClick={() => updateAudioSettings({ muted: !audio.muted })}
-                  className="pixel-corners-sm bg-[#181922] hover:bg-[#222432] text-gray-300 hover:text-[#facc15] p-1.5 sm:p-2 flex items-center justify-center transition-colors cursor-pointer"
+                  onClick={onBackToRoom}
+                  aria-label="View room players and settings"
+                  className="pixel-corners-sm bg-[#181922] hover:bg-[#222432] text-gray-200 hover:text-white font-retro text-[10px] sm:text-xs font-bold uppercase tracking-wider px-2.5 py-1.5 flex items-center gap-2 transition-colors cursor-pointer"
                 >
-                  {audio.muted ? (
-                    <VolumeX className="size-3.5" />
-                  ) : (
-                    <Volume2 className="size-3.5" />
-                  )}
+                  <ArrowLeft className="size-3.5 text-[#facc15]" />
+                  <span>Room</span>
+                  <span className="pixel-corners-sm bg-white/15 p-[1px] inline-flex">
+                    <span className="pixel-corners-sm bg-[#0a0b10] px-1.5 py-0.5 font-mono text-[10px] text-[#facc15]">
+                      {room.players.length}/{room.maxPlayers}
+                    </span>
+                  </span>
                 </button>
               </div>
 
-              <div
-                className={cn(
-                  "pixel-corners-sm bg-white/15 hover:bg-rose-500/40 p-[1px] transition-colors inline-flex",
-                  leaveBusy && "opacity-40 cursor-not-allowed",
-                )}
-              >
-                <button
-                  type="button"
-                  aria-label="Leave room"
-                  title="Leave room"
-                  onClick={onLeave}
-                  disabled={leaveBusy}
-                  className="pixel-corners-sm bg-[#181922] hover:bg-rose-500/20 text-rose-300 hover:text-rose-200 p-1.5 sm:p-2 flex items-center justify-center transition-colors cursor-pointer disabled:cursor-not-allowed"
+              {/* Center: Game & Room Code */}
+              <div className="flex items-center gap-2.5">
+                <span className="hidden sm:inline-flex items-center gap-1.5 font-retro text-xs font-bold uppercase tracking-wide text-white">
+                  <Gamepad2 className="size-3.5 text-[#facc15]" />
+                  <span>{game.name}</span>
+                </span>
+                <span className="pixel-corners-sm bg-white/15 p-[1px] inline-flex">
+                  <span className="pixel-corners-sm bg-[#0a0b10] px-2 py-0.5 font-mono text-xs font-bold tracking-widest text-[#facc15]">
+                    {room.code}
+                  </span>
+                </span>
+              </div>
+
+              {/* Right: Audio & Leave */}
+              <div className="flex items-center gap-1.5">
+                <div className="pixel-corners-sm bg-white/15 hover:bg-white/25 p-[1px] transition-colors inline-flex">
+                  <button
+                    type="button"
+                    aria-label={
+                      audio.muted ? "Unmute game audio" : "Mute game audio"
+                    }
+                    onClick={() => updateAudioSettings({ muted: !audio.muted })}
+                    className="pixel-corners-sm bg-[#181922] hover:bg-[#222432] text-gray-300 hover:text-[#facc15] p-1.5 sm:p-2 flex items-center justify-center transition-colors cursor-pointer"
+                  >
+                    {audio.muted ? (
+                      <VolumeX className="size-3.5" />
+                    ) : (
+                      <Volume2 className="size-3.5" />
+                    )}
+                  </button>
+                </div>
+
+                <div
+                  className={cn(
+                    "pixel-corners-sm bg-white/15 hover:bg-rose-500/40 p-[1px] transition-colors inline-flex",
+                    leaveBusy && "opacity-40 cursor-not-allowed",
+                  )}
                 >
-                  <LogOut className="size-3.5" />
-                </button>
+                  <button
+                    type="button"
+                    aria-label="Leave room"
+                    title="Leave room"
+                    onClick={onLeave}
+                    disabled={leaveBusy}
+                    className="pixel-corners-sm bg-[#181922] hover:bg-rose-500/20 text-rose-300 hover:text-rose-200 p-1.5 sm:p-2 flex items-center justify-center transition-colors cursor-pointer disabled:cursor-not-allowed"
+                  >
+                    <LogOut className="size-3.5" />
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -442,7 +444,7 @@ function InGameContainer({
 
       {/* Offline Host Countdown Alert */}
       {secondsLeft !== null && owner && (
-        <div className="mx-auto mb-3 max-w-5xl px-2">
+        <div className="mx-auto mb-1 w-full max-w-5xl px-2 shrink-0">
           <div className="pixel-corners-sm bg-amber-400/35 p-[1px] w-full">
             <div
               role="status"
@@ -460,27 +462,31 @@ function InGameContainer({
       )}
 
       {/* Main Game Screen with Error Boundary and Launch Loader */}
-      <div className="lg:relative lg:left-1/2 lg:w-[calc(100vw-2rem)] lg:max-w-[2000px] lg:-translate-x-1/2">
+      <div className="relative flex-1 w-full flex flex-col min-h-0 overflow-hidden">
         <GameErrorBoundary
           gameName={game.name}
           onBackToRoom={onBackToRoom}
           onLeaveRoom={onLeave}
         >
           {isLaunching ? (
-            <GameLaunchScreen
-              room={room}
-              gameName={game.name}
-              onBackToRoom={onBackToRoom}
-            />
+            <div className="flex-1 flex items-center justify-center p-4">
+              <GameLaunchScreen
+                room={room}
+                gameName={game.name}
+                onBackToRoom={onBackToRoom}
+              />
+            </div>
           ) : (
             <Suspense
               fallback={
-                <GameLaunchScreen
-                  room={room}
-                  gameName={game.name}
-                  onBackToRoom={onBackToRoom}
-                  statusMessage="Downloading game engine components..."
-                />
+                <div className="flex-1 flex items-center justify-center p-4">
+                  <GameLaunchScreen
+                    room={room}
+                    gameName={game.name}
+                    onBackToRoom={onBackToRoom}
+                    statusMessage="Downloading game engine components..."
+                  />
+                </div>
               }
             >
               <GameComponent room={room} userId={userId} />
@@ -702,7 +708,12 @@ function RoomView({ room, userId }: { room: RoomSnapshot; userId: string }) {
         Kept mounted when match is active so socket subscriptions and state are preserved.
       */}
       {room.status === "in_progress" && (
-        <div className={cn(viewMode === "game" ? "block" : "hidden")}>
+        <div
+          className={cn(
+            "w-full flex-1 flex flex-col h-full max-h-full min-h-0 overflow-hidden",
+            viewMode === "game" ? "flex" : "hidden",
+          )}
+        >
           <InGameContainer
             room={room}
             userId={userId}

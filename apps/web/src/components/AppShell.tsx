@@ -168,8 +168,13 @@ export function AppShell() {
   if (isPending && !isAuthInitialized) return <SplashScreen />;
 
   return (
-    <div className="relative min-h-dvh">
-      <Background />
+    <div
+      className={cn(
+        "relative flex flex-col",
+        inGameMode ? "h-dvh max-h-dvh overflow-hidden" : "min-h-dvh",
+      )}
+    >
+      {!inGameMode && <Background />}
       <MusicController />
 
       {!inGameMode && (
@@ -333,7 +338,12 @@ export function AppShell() {
         </p>
       )}
 
-      <main className="w-full">
+      <main
+        className={cn(
+          "w-full flex-1 flex flex-col",
+          inGameMode && "min-h-0 overflow-hidden",
+        )}
+      >
         <PageTransition />
       </main>
 
