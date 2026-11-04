@@ -229,3 +229,66 @@
     transition: none;
   }
 }
+
+/* Room setup shares the charcoal-and-gold arcade skin used across Kridora. */
+.setup {
+  border: 2px solid #facc15;
+  border-radius: 3px;
+  background: #12131a;
+  color: #f4f1ff;
+  box-shadow: 0 4px 0 #78350f;
+}
+.headingRow h2 {
+  color: #facc15;
+  font-family: var(--font-display);
+}
+.headingRow p,
+.ageSummary small,
+.modeChip small {
+  color: #c4c4cc;
+}
+.liveBadge {
+  border-color: rgba(93, 255, 154, 0.38);
+  border-radius: 2px;
+  background: rgba(93, 255, 154, 0.08);
+  color: #a7f3c0;
+}
+.modeChip {
+  border: 1px solid rgba(250, 204, 21, 0.36);
+  border-radius: 3px;
+  background: #0e0f16;
+  box-shadow: 0 3px 0 rgba(120, 53, 15, 0.65);
+  color: #f4f1ff;
+}
+.modeChip strong {
+  color: #f4f1ff;
+}
+.modeChip:hover:not(:disabled) {
+  border-color: #fde047;
+  background: #1a1b24;
+  box-shadow: 0 4px 0 #78350f;
+}
+.selected,
+.spicy.selected {
+  border-color: #facc15;
+  background: rgba(250, 204, 21, 0.15);
+  box-shadow: 0 3px 0 #78350f, inset 0 0 0 1px rgba(250, 204, 21, 0.25);
+}
+.adultMark {
+  color: #facc15;
+}
+.ageSummary {
+  border-top-color: rgba(250, 204, 21, 0.25);
+}
+.ageSummary span {
+  color: #facc15;
+}
+.ageSummary strong {
+  border-color: rgba(250, 204, 21, 0.4);
+  border-radius: 2px;
+  background: #0e0f16;
+  color: #f4f1ff;
+}
+.lockedNote {
+  color: #fde047;
+}

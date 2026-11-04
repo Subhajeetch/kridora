@@ -2217,3 +2217,250 @@
 .secondaryActions {
   flex-wrap: wrap;
 }
+
+/* Match the pulled arcade UI: charcoal surfaces, pixel edges, and coin-gold accents. */
+.page {
+  color: #f4f1ff;
+  font-family: var(--font-sans);
+}
+.hero {
+  border: 2px solid #facc15;
+  border-radius: 4px;
+  background: #12131a;
+  box-shadow: 0 5px 0 #78350f, 0 18px 45px rgba(0, 0, 0, 0.55);
+}
+.backgroundGlow {
+  opacity: 0.2;
+  background: radial-gradient(ellipse, rgba(250, 204, 21, 0.17), transparent 68%);
+}
+.topline,
+.playerRange,
+.setupLabel,
+.ageControl,
+.modeChip,
+.secondaryButton {
+  color: #e7e5e4;
+}
+.brand,
+.themeControl select,
+.playfulTitle,
+.dialogHeading > h2,
+.guideHeading h2 {
+  font-family: var(--font-display);
+}
+.brand svg,
+.playerRange svg {
+  color: #facc15;
+}
+.playerRange,
+.themeControl select,
+.themeToggle,
+.homeAgeControl,
+.modeChip,
+.ageControl select,
+.guideCard,
+.minimumAge,
+.agePacks li,
+.kindReminder,
+.exitLink,
+.dialogClose {
+  border-color: rgba(250, 204, 21, 0.42);
+  border-radius: 3px;
+  background: #0e0f16;
+  box-shadow: 0 3px 0 rgba(120, 53, 15, 0.7);
+}
+.themeControl select,
+.homeAgeControl select,
+.ageControl select {
+  color: #f4f1ff;
+}
+.themeControl select option,
+.homeAgeControl select option {
+  background: #12131a;
+  color: #f4f1ff;
+}
+.playfulTitle {
+  color: #facc15;
+  text-shadow: 3px 3px 0 #78350f;
+  transform: none;
+}
+.playfulTitle span {
+  border: 2px solid #000;
+  border-radius: 3px;
+  background: #ff3db8;
+  box-shadow: 0 4px 0 #881337;
+  color: #0a0b10;
+}
+.tableDisc {
+  border: 3px solid #facc15;
+  background: radial-gradient(ellipse at 50% 45%, #262733, #0a0b10 72%);
+  box-shadow: inset 0 0 0 6px rgba(250, 204, 21, 0.08), 0 5px 0 #78350f;
+}
+.tableDisc::after {
+  border-color: rgba(250, 204, 21, 0.3);
+}
+.artCenter {
+  border: 2px solid #facc15;
+  border-radius: 3px;
+  background: #12131a;
+  box-shadow: 0 4px 0 #78350f;
+}
+.artCenter small {
+  border-color: #facc15;
+  border-radius: 2px;
+  background: #0a0b10;
+  color: #facc15;
+}
+.artCenter i {
+  border-radius: 2px;
+  background: linear-gradient(110deg, #fff7ed, #ff3db8);
+  box-shadow: 0 0 10px rgba(255, 61, 184, 0.38);
+}
+.miniPlayer {
+  border: 2px solid #facc15;
+  border-radius: 3px;
+  background: #12131a;
+  box-shadow: 0 4px 0 #78350f;
+}
+.spinPrompt {
+  border: 1px solid #facc15;
+  border-radius: 2px;
+  background: #0a0b10;
+  color: #facc15;
+  font-family: var(--font-retro);
+}
+.playButton {
+  border: 2px solid #000 !important;
+  border-radius: 2px !important;
+  background: #facc15 !important;
+  box-shadow: 0 4px 0 #78350f !important;
+  color: #0a0b10 !important;
+  font-family: var(--font-retro) !important;
+  text-transform: uppercase;
+  text-shadow: none !important;
+}
+.playButton:hover:not(:disabled) {
+  background: #fbbf24 !important;
+  box-shadow: 0 5px 0 #78350f !important;
+  transform: translateY(-1px);
+}
+.page[data-theme] .playButton {
+  background: #facc15 !important;
+  box-shadow: 0 4px 0 #78350f !important;
+}
+.page[data-theme] .playButton:hover:not(:disabled) {
+  background: #fbbf24 !important;
+  box-shadow: 0 5px 0 #78350f !important;
+}
+.secondaryButton {
+  border: 2px solid #facc15 !important;
+  border-radius: 2px !important;
+  background: #12131a !important;
+  box-shadow: 0 4px 0 #78350f !important;
+  color: #facc15 !important;
+  font-family: var(--font-retro) !important;
+  text-transform: uppercase;
+}
+.secondaryButton:hover:not(:disabled) {
+  background: #1a1b24 !important;
+  color: #fde047 !important;
+}
+.exitLink {
+  border: 1px solid rgba(250, 204, 21, 0.4);
+  border-radius: 2px;
+  background: #12131a;
+  box-shadow: 0 3px 0 #78350f;
+  color: #facc15;
+}
+.exitLink:hover {
+  color: #fde047;
+}
+.guideLink {
+  color: #facc15;
+  font-family: var(--font-retro);
+}
+.guideLink:hover {
+  color: #fde047;
+}
+.modeChip:hover:not(:disabled),
+.modeSelected {
+  border-color: #facc15;
+  background: #1a1b24;
+  box-shadow: 0 4px 0 #78350f;
+}
+.modeChip[aria-pressed="true"] {
+  border-color: #facc15;
+  background: rgba(250, 204, 21, 0.12);
+  color: #fff7ed;
+}
+.page[data-theme] .modeChip[aria-pressed="true"] {
+  border-color: #facc15;
+  background: rgba(250, 204, 21, 0.12);
+}
+.guideDialog {
+  border: 2px solid #facc15 !important;
+  border-radius: 4px !important;
+  background: #12131a !important;
+  box-shadow: 0 5px 0 #78350f !important;
+}
+.guideCard {
+  background: #0e0f16;
+  box-shadow: 0 4px 0 #78350f;
+}
+.guideIcon,
+.ageIcon {
+  border-color: rgba(250, 204, 21, 0.5);
+  border-radius: 2px;
+  background: rgba(250, 204, 21, 0.1);
+  color: #facc15;
+}
+.guideHeading p,
+.steps li > span,
+.minimumAge > span,
+.minimumAge > strong,
+.familyMark,
+.teenMark,
+.adultMark {
+  color: #facc15;
+}
+.steps p,
+.ageReminder,
+.agePacks small,
+.minimumAge p,
+.kindReminder {
+  color: #c4c4cc;
+}
+.agePacks li > span {
+  border-radius: 2px;
+  background: #1a1b24;
+}
+.kindReminder {
+  border-color: rgba(250, 204, 21, 0.28);
+  border-radius: 2px;
+  background: rgba(250, 204, 21, 0.06);
+}
+.kindReminder svg {
+  color: #facc15;
+}
+.page[data-tone="light"] .hero {
+  border-color: #a16207;
+  background: #f5f1e6;
+  color: #171717;
+}
+.page[data-tone="light"] .playfulTitle {
+  color: #854d0e;
+}
+.page[data-tone="light"] .topline,
+.page[data-tone="light"] .playerRange,
+.page[data-tone="light"] .setupLabel,
+.page[data-tone="light"] .ageControl,
+.page[data-tone="light"] .modeChip {
+  color: #292524;
+}
+.page[data-tone="light"] .homeAgeControl,
+.page[data-tone="light"] .modeChip,
+.page[data-tone="light"] .ageControl select,
+.page[data-tone="light"] .themeControl select {
+  background: #fffbeb;
+  color: #292524;
+}

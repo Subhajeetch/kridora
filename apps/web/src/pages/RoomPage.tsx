@@ -54,6 +54,7 @@ import { describeError, request } from "@/lib/socket";
 import { cn } from "@/lib/utils";
 import { useGameLayout } from "@/providers/game-layout-context";
 import { useRealtime } from "@/providers/realtime-context";
+import roomStyles from "./room-retro.module.css";
 import NotFoundPage from "./NotFoundPage";
 
 /** yourdomain.com/<game>/room */
@@ -640,7 +641,12 @@ function RoomView({ room, userId }: { room: RoomSnapshot; userId: string }) {
         Visible in lobby mode OR when user clicks the "Room & Players" back button during an active game.
       */}
       <div className={cn(viewMode === "room" ? "block" : "hidden")}>
-        <section className="py-6">
+        <section
+          className={cn(
+            "py-6",
+            room.gameSlug === "truth-and-dare" && roomStyles.roomSkin,
+          )}
+        >
           {/* Active Game Notice Banner when toggling to Room view while game is in progress */}
           {room.status === "in_progress" && (
             <div className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-neon-cyan/40 bg-panel/90 p-4 sm:p-5 backdrop-blur-xl shadow-xl shadow-neon-cyan/5">

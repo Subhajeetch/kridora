@@ -606,3 +606,66 @@
     transition: none;
   }
 }
+
+/* Keep the single-screen turn panels consistent with the arcade shell. */
+.localGame {
+  --game-gold: #facc15;
+  color: #f4f1ff;
+}
+.turnPanel,
+.votePanel,
+.rewardPanel,
+.scoreboard li,
+.promptCard {
+  border-color: rgba(250, 204, 21, 0.38);
+  border-radius: 3px;
+  background: #12131a;
+  box-shadow: 0 3px 0 rgba(120, 53, 15, 0.7);
+}
+.gameStatus strong,
+.turnStatus strong,
+.voteHeading strong,
+.rewardPanel > strong,
+.scoreName strong {
+  color: #f4f1ff;
+  font-family: var(--font-display);
+}
+.turnBadge,
+.timerLabels strong,
+.scorePoints strong {
+  color: #facc15;
+}
+.bottleTrigger,
+.randomChoice,
+.soundToggle,
+.reactionGrid button,
+.performanceActions button,
+.rewardPanel button,
+.nextTurnPanel button {
+  border-radius: 2px;
+}
+.randomChoice,
+.soundToggle,
+.reactionGrid button,
+.skipButton {
+  border-color: rgba(250, 204, 21, 0.4);
+  background: #0e0f16;
+  box-shadow: 0 3px 0 #78350f;
+  color: #f4f1ff;
+}
+.doneButton,
+.rewardPanel button,
+.nextTurnPanel button {
+  border: 2px solid #000;
+  border-radius: 2px;
+  background: #facc15;
+  box-shadow: 0 4px 0 #78350f;
+  color: #0a0b10;
+  font-family: var(--font-retro);
+  text-transform: uppercase;
+}
+.modalActions button {
+  border-radius: 2px;
+  font-family: var(--font-retro);
+  text-transform: uppercase;
+}
