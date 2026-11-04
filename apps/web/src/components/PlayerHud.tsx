@@ -8,6 +8,7 @@ interface PlayerHudProps {
   xp?: number | null | undefined;
   isGuest?: boolean;
   isVerified?: boolean;
+  guestHint?: string;
   onClick?: () => void;
 }
 
@@ -48,6 +49,7 @@ export function PlayerHud({
   xp,
   isGuest,
   isVerified,
+  guestHint,
   onClick,
 }: PlayerHudProps) {
   const reduce = useReducedMotion();
@@ -75,7 +77,7 @@ export function PlayerHud({
         aria-label="View guest profile and user ID"
       >
         <div className="pixel-corners-sm bg-[#facc15] hover:bg-white group-hover:bg-white p-[2px] transition-colors">
-          <div className="pixel-corners-sm bg-[#12131a] flex items-center h-8 sm:h-9 px-2 sm:px-2.5 gap-2">
+          <div className="pixel-corners-sm bg-[#12131a] flex min-h-8 sm:min-h-9 items-center px-2 sm:px-2.5 py-1 gap-2">
             <span
               aria-hidden="true"
               className="grid size-5.5 sm:size-6 place-items-center pixel-corners-sm bg-linear-to-br from-amber-400 to-amber-600 font-display text-[10px] sm:text-[11px] leading-none uppercase text-black font-bold overflow-hidden shadow-xs"
@@ -92,13 +94,20 @@ export function PlayerHud({
               )}
             </span>
 
-            <div className="flex min-w-0 items-center gap-1.5">
-              <span className="max-w-20 truncate text-xs font-semibold text-white sm:max-w-32">
-                {name}
-              </span>
-              <span className="hidden pixel-corners-sm border border-amber-400/50 bg-amber-400/20 px-1.5 py-0.5 text-[8px] font-retro font-bold uppercase tracking-wider text-amber-300 sm:inline-flex">
-                GUEST
-              </span>
+            <div className="flex min-w-0 flex-col gap-1">
+              <div className="flex min-w-0 items-center gap-1.5">
+                <span className="max-w-20 truncate text-xs font-semibold text-white sm:max-w-32">
+                  {name}
+                </span>
+                <span className="hidden pixel-corners-sm border border-amber-400/50 bg-amber-400/20 px-1.5 py-0.5 text-[8px] font-retro font-bold uppercase tracking-wider text-amber-300 sm:inline-flex">
+                  GUEST
+                </span>
+              </div>
+              {guestHint && (
+                <span className="hidden max-w-44 truncate text-[8px] leading-none text-gray-300 sm:block">
+                  {guestHint}
+                </span>
+              )}
             </div>
           </div>
         </div>

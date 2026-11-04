@@ -14,4 +14,5 @@ export const gameComponents: Record<
   monopoly: lazy(() => import("./monopoly/main")),
   fatebyai: lazy(() => import("./fatebyai/main")),
   ludo: lazy(() => import("./ludo/main")),
+  "truth-and-dare": lazy(() => import("./truth-and-dare/main")),
 };

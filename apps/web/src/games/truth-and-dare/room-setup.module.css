@@ -1,0 +1,231 @@
+.setup {
+  --setup-gold: #ffd447;
+  margin-bottom: 20px;
+  padding: 20px;
+  border: 1px solid rgba(226, 166, 255, 0.2);
+  border-radius: 24px;
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(170, 82, 238, 0.16), transparent 58%),
+    linear-gradient(140deg, rgba(30, 17, 55, 0.94), rgba(14, 13, 34, 0.94));
+  color: #fff7ff;
+  box-shadow: 0 18px 48px rgba(4, 2, 20, 0.24), inset 0 1px rgba(255, 255, 255, 0.05);
+}
+
+.headingRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 15px;
+}
+
+.headingRow h2 {
+  margin: 0;
+  color: #fffaff;
+  font-size: 19px;
+  font-weight: 850;
+  letter-spacing: -0.025em;
+}
+
+.headingRow p {
+  margin: 4px 0 0;
+  color: #cfc1e5;
+  font-size: 13px;
+}
+
+.liveBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex: none;
+  padding: 7px 11px;
+  border: 1px solid rgba(95, 255, 185, 0.25);
+  border-radius: 999px;
+  background: rgba(61, 214, 150, 0.1);
+  color: #adffd8;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.liveBadge i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #5dffb6;
+  box-shadow: 0 0 11px rgba(93, 255, 182, 0.9);
+}
+
+.modeGrid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.childModes {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.modeChip {
+  min-width: 0;
+  min-height: 70px;
+  padding: 10px 9px;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 5px;
+  border: 1px solid rgba(220, 193, 248, 0.2);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.055);
+  color: #f8efff;
+  text-align: center;
+  cursor: pointer;
+  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
+}
+
+.modeChip strong {
+  overflow: hidden;
+  max-width: 100%;
+  color: #fffaff;
+  font-size: 15px;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.modeChip strong span {
+  margin-right: 3px;
+}
+
+.modeChip small {
+  color: #d7c9e8;
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.modeChip:hover:not(:disabled) {
+  transform: translateY(-2px);
+  border-color: rgba(209, 150, 255, 0.75);
+  background: rgba(173, 111, 255, 0.14);
+}
+
+.modeChip:focus-visible {
+  outline: 3px solid rgba(255, 212, 71, 0.82);
+  outline-offset: 3px;
+}
+
+.modeChip:disabled {
+  cursor: not-allowed;
+  opacity: 0.68;
+}
+
+.selected {
+  border-color: #ba7bff;
+  background: linear-gradient(145deg, rgba(157, 83, 236, 0.35), rgba(90, 43, 146, 0.34));
+  box-shadow: 0 0 22px rgba(174, 101, 255, 0.2), inset 0 1px rgba(255, 255, 255, 0.1);
+}
+
+.spicy.selected {
+  border-color: var(--setup-gold);
+  background: rgba(255, 192, 66, 0.15);
+  box-shadow: 0 0 20px rgba(255, 199, 64, 0.14);
+}
+
+.adultMark {
+  color: #ffe38a;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.ageSummary {
+  margin-top: 12px;
+  padding-top: 11px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  border-top: 1px solid rgba(220, 193, 248, 0.12);
+}
+
+.ageSummary span {
+  color: #e6d9f4;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.ageSummary strong {
+  padding: 5px 9px;
+  border: 1px solid rgba(220, 193, 248, 0.2);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #fffaff;
+  font-size: 12px;
+}
+
+.ageSummary small {
+  margin-left: auto;
+  color: #cfc1e5;
+  font-size: 11px;
+}
+
+.lockedNote,
+.loading,
+.error {
+  margin: 12px 0 0;
+  font-size: 13px;
+}
+
+.lockedNote {
+  color: #ffe38a;
+}
+
+.loading {
+  color: #e7d7fb;
+}
+
+.error {
+  color: #ffb1ca;
+}
+
+@media (max-width: 700px) {
+  .setup {
+    padding: 16px;
+  }
+
+  .modeGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+}
+
+@media (max-width: 420px) {
+  .headingRow {
+    align-items: flex-start;
+  }
+
+  .headingRow h2 {
+    font-size: 17px;
+  }
+
+  .headingRow p {
+    font-size: 12px;
+  }
+
+  .liveBadge {
+    padding: 6px 8px;
+    font-size: 10px;
+  }
+
+  .modeGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .childModes {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modeChip {
+    transition: none;
+  }
+}

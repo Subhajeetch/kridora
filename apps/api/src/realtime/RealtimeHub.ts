@@ -352,13 +352,6 @@ export class RealtimeHub extends DurableObject<Env> {
 
     // 2. Modular Game Events ("<gameSlug>:*")
     const room = this.roomManager.getRequiredRoomForUser(user.id);
-    if (room.status !== "in_progress") {
-      throw new ApiError(
-        "VALIDATION_ERROR",
-        "No match is currently in progress in this room.",
-      );
-    }
-
     const gameModule = getServerGameModule(room.gameSlug);
     if (gameModule.eventPrefix !== prefix) {
       throw new ApiError(
@@ -367,11 +360,21 @@ export class RealtimeHub extends DurableObject<Env> {
       );
     }
 
-    if (room.gameState === null || room.gameState === undefined) {
-      room.gameState = gameModule.createInitialState(room.players);
+    const lobbyAction =
+      room.status === "lobby" && gameModule.lobbyActions?.includes(action);
+    if (room.status !== "in_progress" && !lobbyAction) {
+      throw new ApiError(
+        "VALIDATION_ERROR",
+        "No match is currently in progress in this room.",
+      );
     }
 
     let stateMutated = false;
+
+    if (room.gameState === null || room.gameState === undefined) {
+      room.gameState = gameModule.createInitialState(room.players);
+      stateMutated = true;
+    }
 
     const ctx: GameActionContext<unknown> = {
       env: this.env,

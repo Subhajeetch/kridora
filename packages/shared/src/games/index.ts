@@ -42,5 +42,6 @@ export type {
   UnmetRequirementCode,
 } from "./requirements";
 export * from "./ludo";
+export * from "./truth-and-dare";
 export { developmentGames } from "./config.development";
 export { productionGames } from "./config.production";

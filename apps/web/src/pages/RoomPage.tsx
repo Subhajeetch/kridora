@@ -18,7 +18,9 @@ import {
   Loader2,
   Lock,
   LogOut,
+  Plus,
   Play,
+  QrCode,
   UserPlus,
   Users,
   UserX,
@@ -27,6 +29,7 @@ import {
   WifiOff,
 } from "lucide-react";
 import { Suspense, useEffect, useRef, useState } from "react";
+import { QRCodeSVG } from "qrcode.react";
 import { Link, useNavigate, useParams } from "react-router";
 import { ChangeGameDialog } from "@/components/games/ChangeGameDialog";
 import { GameErrorBoundary } from "@/components/games/GameErrorBoundary";
@@ -43,6 +46,7 @@ import {
 } from "@/components/ui/dialog";
 import { findEnabledGame } from "@/config/games";
 import { gameComponents } from "@/games/registry";
+import { TruthAndDareRoomSetup } from "@/games/truth-and-dare/room-setup";
 import { useCountdown } from "@/hooks/useCountdown";
 import { updateAudioSettings, useAudioSettings } from "@/lib/audio-settings";
 import { authClient } from "@/lib/auth-client";
@@ -412,6 +416,9 @@ function RoomView({ room, userId }: { room: RoomSnapshot; userId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<"code" | "link" | null>(null);
   const [copyingLink, setCopyingLink] = useState(false);
+  const [qrDialogOpen, setQrDialogOpen] = useState(false);
+  const [inviteQrUrl, setInviteQrUrl] = useState<string | null>(null);
+  const [qrLoading, setQrLoading] = useState(false);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [changeGameOpen, setChangeGameOpen] = useState(false);
   const [gameChangeNotice, setGameChangeNotice] = useState<string | null>(null);
@@ -517,6 +524,21 @@ function RoomView({ room, userId }: { room: RoomSnapshot; userId: string }) {
     }
   }
 
+  async function showInviteQr() {
+    if (qrLoading) return;
+    setQrLoading(true);
+    setError(null);
+    try {
+      const result = await request("room:get-invite-token", {});
+      setInviteQrUrl(`${window.location.origin}${result.inviteUrl}`);
+      setQrDialogOpen(true);
+    } catch (err) {
+      setError(describeError(err));
+    } finally {
+      setQrLoading(false);
+    }
+  }
+
   async function handleChangeGame(newGameSlug: GameSlug) {
     if (busy || newGameSlug === room.gameSlug) return;
     setBusy(true);
@@ -585,6 +607,10 @@ function RoomView({ room, userId }: { room: RoomSnapshot; userId: string }) {
   );
 
   const emptySeats = Math.max(0, room.maxPlayers - room.players.length);
+  const localInviteOrigin =
+    typeof window !== "undefined" &&
+    (window.location.hostname === "localhost" ||
+      window.location.hostname === "127.0.0.1");
 
   return (
     <>
@@ -652,6 +678,10 @@ function RoomView({ room, userId }: { room: RoomSnapshot; userId: string }) {
 
           {header}
 
+          {room.status === "lobby" && room.gameSlug === "truth-and-dare" && (
+            <TruthAndDareRoomSetup />
+          )}
+
           {gameChangeNotice && (
             <div
               role="status"
@@ -685,39 +715,168 @@ function RoomView({ room, userId }: { room: RoomSnapshot; userId: string }) {
 
           <div className="grid gap-4 lg:grid-cols-[1fr_20rem]">
             {/* Players Roster */}
-            <div className="rounded-3xl border border-white/10 bg-card/70 p-5">
-              <h2 className="mb-3 font-semibold">
-                Players ({room.players.length}/{room.maxPlayers})
-              </h2>
-              <ul className="space-y-2">
-                {room.players.map((p) => (
-                  <PlayerRow
-                    key={p.userId}
-                    player={p}
-                    room={room}
-                    isMe={p.userId === userId}
-                    canManage={isOwner}
-                    disabled={busy}
-                    onMakeOwner={() =>
-                      void act(() =>
-                        request("room:transfer-owner", { userId: p.userId }),
-                      )
-                    }
-                    onKick={() =>
-                      void act(() => request("room:kick", { userId: p.userId }))
-                    }
-                  />
-                ))}
-                {Array.from({ length: emptySeats }, (_, i) => (
-                  <li
-                    key={`empty-${i}`}
-                    className="rounded-2xl border border-dashed border-white/10 px-3 py-3 text-sm text-muted-foreground"
-                  >
-                    Waiting for a player...
-                  </li>
-                ))}
-              </ul>
-            </div>
+            {room.gameSlug === "truth-and-dare" ? (
+              <div className="rounded-3xl border border-white/10 bg-card/70 p-5">
+                <div className="mb-5 flex flex-wrap items-end justify-between gap-2">
+                  <div>
+                    <h2 className="font-semibold">
+                      Players ({room.players.length}/{room.maxPlayers})
+                    </h2>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {room.status === "lobby"
+                        ? `${emptySeats} open ${emptySeats === 1 ? "seat" : "seats"} · Share the code or QR to invite friends.`
+                        : `${room.players.length} players at this table.`}
+                    </p>
+                  </div>
+                </div>
+                <ul className="grid grid-cols-[repeat(auto-fill,minmax(112px,1fr))] gap-x-3 gap-y-4 sm:grid-cols-[repeat(auto-fill,minmax(124px,1fr))]">
+                  {room.players.map((player) => {
+                    const isMe = player.userId === userId;
+                    const isPlayerOwner = player.userId === room.ownerId;
+                    return (
+                      <li key={player.userId} className="min-w-0">
+                        <div
+                          className={cn(
+                            "relative flex min-h-36 flex-col items-center justify-center gap-2 rounded-[26px] border bg-background/40 px-2 py-4 text-center transition-colors",
+                            player.connected
+                              ? "border-white/12 hover:border-fuchsia-300/40"
+                              : "border-white/8 opacity-65",
+                          )}
+                        >
+                          {isPlayerOwner && (
+                            <Crown
+                              className="absolute right-2 top-2 size-4 text-amber-300"
+                              aria-label="Room owner"
+                            />
+                          )}
+                          <span
+                            className={cn(
+                              "grid size-16 shrink-0 place-items-center overflow-hidden rounded-full border-2 bg-violet-500/20 text-xl font-bold text-white shadow-[0_0_20px_rgba(167,115,255,0.2)]",
+                              player.connected
+                                ? "border-fuchsia-300/50"
+                                : "border-white/15",
+                            )}
+                            aria-hidden="true"
+                          >
+                            {player.image ? (
+                              <img
+                                src={player.image}
+                                alt=""
+                                className="size-full object-cover"
+                              />
+                            ) : (
+                              player.name.charAt(0).toUpperCase()
+                            )}
+                          </span>
+                          <span className="max-w-full truncate text-sm font-semibold text-foreground">
+                            {player.name}
+                          </span>
+                          {isMe && (
+                            <span className="-mt-1 text-[11px] text-muted-foreground">
+                              You
+                            </span>
+                          )}
+                          {!player.connected && (
+                            <span className="-mt-1 text-[11px] text-amber-200">
+                              Offline
+                            </span>
+                          )}
+                          {isOwner && !isMe && (
+                            <div className="mt-auto flex gap-1 pt-1">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon-sm"
+                                title="Make owner"
+                                aria-label={`Make ${player.name} the owner`}
+                                disabled={busy}
+                                onClick={() =>
+                                  void act(() =>
+                                    request("room:transfer-owner", {
+                                      userId: player.userId,
+                                    }),
+                                  )
+                                }
+                              >
+                                <Crown />
+                              </Button>
+                              {room.status === "lobby" && (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon-sm"
+                                  title="Remove from room"
+                                  aria-label={`Remove ${player.name}`}
+                                  disabled={busy}
+                                  onClick={() =>
+                                    void act(() =>
+                                      request("room:kick", {
+                                        userId: player.userId,
+                                      }),
+                                    )
+                                  }
+                                >
+                                  <UserX />
+                                </Button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </li>
+                    );
+                  })}
+                  {room.status === "lobby" && emptySeats > 0 && (
+                    <li className="min-w-0">
+                      <button
+                        type="button"
+                        className="group flex min-h-36 w-full flex-col items-center justify-center gap-3 rounded-[26px] border border-dashed border-fuchsia-200/30 bg-fuchsia-300/[0.035] px-2 py-4 text-center text-muted-foreground transition hover:border-fuchsia-200/70 hover:bg-fuchsia-300/[0.08] hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fuchsia-200"
+                        onClick={() => setInviteDialogOpen(true)}
+                        aria-label="Invite another player"
+                      >
+                        <span className="grid size-16 place-items-center rounded-full border border-dashed border-fuchsia-200/40 bg-fuchsia-300/[0.08] text-fuchsia-100 transition group-hover:scale-105">
+                          <Plus className="size-7" />
+                        </span>
+                        <span className="text-sm font-semibold">Add player</span>
+                      </button>
+                    </li>
+                  )}
+                </ul>
+              </div>
+            ) : (
+              <div className="rounded-3xl border border-white/10 bg-card/70 p-5">
+                <h2 className="mb-3 font-semibold">
+                  Players ({room.players.length}/{room.maxPlayers})
+                </h2>
+                <ul className="space-y-2">
+                  {room.players.map((p) => (
+                    <PlayerRow
+                      key={p.userId}
+                      player={p}
+                      room={room}
+                      isMe={p.userId === userId}
+                      canManage={isOwner}
+                      disabled={busy}
+                      onMakeOwner={() =>
+                        void act(() =>
+                          request("room:transfer-owner", { userId: p.userId }),
+                        )
+                      }
+                      onKick={() =>
+                        void act(() => request("room:kick", { userId: p.userId }))
+                      }
+                    />
+                  ))}
+                  {Array.from({ length: emptySeats }, (_, i) => (
+                    <li
+                      key={`empty-${i}`}
+                      className="rounded-2xl border border-dashed border-white/10 px-3 py-3 text-sm text-muted-foreground"
+                    >
+                      Waiting for a player...
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             {/* Room Details & Actions */}
             <div className="space-y-4">
@@ -767,6 +926,21 @@ function RoomView({ room, userId }: { room: RoomSnapshot; userId: string }) {
                     )}{" "}
                     {copied === "link" ? "Copied" : "Copy invite link"}
                   </Button>
+                  {room.status === "lobby" && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={qrLoading}
+                      onClick={() => void showInviteQr()}
+                    >
+                      {qrLoading ? (
+                        <Loader2 className="animate-spin" />
+                      ) : (
+                        <QrCode />
+                      )}
+                      Show QR
+                    </Button>
+                  )}
                   <Button
                     variant="outline"
                     size="sm"
@@ -885,6 +1059,55 @@ function RoomView({ room, userId }: { room: RoomSnapshot; userId: string }) {
         open={inviteDialogOpen}
         onOpenChange={setInviteDialogOpen}
       />
+
+      <Dialog open={qrDialogOpen} onOpenChange={setQrDialogOpen}>
+        <DialogContent className="max-w-sm border-fuchsia-300/20 bg-card text-card-foreground">
+          <div className="text-center">
+            <div className="mx-auto mb-3 grid size-11 place-items-center rounded-2xl border border-fuchsia-300/25 bg-fuchsia-300/10 text-fuchsia-100">
+              <QrCode className="size-5" />
+            </div>
+            <DialogTitle className="text-xl font-bold">
+              Scan to join the party
+            </DialogTitle>
+            <DialogDescription className="mt-1">
+              Open the invite link on another device, or share this room code.
+            </DialogDescription>
+          </div>
+          {inviteQrUrl && (
+            <div className="mx-auto mt-2 rounded-2xl bg-white p-3 shadow-[0_10px_32px_rgba(0,0,0,0.25)]">
+              <QRCodeSVG
+                value={inviteQrUrl}
+                size={216}
+                level="H"
+                title={`Invite QR code for room ${room.code}`}
+              />
+            </div>
+          )}
+          {localInviteOrigin ? (
+            <p className="text-center text-xs leading-relaxed text-muted-foreground">
+              Local testing: open Kridora with your computer’s network address
+              for friends to scan this QR. Room code <strong className="font-bold tracking-[0.2em] text-foreground">{room.code}</strong> also works.
+            </p>
+          ) : (
+            <p className="text-center text-sm text-muted-foreground">
+              Room code <strong className="ml-1 font-bold tracking-[0.2em] text-foreground">{room.code}</strong>
+            </p>
+          )}
+          <div className="flex justify-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => void copy("code")}
+            >
+              {copied === "code" ? <Check /> : <Copy />}
+              {copied === "code" ? "Copied" : "Copy code"}
+            </Button>
+            <Button type="button" onClick={() => setQrDialogOpen(false)}>
+              Done
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={leaveConfirmOpen} onOpenChange={setLeaveConfirmOpen}>
         <DialogContent className="max-w-md border-rose-500">

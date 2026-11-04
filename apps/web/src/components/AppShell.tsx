@@ -300,6 +300,11 @@ export function AppShell() {
                     !(session.user.isAnonymous ?? me?.user.isAnonymous) &&
                     (me?.user.emailVerified ?? session.user.emailVerified),
                   )}
+                  guestHint={
+                    location.pathname.startsWith("/truth-and-dare")
+                      ? "Sign in to save your parties"
+                      : undefined
+                  }
                   onClick={() => setProfileOpen(true)}
                 />
                 <RingsBadge rings={me?.profile.rings} />

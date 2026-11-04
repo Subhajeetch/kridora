@@ -45,6 +45,18 @@ export const GAME_DEFINITIONS = {
     maxPlayers: 4,
     requirements: { allPlayersReady: true, allPlayersConnected: true },
   },
+  "truth-and-dare": {
+    slug: "truth-and-dare",
+    name: "Truth and Dare",
+    tagline: "Round the table. Spin for a story.",
+    description:
+      "Choose your character, set an age-friendly prompt pack, then spin the bottle, a magic wand, or a compass to pick who plays next.",
+    accent: "#f472b6",
+    playTime: "10-30 min",
+    minPlayers: 2,
+    maxPlayers: 8,
+    requirements: { allPlayersReady: true, allPlayersConnected: true },
+  },
 } satisfies Record<string, GameDefinition>;
 
 export type GameSlug = keyof typeof GAME_DEFINITIONS;

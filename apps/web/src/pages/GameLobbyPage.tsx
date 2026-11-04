@@ -3,6 +3,7 @@ import {
   type GameSlug,
   type RoomSnapshot,
 } from "@kridora/shared";
+import type { TruthAndDareAgeGroup, TruthAndDareMode } from "@kridora/shared";
 import { Check, Copy, DoorOpen, Hash, Plus, Users } from "lucide-react";
 import { useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
@@ -18,6 +19,7 @@ import {
   waitForSocketConnected,
 } from "@/lib/socket";
 import { useRealtime } from "@/providers/realtime-context";
+import { TruthAndDareLanding } from "@/games/truth-and-dare/landing";
 import NotFoundPage from "./NotFoundPage";
 
 /** yourdomain.com/<game>: the game's front door with "Join a public room", "Join with code" and "Create room". */
@@ -43,6 +45,10 @@ function GameEntrance({ slug }: { slug: GameSlug }) {
   const [pendingAction, setPendingAction] = useState<
     "create" | "public" | null
   >(null);
+  const [pendingPartySettings, setPendingPartySettings] = useState<{
+    ageGroup: TruthAndDareAgeGroup;
+    mode: TruthAndDareMode;
+  } | null>(null);
 
   // Join Room with Code / Invite modal state
   const [userOpenedJoin, setUserOpenedJoin] = useState(false);
@@ -83,16 +89,49 @@ function GameEntrance({ slug }: { slug: GameSlug }) {
     }
   }
 
-  function handleCreateRoom() {
+  function createPrivateRoom(partySettings?: {
+    ageGroup: TruthAndDareAgeGroup;
+    mode: TruthAndDareMode;
+  }) {
+    void enter("create", async () => {
+      await waitForSocketConnected();
+      const room = await request("room:create", {
+        gameSlug: slug,
+        visibility: "private",
+      });
+      setActiveRoom(room);
+      if (slug === "truth-and-dare" && partySettings) {
+        await request("truth-and-dare:configure", {
+          ...partySettings,
+          spinner: "bottle",
+        });
+      }
+      return room;
+    });
+  }
+
+  function handleCreateRoom(partySettings?: {
+    ageGroup: TruthAndDareAgeGroup;
+    mode: TruthAndDareMode;
+  }) {
     if (!session) {
       setPendingAction("create");
+      setPendingPartySettings(partySettings ?? null);
       setAuthOpen(true);
       return;
     }
-    void enter("create", async () => {
-      await waitForSocketConnected();
-      return request("room:create", { gameSlug: slug, visibility: "private" });
-    });
+    createPrivateRoom(partySettings);
+  }
+
+  function handlePlay(partySettings: {
+    ageGroup: TruthAndDareAgeGroup;
+    mode: TruthAndDareMode;
+  }) {
+    if (activeRoom?.gameSlug === slug) {
+      void navigate(`/${slug}/room`);
+      return;
+    }
+    handleCreateRoom(partySettings);
   }
 
   function handleJoinPublic() {
@@ -109,15 +148,11 @@ function GameEntrance({ slug }: { slug: GameSlug }) {
 
   function handleAuthSuccess() {
     const action = pendingAction;
+    const partySettings = pendingPartySettings;
     setPendingAction(null);
+    setPendingPartySettings(null);
     if (action === "create") {
-      void enter("create", async () => {
-        await waitForSocketConnected();
-        return request("room:create", {
-          gameSlug: slug,
-          visibility: "private",
-        });
-      });
+      createPrivateRoom(partySettings ?? undefined);
     } else if (action === "public") {
       void enter("public", async () => {
         await waitForSocketConnected();
@@ -163,6 +198,58 @@ function GameEntrance({ slug }: { slug: GameSlug }) {
     } else {
       setUserOpenedJoin(true);
     }
+  }
+
+  const dialogs = (
+    <>
+      <AuthDialog
+        open={authOpen}
+        onOpenChange={(open) => {
+          setAuthOpen(open);
+          if (!open) {
+            setPendingAction(null);
+            setPendingPartySettings(null);
+          }
+        }}
+        onSuccess={handleAuthSuccess}
+      />
+
+      <JoinRoomDialog
+        open={joinOpen}
+        onOpenChange={handleJoinOpenChange}
+        defaultCode={initialJoinCode}
+        defaultGameSlug={slug}
+      />
+    </>
+  );
+
+  if (slug === "truth-and-dare") {
+    return (
+      <>
+        <TruthAndDareLanding
+          onPlay={handlePlay}
+          onExit={() => void navigate("/games")}
+          onJoinCode={() => setUserOpenedJoin(true)}
+          onJoinPublic={handleJoinPublic}
+          playDisabled={busy !== null || (session ? !connected : false)}
+          publicDisabled={busy !== null || (session ? !connected : false)}
+          isBusy={busy === "create"}
+          hasRoom={activeRoom?.gameSlug === slug}
+          errorMessage={error?.message ?? null}
+          players={
+            activeRoom?.gameSlug === slug
+              ? activeRoom.players.map((player) => ({
+                  userId: player.userId,
+                  name: player.name,
+                  image: player.image ?? null,
+                }))
+              : []
+          }
+          currentUserName={session?.user.name ?? "You"}
+        />
+        {dialogs}
+      </>
+    );
   }
 
   return (
@@ -226,7 +313,7 @@ function GameEntrance({ slug }: { slug: GameSlug }) {
             size="lg"
             className="h-12 text-sm sm:text-base font-semibold shadow-md shadow-primary/20"
             disabled={busy !== null || (session ? !connected : false)}
-            onClick={handleCreateRoom}
+            onClick={() => handleCreateRoom()}
           >
             <Plus className="size-4" />{" "}
             {busy === "create" ? "Creating..." : "Create room"}
@@ -300,23 +387,7 @@ function GameEntrance({ slug }: { slug: GameSlug }) {
         )}
       </div>
 
-      {/* Auth Dialog for Create / Public actions */}
-      <AuthDialog
-        open={authOpen}
-        onOpenChange={(open) => {
-          setAuthOpen(open);
-          if (!open) setPendingAction(null);
-        }}
-        onSuccess={handleAuthSuccess}
-      />
-
-      {/* Join Room with Code Dialog */}
-      <JoinRoomDialog
-        open={joinOpen}
-        onOpenChange={handleJoinOpenChange}
-        defaultCode={initialJoinCode}
-        defaultGameSlug={slug}
-      />
+      {dialogs}
     </section>
   );
 }

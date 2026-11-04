@@ -38,8 +38,13 @@ export interface ServerGameModule<TState = unknown> {
   readonly eventPrefix: string;
   /** Outbound event name used when syncing game state, e.g. `"ludo:state"`. */
   readonly stateEvent: string;
-  /** Creates initial match state when the room owner presses Start. */
-  createInitialState: (players: readonly RoomPlayer[]) => TState;
+  /** Actions permitted in the room lobby before a match starts. */
+  readonly lobbyActions?: readonly string[];
+  /** Creates initial match state, optionally carrying setup from the room lobby. */
+  createInitialState: (
+    players: readonly RoomPlayer[],
+    previousState?: TState,
+  ) => TState;
   /**
    * Optional per-player state sanitizer for hidden-information games
    * (e.g. hiding other players' cards/choices before reveal). Defaults to full state.

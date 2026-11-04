@@ -839,7 +839,7 @@ export class RoomManager {
     room.status = "in_progress";
     room.matchId = matchId;
     room.matchCompleted = false;
-    room.gameState = gameModule.createInitialState(room.players);
+    room.gameState = gameModule.createInitialState(room.players, room.gameState);
 
     this.broadcastRoomState(room);
     this.broadcaster.broadcastGameState(room);
