@@ -1,5 +1,6 @@
 import { ArrowRight, Gamepad2, Search, X } from "lucide-react";
 import {
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -83,16 +84,17 @@ export function AppShell() {
     null,
   );
   const isMobileSearchOpen = mobileSearchOpenKey === currentLocationKey;
-  const setIsMobileSearchOpen = (
-    action: boolean | ((prev: boolean) => boolean),
-  ) => {
-    setMobileSearchOpenKey((prevKey) => {
-      const currentlyOpen = prevKey === currentLocationKey;
-      const next =
-        typeof action === "function" ? action(currentlyOpen) : action;
-      return next ? currentLocationKey : null;
-    });
-  };
+  const setIsMobileSearchOpen = useCallback(
+    (action: boolean | ((prev: boolean) => boolean)) => {
+      setMobileSearchOpenKey((prevKey) => {
+        const currentlyOpen = prevKey === currentLocationKey;
+        const next =
+          typeof action === "function" ? action(currentlyOpen) : action;
+        return next ? currentLocationKey : null;
+      });
+    },
+    [currentLocationKey],
+  );
   const searchContainerRef = useRef<HTMLDivElement>(null);
   const mobileInputRef = useRef<HTMLInputElement>(null);
 
@@ -128,7 +130,7 @@ export function AppShell() {
       document.removeEventListener("touchstart", handleClickOutside);
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isMobileSearchOpen]);
+  }, [isMobileSearchOpen, setIsMobileSearchOpen]);
 
   function handleSearchSubmit(e: FormEvent) {
     e.preventDefault();

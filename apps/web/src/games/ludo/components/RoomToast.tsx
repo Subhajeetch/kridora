@@ -64,7 +64,9 @@ export function RoomToast({ players, audioSettings }: RoomToastProps) {
     }
 
     if (newToasts.length > 0) {
-      setToasts((prev) => [...prev, ...newToasts]);
+      queueMicrotask(() => {
+        setToasts((prev) => [...prev, ...newToasts]);
+      });
     }
   }, [players, audioSettings]);
 
