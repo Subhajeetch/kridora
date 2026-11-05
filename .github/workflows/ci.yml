@@ -118,7 +118,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Review pull request dependencies
-        uses: actions/dependency-review-action@v4
+        uses: actions/dependency-review-action@v5
 
   ci-passed:
     name: CI passed
