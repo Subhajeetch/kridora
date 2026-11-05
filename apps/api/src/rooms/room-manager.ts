@@ -57,7 +57,10 @@ export class RoomManager {
         p.connected = activeUserIds.has(p.userId);
         this.userToRoom.set(p.userId, code);
       }
-      if (!room.players.some((p) => p.connected) && room.emptyCloseAt === null) {
+      if (
+        !room.players.some((p) => p.connected) &&
+        room.emptyCloseAt === null
+      ) {
         room.emptyCloseAt = Date.now() + EMPTY_ROOM_CLOSE_DELAY_MS;
       }
       this.rooms.set(code, room);

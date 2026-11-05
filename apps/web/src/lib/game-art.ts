@@ -8,4 +8,3 @@ export function getGameScreenshotSrc(
 ): string {
   return `/games/ss/${slug}-${variant}.webp`;
 }
-

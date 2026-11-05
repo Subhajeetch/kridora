@@ -261,12 +261,7 @@ export const GAME_DEFINITIONS = {
     minPlayers: 2,
     maxPlayers: 8,
     requirements: { allPlayersReady: true, allPlayersConnected: true },
-    genre: [
-      "Party Game",
-      "Social Icebreaker",
-      "Casual Fun",
-      "Turn-Based",
-    ],
+    genre: ["Party Game", "Social Icebreaker", "Casual Fun", "Turn-Based"],
     difficulty: "Casual & Good Vibes",
     overview: [
       "Truth and Dare brings the classic party circle directly into your browser with zero awkwardness and 100% good vibes.",

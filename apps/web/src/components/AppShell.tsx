@@ -169,10 +169,7 @@ export function AppShell() {
 
   if (!splashFinished && !isAuthInitialized) {
     return (
-      <SplashScreen
-        isReady={!isPending}
-        onComplete={handleSplashComplete}
-      />
+      <SplashScreen isReady={!isPending} onComplete={handleSplashComplete} />
     );
   }
 
@@ -180,7 +177,9 @@ export function AppShell() {
     <div
       className={cn(
         "relative flex flex-col w-full min-w-full",
-        inGameMode ? "h-dvh max-h-dvh overflow-hidden w-screen max-w-full" : "min-h-dvh",
+        inGameMode
+          ? "h-dvh max-h-dvh overflow-hidden w-screen max-w-full"
+          : "min-h-dvh",
       )}
     >
       {!inGameMode && <Background />}

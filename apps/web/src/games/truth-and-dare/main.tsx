@@ -411,8 +411,7 @@ export default function TruthAndDareGame({ room, userId }: GameComponentProps) {
     }
   }
 
-  const isHost =
-    room.ownerId === userId || inGame.owner?.userId === userId;
+  const isHost = room.ownerId === userId || inGame.owner?.userId === userId;
 
   const handleConfigure = (
     ageGroup: TruthAndDareAgeGroup,
@@ -873,8 +872,8 @@ export default function TruthAndDareGame({ room, userId }: GameComponentProps) {
                 disabled={!ageConfirmed || busy}
                 onClick={confirmSpicyMode}
               >
-                Continue to{" "}
-                {pendingAdultMode === "spicy" ? "Spicy" : "Couples"} (18+)
+                Continue to {pendingAdultMode === "spicy" ? "Spicy" : "Couples"}{" "}
+                (18+)
               </Button>
             </div>
           </DialogContent>
@@ -1356,7 +1355,9 @@ export default function TruthAndDareGame({ room, userId }: GameComponentProps) {
               })}
             </div>
             <div className={styles.modePickerHeading}>
-              <span>Content mode: <b>{state.settings.mode.toUpperCase()}</b></span>
+              <span>
+                Content mode: <b>{state.settings.mode.toUpperCase()}</b>
+              </span>
             </div>
             <div
               className={styles.modePicker}
