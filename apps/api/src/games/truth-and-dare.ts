@@ -254,7 +254,9 @@ function normalizeState(state: TruthAndDareState): boolean {
     ? "challenge"
     : state.selection
       ? "selecting"
-      : "choosing";
+      : state.phase === "setup"
+        ? "setup"
+        : "choosing";
   if (state.phase !== expectedPhase) {
     state.phase = expectedPhase;
     changed = true;
@@ -307,22 +309,19 @@ export const truthAndDareGameModule: ServerGameModule<TruthAndDareState> = {
   slug: "truth-and-dare",
   eventPrefix: "truth-and-dare",
   stateEvent: "truth-and-dare:state",
-  lobbyActions: ["get-state", "configure"],
 
-  createInitialState(players, previousState) {
+  createInitialState(players) {
     return {
       players: players.map(({ userId, name, image }) => ({
         userId,
         name,
         image,
-        character:
-          previousState?.players.find((player) => player.userId === userId)
-            ?.character ?? "mystery",
+        character: "mystery",
       })),
       currentPlayerIndex: 0,
       round: 1,
-      phase: "choosing",
-      settings: { ...DEFAULT_SETTINGS, ...previousState?.settings },
+      phase: "setup",
+      settings: { ...DEFAULT_SETTINGS },
       selection: null,
       challenge: null,
       history: [],
@@ -384,6 +383,13 @@ export const truthAndDareGameModule: ServerGameModule<TruthAndDareState> = {
 
     switch (action) {
       case "configure": {
+        const isOwner = ctx.ownerId ? user.id === ctx.ownerId : true;
+        if (!isOwner) {
+          throw new ApiError(
+            "FORBIDDEN",
+            "Only the room owner can change party settings.",
+          );
+        }
         const settings = truthAndDareConfigureSchema.parse(rawPayload);
         requirePlayer(state, user.id);
         if (
@@ -395,13 +401,31 @@ export const truthAndDareGameModule: ServerGameModule<TruthAndDareState> = {
             "Couples and Spicy modes require the Adult 18+ pack.",
           );
         }
-        if (state.history.length > 0 || state.phase !== "choosing") {
+        if (state.history.length > 0) {
           throw new ApiError(
             "VALIDATION_ERROR",
             "Party settings lock after the first spin.",
           );
         }
         state.settings = settings;
+        break;
+      }
+      case "start-game": {
+        emptySchema.parse(rawPayload);
+        const isOwner = ctx.ownerId ? user.id === ctx.ownerId : true;
+        if (!isOwner) {
+          throw new ApiError(
+            "FORBIDDEN",
+            "Only the room owner can start the game.",
+          );
+        }
+        if (state.phase !== "setup") {
+          throw new ApiError(
+            "VALIDATION_ERROR",
+            "Game is already in progress.",
+          );
+        }
+        state.phase = "choosing";
         break;
       }
       case "set-character": {
@@ -412,6 +436,12 @@ export const truthAndDareGameModule: ServerGameModule<TruthAndDareState> = {
       }
       case "spin": {
         emptySchema.parse(rawPayload);
+        if (state.phase === "setup") {
+          throw new ApiError(
+            "VALIDATION_ERROR",
+            "Waiting for the host to start the game.",
+          );
+        }
         requireCurrentTurn(state, user.id);
         if (state.phase !== "choosing") {
           throw new ApiError(

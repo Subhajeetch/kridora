@@ -1,6 +1,7 @@
 import { Crown, Dices } from "lucide-react";
 import { memo } from "react";
 import {
+  getLudoAutoMoveToken,
   LUDO_HOME_STEP,
   type LudoColor,
   type LudoGameState,
@@ -20,9 +21,11 @@ interface NocturneSidePanelProps {
   activePlayer: LudoPlayerState | undefined;
   isMyTurn: boolean;
   canRoll: boolean;
+  canPass?: boolean;
   rollingColor: LudoColor | null;
   diceValue: number;
   onRoll: () => void;
+  onPass?: () => void;
   onEmote: (emoji: string) => void;
   activeEmotes: Record<string, { emoji: string; timestamp: number }>;
   playerAvatars: Record<string, string | null>;
@@ -35,9 +38,11 @@ export const NocturneSidePanel = memo(function NocturneSidePanel({
   activePlayer,
   isMyTurn,
   canRoll,
+  canPass = false,
   rollingColor,
   diceValue,
   onRoll,
+  onPass,
   onEmote,
   activeEmotes,
   playerAvatars,
@@ -55,6 +60,12 @@ export const NocturneSidePanel = memo(function NocturneSidePanel({
     ? state.players.find((p) => p.userId === state.winnerId)
     : undefined;
 
+  const isAutoMoving =
+    isMyTurn &&
+    state.dice !== null &&
+    activePlayer !== undefined &&
+    getLudoAutoMoveToken(activePlayer, state.movableTokens) !== null;
+
   const getDiceHeadline = () => {
     if (winnerPlayer) {
       return winnerPlayer.userId === userId
@@ -64,6 +75,7 @@ export const NocturneSidePanel = memo(function NocturneSidePanel({
     if (isRolling) return "Rolling...";
     if (state.dice !== null) return `Rolled a ${state.dice}`;
     if (canRoll) return "Roll now";
+    if (canPass) return "No moves";
     if (isMyTurn) return "Select a piece";
     return `Waiting for ${activePlayer?.name ?? "player"}...`;
   };
@@ -83,8 +95,9 @@ export const NocturneSidePanel = memo(function NocturneSidePanel({
         ? "A six gives an extra turn!"
         : `${activePlayer?.name ?? "Player"} is choosing a piece`;
     }
-    if (canRoll) return "A six unlocks a piece & gives an extra roll.";
-    return "A six starts a piece.";
+    if (canRoll)
+      return "A 1 or 6 starts a piece; only a 6 gives an extra roll.";
+    return "Roll a 1 or 6 to start a piece.";
   };
 
   return (
@@ -201,16 +214,18 @@ export const NocturneSidePanel = memo(function NocturneSidePanel({
         </div>
       </div>
 
-      {/* Roll Action Button */}
+      {/* Roll / Pass Action Button */}
       <button
         type="button"
-        onClick={canRoll ? onRoll : undefined}
-        disabled={!canRoll}
+        onClick={canRoll ? onRoll : canPass ? onPass : undefined}
+        disabled={!canRoll && !canPass}
         className={cn(
           "relative flex h-12 w-full sm:h-13 items-center justify-center gap-2 rounded-2xl text-sm font-black uppercase tracking-wider transition-all duration-150 select-none",
           canRoll
             ? "cursor-pointer bg-gradient-to-r from-[#ff4d64] to-[#ff6b81] text-white shadow-[0_4px_0_#c9253d,0_8px_20px_rgba(255,77,100,0.35)] hover:brightness-110 active:translate-y-1 active:shadow-[0_0_0_#c9253d]"
-            : "cursor-not-allowed border border-white/5 bg-slate-800/60 text-slate-500 shadow-none",
+            : canPass
+              ? "cursor-pointer bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-[0_4px_0_#b45309,0_8px_20px_rgba(245,158,11,0.35)] hover:brightness-110 active:translate-y-1 active:shadow-[0_0_0_#b45309]"
+              : "cursor-not-allowed border border-white/5 bg-slate-800/60 text-slate-500 shadow-none",
         )}
       >
         <Dices className="size-5" />
@@ -221,13 +236,17 @@ export const NocturneSidePanel = memo(function NocturneSidePanel({
               ? "Rolling..."
               : canRoll
                 ? "Roll the die"
-                : isMyTurn
-                  ? state.dice === null
-                    ? "Moving..."
-                    : state.movableTokens.length > 0
-                      ? "Select a piece"
-                      : "Turn passing..."
-                  : `Waiting for ${activePlayer?.name ?? "player"}...`}
+                : canPass
+                  ? "Pass Turn"
+                  : isMyTurn
+                    ? state.dice === null
+                      ? "Moving..."
+                      : isAutoMoving
+                        ? "Auto-moving..."
+                        : state.movableTokens.length > 0
+                          ? "Select a piece"
+                          : "Turn passing..."
+                    : `Waiting for ${activePlayer?.name ?? "player"}...`}
         </span>
       </button>
 

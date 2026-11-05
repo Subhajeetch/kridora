@@ -7,8 +7,16 @@ import {
   getLudoMovableTokens,
   getLudoTrackSquare,
   isLudoStarSquare,
+  LUDO_COLOR_STARTS,
   LUDO_HOME_STEP,
+  LUDO_SAFE_SQUARES,
   LUDO_YARD_STEP,
+  ludoDebugEnableSchema,
+  ludoDebugScenarioSchema,
+  ludoDebugSetDiceSchema,
+  ludoDebugSetPieceSchema,
+  ludoDebugSetTurnSchema,
+  ludoDebugSetupCutSchema,
   ludoEmoteSchema,
   ludoMoveSchema,
   rollProfessionalLudoDice,
@@ -30,6 +38,7 @@ function toClientState(state: LudoGameState): LudoGameState {
     winnerId: state.winnerId,
     lastAction: state.lastAction,
     updatedAt: state.updatedAt,
+    debugMode: state.debugMode,
   };
 }
 
@@ -245,7 +254,7 @@ export const ludoGameModule: ServerGameModule<LudoGameState> = {
           if (
             !isCurrentTurnCaller &&
             activeRoomMember?.connected &&
-            elapsedSinceRoll < 1500
+            elapsedSinceRoll < 1200
           ) {
             return toClientState(state);
           }
@@ -353,13 +362,13 @@ export const ludoGameModule: ServerGameModule<LudoGameState> = {
         }
 
         const reachedHome = nextProgress === LUDO_HOME_STEP;
-        const bonusTurn = dice === 6 || capturedCount > 0 || reachedHome;
+        const bonusTurn = dice === 6;
 
         if (bonusTurn) {
           if (capturedCount > 0) {
-            state.lastAction = `${activePlayer.name} captured ${capturedCount > 1 ? `${capturedCount} pieces` : "a rival piece"}! Roll again.`;
-          } else if (reachedHome) {
-            state.lastAction = `${activePlayer.name} brought a piece home! Roll again.`;
+            state.lastAction = `${activePlayer.name} captured a piece and rolled a 6! Roll again.`;
+          } else if (currentProgress === LUDO_YARD_STEP) {
+            state.lastAction = `${activePlayer.name} rolled a 6 and brought a piece out of home! Roll again.`;
           } else {
             state.lastAction = `${activePlayer.name} rolled a 6! Roll again.`;
           }
@@ -371,10 +380,16 @@ export const ludoGameModule: ServerGameModule<LudoGameState> = {
           state.currentPlayerIndex =
             (state.currentPlayerIndex + 1) % state.players.length;
           const nextPlayer = state.players[state.currentPlayerIndex];
-          const safeNote = isLudoStarSquare(activePlayer.color, nextProgress)
-            ? " onto a safe star"
-            : "";
-          state.lastAction = `${activePlayer.name} moved${safeNote}. ${nextPlayer?.name ?? "Next player"}'s turn.`;
+          if (capturedCount > 0) {
+            state.lastAction = `${activePlayer.name} captured ${capturedCount > 1 ? `${capturedCount} rival pieces` : "a rival piece"}! ${nextPlayer?.name ?? "Next player"}'s turn.`;
+          } else if (currentProgress === LUDO_YARD_STEP) {
+            state.lastAction = `${activePlayer.name} brought a piece out of home! ${nextPlayer?.name ?? "Next player"}'s turn.`;
+          } else {
+            const safeNote = isLudoStarSquare(activePlayer.color, nextProgress)
+              ? " onto a safe star"
+              : "";
+            state.lastAction = `${activePlayer.name} moved${safeNote}. ${nextPlayer?.name ?? "Next player"}'s turn.`;
+          }
         }
 
         ctx.setState(state);
@@ -396,6 +411,197 @@ export const ludoGameModule: ServerGameModule<LudoGameState> = {
           emoji,
         });
         return { ok: true };
+      }
+
+      case "debug-enable": {
+        const { enabled } = ludoDebugEnableSchema.parse(rawPayload);
+        if (ctx.ownerId && ctx.ownerId !== user.id) {
+          return toClientState(state);
+        }
+        state.debugMode = enabled;
+        state.updatedAt = Date.now();
+        state.lastAction = enabled
+          ? "Debug mode activated by room owner."
+          : "Debug mode deactivated.";
+        ctx.broadcastEvent("ludo:debug-enabled", { enabled });
+        ctx.setState(state);
+        ctx.broadcastState();
+        return toClientState(state);
+      }
+
+      case "debug-set-dice": {
+        const { dice } = ludoDebugSetDiceSchema.parse(rawPayload);
+        const activePlayer = state.players[state.currentPlayerIndex];
+        if (!activePlayer) return toClientState(state);
+        state.dice = dice;
+        state.lastRolls[state.currentPlayerIndex] = dice;
+        state.movableTokens = getLudoMovableTokens(activePlayer, dice);
+        state.updatedAt = Date.now();
+        state.lastAction = `[DEBUG] Set dice to ${dice}.`;
+        ctx.setState(state);
+        ctx.broadcastState();
+        return toClientState(state);
+      }
+
+      case "debug-set-piece": {
+        const { playerIndex, tokenIndex, step } =
+          ludoDebugSetPieceSchema.parse(rawPayload);
+        const targetPlayer = state.players[playerIndex];
+        if (!targetPlayer) return toClientState(state);
+        targetPlayer.tokens[tokenIndex] = step;
+        const activePlayer = state.players[state.currentPlayerIndex];
+        if (activePlayer && state.dice !== null) {
+          state.movableTokens = getLudoMovableTokens(activePlayer, state.dice);
+        }
+        state.updatedAt = Date.now();
+        state.lastAction = `[DEBUG] Placed ${targetPlayer.name} token ${tokenIndex + 1} at position ${step}.`;
+        ctx.setState(state);
+        ctx.broadcastState();
+        return toClientState(state);
+      }
+
+      case "debug-set-turn": {
+        const { playerIndex } = ludoDebugSetTurnSchema.parse(rawPayload);
+        if (playerIndex >= 0 && playerIndex < state.players.length) {
+          state.currentPlayerIndex = playerIndex;
+          state.dice = null;
+          state.movableTokens = [];
+          state.updatedAt = Date.now();
+          const p = state.players[playerIndex];
+          state.lastAction = `[DEBUG] Turn changed to ${p?.name ?? "Player"}.`;
+          ctx.setState(state);
+          ctx.broadcastState();
+        }
+        return toClientState(state);
+      }
+
+      case "debug-setup-cut": {
+        const {
+          attackerPlayerIndex,
+          attackerTokenIndex,
+          defenderPlayerIndex,
+          defenderTokenIndex,
+          distance,
+        } = ludoDebugSetupCutSchema.parse(rawPayload);
+
+        const attacker = state.players[attackerPlayerIndex];
+        const defender = state.players[defenderPlayerIndex];
+        if (
+          !attacker ||
+          !defender ||
+          attackerPlayerIndex === defenderPlayerIndex
+        ) {
+          return toClientState(state);
+        }
+
+        const attackerStart = LUDO_COLOR_STARTS[attacker.color];
+        let targetRingSquare = (attackerStart + 3 + distance) % 52;
+        while (LUDO_SAFE_SQUARES.has(targetRingSquare)) {
+          targetRingSquare = (targetRingSquare + 1) % 52;
+        }
+
+        const defenderStart = LUDO_COLOR_STARTS[defender.color];
+        const defenderProgress = (targetRingSquare - defenderStart + 52) % 52;
+        const attackerLandingProgress =
+          (targetRingSquare - attackerStart + 52) % 52;
+        const attackerProgress = attackerLandingProgress - distance;
+
+        if (
+          attackerProgress >= 0 &&
+          defenderProgress >= 0 &&
+          defenderProgress <= 50
+        ) {
+          attacker.tokens[attackerTokenIndex] = attackerProgress;
+          defender.tokens[defenderTokenIndex] = defenderProgress;
+          state.currentPlayerIndex = attackerPlayerIndex;
+          state.dice = distance;
+          state.lastRolls[attackerPlayerIndex] = distance;
+          state.movableTokens = [attackerTokenIndex];
+          state.updatedAt = Date.now();
+          state.lastAction = `[DEBUG] Cut setup: ${attacker.name} is ${distance} steps behind ${defender.name}! Click piece to capture.`;
+          ctx.setState(state);
+          ctx.broadcastState();
+        }
+        return toClientState(state);
+      }
+
+      case "debug-scenario": {
+        const { scenario } = ludoDebugScenarioSchema.parse(rawPayload);
+        const activePlayer = state.players[state.currentPlayerIndex];
+        if (!activePlayer) return toClientState(state);
+
+        switch (scenario) {
+          case "all_yard":
+            state.players.forEach((p) => {
+              p.tokens = [
+                LUDO_YARD_STEP,
+                LUDO_YARD_STEP,
+                LUDO_YARD_STEP,
+                LUDO_YARD_STEP,
+              ];
+            });
+            state.dice = null;
+            state.movableTokens = [];
+            state.winnerId = null;
+            state.lastAction = "[DEBUG] Reset all pieces to yard.";
+            break;
+
+          case "all_track":
+            state.players.forEach((p) => {
+              p.tokens = [0, 8, 16, 24];
+            });
+            state.dice = null;
+            state.movableTokens = [];
+            state.winnerId = null;
+            state.lastAction = "[DEBUG] Placed pieces along track.";
+            break;
+
+          case "near_win":
+            activePlayer.tokens = [
+              LUDO_HOME_STEP,
+              LUDO_HOME_STEP,
+              LUDO_HOME_STEP,
+              55,
+            ];
+            state.dice = 1;
+            state.movableTokens = [3];
+            state.winnerId = null;
+            state.lastAction = `[DEBUG] ${activePlayer.name} is 1 step away from victory! Roll 1 to win.`;
+            break;
+
+          case "instant_win":
+            activePlayer.tokens = [
+              LUDO_HOME_STEP,
+              LUDO_HOME_STEP,
+              LUDO_HOME_STEP,
+              LUDO_HOME_STEP,
+            ];
+            state.dice = null;
+            state.movableTokens = [];
+            state.winnerId = activePlayer.userId;
+            state.lastAction = `[DEBUG] ${activePlayer.name} brought all pieces home! Victory!`;
+            break;
+
+          case "scatter":
+            state.players.forEach((p, pIdx) => {
+              p.tokens = [
+                (pIdx * 12 + 2) % 50,
+                (pIdx * 12 + 10) % 50,
+                (pIdx * 12 + 22) % 50,
+                52,
+              ];
+            });
+            state.dice = null;
+            state.movableTokens = [];
+            state.winnerId = null;
+            state.lastAction = "[DEBUG] Scattered all pieces on the board.";
+            break;
+        }
+
+        state.updatedAt = Date.now();
+        ctx.setState(state);
+        ctx.broadcastState();
+        return toClientState(state);
       }
 
       default:

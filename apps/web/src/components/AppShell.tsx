@@ -54,12 +54,12 @@ export function AppShell() {
     authStore.getSnapshot,
     () => false,
   );
+  const [splashFinished, setSplashFinished] = useState(() => isAuthInitialized);
 
-  useEffect(() => {
-    if (!isPending) {
-      authStore.setInitialized();
-    }
-  }, [isPending]);
+  const handleSplashComplete = () => {
+    authStore.setInitialized();
+    setSplashFinished(true);
+  };
 
   const session =
     rawSession &&
@@ -165,11 +165,23 @@ export function AppShell() {
     };
   }, []);
 
-  if (isPending && !isAuthInitialized) return <SplashScreen />;
+  if (!splashFinished && !isAuthInitialized) {
+    return (
+      <SplashScreen
+        isReady={!isPending}
+        onComplete={handleSplashComplete}
+      />
+    );
+  }
 
   return (
-    <div className="min-h-dvh">
-      <Background />
+    <div
+      className={cn(
+        "relative flex flex-col w-full min-w-full",
+        inGameMode ? "h-dvh max-h-dvh overflow-hidden w-screen max-w-full" : "min-h-dvh",
+      )}
+    >
+      {!inGameMode && <Background />}
       <MusicController />
 
       {!inGameMode && (
@@ -300,11 +312,6 @@ export function AppShell() {
                     !(session.user.isAnonymous ?? me?.user.isAnonymous) &&
                     (me?.user.emailVerified ?? session.user.emailVerified),
                   )}
-                  guestHint={
-                    location.pathname.startsWith("/truth-and-dare")
-                      ? "Sign in to save your parties"
-                      : undefined
-                  }
                   onClick={() => setProfileOpen(true)}
                 />
                 <RingsBadge rings={me?.profile.rings} />
@@ -338,7 +345,12 @@ export function AppShell() {
         </p>
       )}
 
-      <main className="w-full">
+      <main
+        className={cn(
+          "w-full min-w-full flex-1 flex flex-col",
+          inGameMode && "min-h-0 overflow-hidden",
+        )}
+      >
         <PageTransition />
       </main>
 

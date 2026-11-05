@@ -61,23 +61,29 @@ export function DialogContent({
     classStr.includes("border-rose") ||
     classStr.includes("destructive") ||
     classStr.includes("border-destructive");
-  const isMaxW2xl = classStr.includes("max-w-2xl");
+  const isMaxW5xl = classStr.includes("max-w-5xl");
+  const isMaxW4xl = classStr.includes("max-w-4xl");
   const isMaxW3xl = classStr.includes("max-w-3xl");
-  const isMaxWLg = classStr.includes("max-w-lg");
+  const isMaxW2xl = classStr.includes("max-w-2xl");
   const isMaxWxl = classStr.includes("max-w-xl");
+  const isMaxWLg = classStr.includes("max-w-lg");
   const isMaxWSm = classStr.includes("max-w-sm");
 
-  const maxWidthClass = isMaxW2xl
-    ? "max-w-2xl"
-    : isMaxW3xl
-      ? "max-w-3xl"
-      : isMaxWLg
-        ? "max-w-lg"
-        : isMaxWxl
-          ? "max-w-xl"
-          : isMaxWSm
-            ? "max-w-sm"
-            : "max-w-md";
+  const maxWidthClass = isMaxW5xl
+    ? "max-w-5xl"
+    : isMaxW4xl
+      ? "max-w-4xl"
+      : isMaxW3xl
+        ? "max-w-3xl"
+        : isMaxW2xl
+          ? "max-w-2xl"
+          : isMaxWxl
+            ? "max-w-xl"
+            : isMaxWLg
+              ? "max-w-lg"
+              : isMaxWSm
+                ? "max-w-sm"
+                : "max-w-md";
 
   return (
     <DialogPrimitive.Portal>

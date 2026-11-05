@@ -1,5 +1,6 @@
-import { ChevronDown, ChevronUp, Crown, Dices, Smile } from "lucide-react";
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { ChevronDown, Crown, Dices, Smile } from "lucide-react";
+import { memo, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   getLudoAutoMoveToken,
   LUDO_HOME_STEP,
@@ -13,6 +14,7 @@ import { DICE_ROTATIONS, SEAT_DEFINITIONS } from "../constants";
 import styles from "../ludo.module.css";
 
 const EMOTES = ["👍", "💀", "😮", "😭", "🔥", "🎉"] as const;
+const EMOTE_LIFETIME_MS = 2000;
 
 interface MobileNocturneDrawerProps {
   state: LudoGameState;
@@ -21,9 +23,11 @@ interface MobileNocturneDrawerProps {
   activePlayer: LudoPlayerState | undefined;
   isMyTurn: boolean;
   canRoll: boolean;
+  canPass?: boolean;
   rollingColor: LudoColor | null;
   diceValue: number;
   onRoll: () => void;
+  onPass?: () => void;
   onEmote: (emoji: string) => void;
   activeEmotes: Record<string, { emoji: string; timestamp: number }>;
   playerAvatars: Record<string, string | null>;
@@ -109,32 +113,75 @@ export const MobileNocturneDrawer = memo(function MobileNocturneDrawer({
   activePlayer,
   isMyTurn,
   canRoll,
+  canPass = false,
   rollingColor,
   diceValue,
   onRoll,
+  onPass,
   onEmote,
   activeEmotes,
   playerAvatars,
 }: MobileNocturneDrawerProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [emojiDropdownOpen, setEmojiDropdownOpen] = useState(false);
+  const [activeReaction, setActiveReaction] = useState<{
+    userId: string;
+    emoji: string;
+    timestamp: number;
+  } | null>(null);
+
   const emojiDropdownRef = useRef<HTMLDivElement>(null);
   const emojiButtonRef = useRef<HTMLButtonElement>(null);
+  const reactionTimerRef = useRef<number | null>(null);
 
-  // Derive newest active emote without extra state/timers (parent clears entries after 2.5s)
-  const latestIncomingEmote = useMemo(() => {
+  // Strictly track newest active reaction and guarantee auto-dismiss at exactly 2.0s
+  useEffect(() => {
+    const now = Date.now();
     let newest: { userId: string; emoji: string; timestamp: number } | null =
       null;
+
     for (const [uId, entry] of Object.entries(activeEmotes)) {
-      if (!newest || entry.timestamp > newest.timestamp) {
-        newest = {
-          userId: uId,
-          emoji: entry.emoji,
-          timestamp: entry.timestamp,
-        };
+      if (now - entry.timestamp < EMOTE_LIFETIME_MS) {
+        if (!newest || entry.timestamp > newest.timestamp) {
+          newest = {
+            userId: uId,
+            emoji: entry.emoji,
+            timestamp: entry.timestamp,
+          };
+        }
       }
     }
-    return newest;
+
+    if (!newest) {
+      if (reactionTimerRef.current) {
+        window.clearTimeout(reactionTimerRef.current);
+        reactionTimerRef.current = null;
+      }
+      setActiveReaction(null);
+      return;
+    }
+
+    setActiveReaction(newest);
+
+    if (reactionTimerRef.current) {
+      window.clearTimeout(reactionTimerRef.current);
+    }
+
+    const remainingMs = Math.max(
+      0,
+      EMOTE_LIFETIME_MS - (Date.now() - newest.timestamp),
+    );
+    reactionTimerRef.current = window.setTimeout(() => {
+      setActiveReaction(null);
+      reactionTimerRef.current = null;
+    }, remainingMs);
+
+    return () => {
+      if (reactionTimerRef.current) {
+        window.clearTimeout(reactionTimerRef.current);
+        reactionTimerRef.current = null;
+      }
+    };
   }, [activeEmotes]);
 
   useEffect(() => {
@@ -207,133 +254,141 @@ export const MobileNocturneDrawer = memo(function MobileNocturneDrawer({
         ? "A six gives an extra turn!"
         : `${activePlayer?.name ?? "Player"} is choosing a piece`;
     }
-    if (canRoll) return "A six unlocks a piece & gives an extra roll.";
-    return "A six starts a piece.";
+    if (canRoll)
+      return "A 1 or 6 starts a piece; only a 6 gives an extra roll.";
+    return "Roll a 1 or 6 to start a piece.";
   };
 
-  const latestSender = latestIncomingEmote
-    ? state.players.find((p) => p.userId === latestIncomingEmote.userId)
+  const reactionSender = activeReaction
+    ? state.players.find((p) => p.userId === activeReaction.userId)
     : null;
-  const latestSenderSeat = latestSender
-    ? SEAT_DEFINITIONS[latestSender.color]
+  const reactionSenderSeat = reactionSender
+    ? SEAT_DEFINITIONS[reactionSender.color]
     : null;
-  const latestSenderAvatar = latestSender
-    ? playerAvatars[latestSender.userId]
+  const reactionSenderAvatar = reactionSender
+    ? playerAvatars[reactionSender.userId]
     : null;
 
-  return (
-    <>
-      {/* 1. FLOATING MOBILE REACTION CARD */}
-      {latestIncomingEmote && latestSender && latestSenderSeat && (
+  if (typeof document === "undefined") {
+    return null;
+  }
+
+  return createPortal(
+    <div className="fixed inset-x-0 bottom-0 z-50 rounded-t-[28px] rounded-b-none border-t border-white/12 bg-[#12141f] px-3.5 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-12px_40px_rgba(0,0,0,0.85)] select-none md:hidden">
+      {/* 1. FLOATING MOBILE REACTION CARD (Anchored directly above drawer, strictly disappears after 2s) */}
+      {activeReaction && reactionSender && reactionSenderSeat && (
         <div
-          key={`${latestIncomingEmote.userId}-${latestIncomingEmote.timestamp}`}
-          className="pointer-events-none fixed bottom-[152px] left-1/2 z-50 flex -translate-x-1/2 items-center gap-2.5 rounded-2xl border border-white/20 bg-[#161828] px-3.5 py-1.5 text-white shadow-2xl animate-in fade-in slide-in-from-bottom-6 duration-200 md:hidden"
+          key={`${activeReaction.userId}-${activeReaction.timestamp}`}
+          className="pointer-events-none absolute bottom-full mb-3 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2.5 rounded-2xl border border-white/20 bg-[#161828] px-3.5 py-1.5 text-white shadow-2xl animate-in fade-in slide-in-from-bottom-2 duration-200"
         >
           <div
             className="size-7 shrink-0 overflow-hidden rounded-full border-2 bg-slate-800 shadow"
-            style={{ borderColor: latestSenderSeat.boardHex }}
+            style={{ borderColor: reactionSenderSeat.boardHex }}
           >
-            {latestSenderAvatar ? (
+            {reactionSenderAvatar ? (
               <img
-                src={latestSenderAvatar}
+                src={reactionSenderAvatar}
                 alt=""
                 className="size-full object-cover"
               />
             ) : (
               <div
                 className="grid size-full place-items-center text-[10px] font-black text-white"
-                style={{ backgroundColor: latestSenderSeat.boardHex }}
+                style={{ backgroundColor: reactionSenderSeat.boardHex }}
               >
-                {latestSender.name.charAt(0).toUpperCase()}
+                {reactionSender.name.charAt(0).toUpperCase()}
               </div>
             )}
           </div>
           <span className="max-w-[100px] truncate text-xs font-black text-white">
-            {latestSender.name}
+            {reactionSender.name}
           </span>
           <span className="animate-bounce text-2xl">
-            {latestIncomingEmote.emoji}
+            {activeReaction.emoji}
           </span>
         </div>
       )}
 
-      {/* 2. MOBILE BOTTOM DRAWER (GPU-friendly solid surface, zero nested backdrop-filter) */}
-      <div className="fixed inset-x-0 bottom-0 z-40 rounded-t-3xl rounded-b-none border-t border-white/10 bg-[#13151f] px-3.5 pt-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom))] shadow-[0_-10px_32px_rgba(0,0,0,0.85)] select-none md:hidden">
-        <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-white/20" />
+      {/* Drawer drag handle */}
+      <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-white/20" />
 
-        {/* Turn & 3D Dice Card */}
-        <div className="flex items-center gap-3 rounded-2xl border border-white/8 bg-[#181a26] p-2.5 shadow-md">
-          <button
-            type="button"
-            onClick={canRoll ? onRoll : undefined}
-            disabled={!canRoll}
-            aria-label={canRoll ? "Tap to roll die" : `Die value ${diceValue}`}
-            className={cn(
-              "relative flex size-12 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-slate-950 p-0.5 shadow-inner",
-              styles.dicePod,
-              canRoll && [
-                styles.podActive,
-                "cursor-pointer ring-2 ring-rose-400 active:scale-95",
-              ],
-              !canRoll && "cursor-default opacity-90",
-            )}
-          >
-            <div className={styles.dicePodWell}>
-              <div
-                className={cn(styles.podDieCube, isRolling && styles.rolling)}
-                style={!isRolling ? { transform: rotation } : undefined}
-              >
-                <StaticDieFaces />
-              </div>
+      {/* Turn & 3D Dice Card */}
+      <div className="flex items-center gap-3 rounded-2xl border border-white/8 bg-[#181a26] p-2.5 shadow-md">
+        <button
+          type="button"
+          onClick={canRoll ? onRoll : undefined}
+          disabled={!canRoll}
+          aria-label={canRoll ? "Tap to roll die" : `Die value ${diceValue}`}
+          className={cn(
+            "relative flex size-12 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-slate-950 p-0.5 shadow-inner",
+            styles.dicePod,
+            canRoll && [
+              styles.podActive,
+              "cursor-pointer ring-2 ring-rose-400 active:scale-95",
+            ],
+            !canRoll && "cursor-default opacity-90",
+          )}
+        >
+          <div className={styles.dicePodWell}>
+            <div
+              className={cn(styles.podDieCube, isRolling && styles.rolling)}
+              style={!isRolling ? { transform: rotation } : undefined}
+            >
+              <StaticDieFaces />
             </div>
-          </button>
-
-          <div className="min-w-0 flex-1 leading-tight">
-            <div className="flex items-center gap-1.5">
-              <span
-                className="rounded px-1 py-0.5 text-[10px] font-black uppercase tracking-wider"
-                style={{
-                  backgroundColor: `${activeSeat.boardHex}25`,
-                  color: activeSeat.boardHex,
-                }}
-              >
-                {winnerPlayer
-                  ? "Match Complete"
-                  : isMyTurn
-                    ? "Your turn"
-                    : `${activePlayer?.name ?? "Player"}'s turn`}
-              </span>
-            </div>
-            <h4 className="mt-0.5 truncate text-sm font-black text-white">
-              {getDiceHeadline()}
-            </h4>
-            <p className="truncate text-[10px] font-medium text-slate-400">
-              {getDiceHint()}
-            </p>
           </div>
-        </div>
+        </button>
 
-        {/* Action Row: Roll Button + Reaction Emoji Menu */}
-        <div className="relative mt-2 flex items-center gap-2">
-          <button
-            type="button"
-            onClick={canRoll ? onRoll : undefined}
-            disabled={!canRoll}
-            className={cn(
-              "relative flex h-12 flex-1 items-center justify-center gap-2 rounded-2xl text-sm font-black uppercase tracking-wider transition-transform duration-150 select-none touch-manipulation",
-              canRoll
-                ? "cursor-pointer bg-gradient-to-r from-[#ff4d64] to-[#ff6b81] text-white shadow-[0_4px_0_#c9253d,0_8px_18px_rgba(255,77,100,0.3)] active:translate-y-1 active:shadow-none"
-                : "cursor-not-allowed border border-white/5 bg-slate-800/70 text-slate-500",
-            )}
-          >
-            <Dices className="size-5" />
-            <span>
+        <div className="min-w-0 flex-1 leading-tight">
+          <div className="flex items-center gap-1.5">
+            <span
+              className="rounded px-1 py-0.5 text-[10px] font-black uppercase tracking-wider"
+              style={{
+                backgroundColor: `${activeSeat.boardHex}25`,
+                color: activeSeat.boardHex,
+              }}
+            >
               {winnerPlayer
-                ? "Match Finished"
-                : isRolling
-                  ? "Rolling..."
-                  : canRoll
-                    ? "Roll the die"
+                ? "Match Complete"
+                : isMyTurn
+                  ? "Your turn"
+                  : `${activePlayer?.name ?? "Player"}'s turn`}
+            </span>
+          </div>
+          <h4 className="mt-0.5 truncate text-sm font-black text-white">
+            {getDiceHeadline()}
+          </h4>
+          <p className="truncate text-[10px] font-medium text-slate-400">
+            {getDiceHint()}
+          </p>
+        </div>
+      </div>
+
+      {/* Action Row: Roll Button + Reaction Emoji Menu */}
+      <div className="relative mt-2 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={canRoll ? onRoll : canPass ? onPass : undefined}
+          disabled={!canRoll && !canPass}
+          className={cn(
+            "relative flex h-12 flex-1 items-center justify-center gap-2 rounded-2xl text-sm font-black uppercase tracking-wider transition-transform duration-150 select-none touch-manipulation",
+            canRoll
+              ? "cursor-pointer bg-gradient-to-r from-[#ff4d64] to-[#ff6b81] text-white shadow-[0_4px_0_#c9253d,0_8px_18px_rgba(255,77,100,0.3)] active:translate-y-1 active:shadow-none"
+              : canPass
+                ? "cursor-pointer bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-[0_4px_0_#b45309,0_8px_18px_rgba(245,158,11,0.3)] active:translate-y-1 active:shadow-none"
+                : "cursor-not-allowed border border-white/5 bg-slate-800/70 text-slate-500",
+          )}
+        >
+          <Dices className="size-5" />
+          <span>
+            {winnerPlayer
+              ? "Match Finished"
+              : isRolling
+                ? "Rolling..."
+                : canRoll
+                  ? "Roll the die"
+                  : canPass
+                    ? "Pass Turn"
                     : isMyTurn
                       ? state.dice === null
                         ? "Moving..."
@@ -343,71 +398,84 @@ export const MobileNocturneDrawer = memo(function MobileNocturneDrawer({
                             ? "Select piece"
                             : "Turn passing..."
                       : "Waiting..."}
-            </span>
-          </button>
-
-          <div className="relative">
-            <button
-              ref={emojiButtonRef}
-              type="button"
-              onClick={() => setEmojiDropdownOpen((prev) => !prev)}
-              aria-label={
-                emojiDropdownOpen ? "Close emoji menu" : "Reaction emojis"
-              }
-              className={cn(
-                "flex size-12 shrink-0 cursor-pointer items-center justify-center rounded-2xl border border-white/10 shadow-md transition-transform active:scale-95 touch-manipulation",
-                emojiDropdownOpen
-                  ? "border-amber-400/50 bg-[#282d40] text-slate-200"
-                  : "bg-[#1e2230] text-amber-400 hover:bg-[#282d40]",
-              )}
-            >
-              {emojiDropdownOpen ? (
-                <ChevronDown className="size-5 text-slate-300" />
-              ) : (
-                <Smile className="size-5 text-amber-400" />
-              )}
-            </button>
-
-            {emojiDropdownOpen && (
-              <div
-                ref={emojiDropdownRef}
-                className="absolute right-0 bottom-14 z-50 flex w-12 flex-col items-center gap-1 rounded-2xl border border-white/15 bg-[#141624] p-1 shadow-2xl animate-in fade-in zoom-in-95 duration-150"
-              >
-                {EMOTES.map((emoji) => (
-                  <button
-                    key={emoji}
-                    type="button"
-                    onClick={() => {
-                      onEmote(emoji);
-                      setEmojiDropdownOpen(false);
-                    }}
-                    className="flex size-9 cursor-pointer items-center justify-center rounded-xl text-2xl transition-transform hover:bg-white/15 active:scale-90 touch-manipulation"
-                  >
-                    {emoji}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Players Expand/Collapse Toggle */}
-        <button
-          type="button"
-          onClick={() => setIsExpanded((prev) => !prev)}
-          className="mx-auto flex cursor-pointer items-center justify-center gap-1 pt-2 pb-1 text-[11px] font-bold text-slate-400 transition-colors hover:text-white select-none touch-manipulation"
-        >
-          <span>Players ({state.players.length})</span>
-          {isExpanded ? (
-            <ChevronUp className="size-3.5 text-slate-300" />
-          ) : (
-            <ChevronDown className="size-3.5 text-slate-300" />
-          )}
+          </span>
         </button>
 
-        {/* Collapsible Players Roster */}
-        {isExpanded && (
-          <div className="flex max-h-[45vh] flex-col gap-2 overflow-y-auto pt-1 pb-2">
+        <div className="relative">
+          <button
+            ref={emojiButtonRef}
+            type="button"
+            onClick={() => setEmojiDropdownOpen((prev) => !prev)}
+            aria-label={
+              emojiDropdownOpen ? "Close emoji menu" : "Reaction emojis"
+            }
+            className={cn(
+              "flex size-12 shrink-0 cursor-pointer items-center justify-center rounded-2xl border border-white/10 shadow-md transition-transform active:scale-95 touch-manipulation",
+              emojiDropdownOpen
+                ? "border-amber-400/50 bg-[#282d40] text-slate-200"
+                : "bg-[#1e2230] text-amber-400 hover:bg-[#282d40]",
+            )}
+          >
+            {emojiDropdownOpen ? (
+              <ChevronDown className="size-5 text-slate-300" />
+            ) : (
+              <Smile className="size-5 text-amber-400" />
+            )}
+          </button>
+
+          {emojiDropdownOpen && (
+            <div
+              ref={emojiDropdownRef}
+              className="absolute right-0 bottom-14 z-50 flex w-12 flex-col items-center gap-1 rounded-2xl border border-white/15 bg-[#141624] p-1 shadow-2xl animate-in fade-in zoom-in-95 duration-150"
+            >
+              {EMOTES.map((emoji) => (
+                <button
+                  key={emoji}
+                  type="button"
+                  onClick={() => {
+                    onEmote(emoji);
+                    setEmojiDropdownOpen(false);
+                  }}
+                  className="flex size-9 cursor-pointer items-center justify-center rounded-xl text-2xl transition-transform hover:bg-white/15 active:scale-90 touch-manipulation"
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Players Expand/Collapse Toggle Button */}
+      <button
+        type="button"
+        onClick={() => setIsExpanded((prev) => !prev)}
+        aria-expanded={isExpanded}
+        className="mx-auto flex cursor-pointer items-center justify-center gap-1.5 pt-2 pb-1 text-[11px] font-bold text-slate-400 transition-colors hover:text-white select-none touch-manipulation"
+      >
+        <span>Players ({state.players.length})</span>
+        <ChevronDown
+          className={cn(
+            "size-3.5 text-slate-300 transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]",
+            isExpanded && "rotate-180",
+          )}
+        />
+      </button>
+
+      {/* Smooth 300ms Accordion Drawer Height Expansion */}
+      <div
+        className={cn(
+          "grid transition-[grid-template-rows] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]",
+          isExpanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
+        )}
+      >
+        <div className="overflow-hidden">
+          <div
+            className={cn(
+              "flex max-h-[45vh] flex-col gap-2 overflow-y-auto pt-1 pb-2 transition-opacity duration-300 ease-out",
+              isExpanded ? "opacity-100" : "opacity-0 pointer-events-none",
+            )}
+          >
             {state.players.map((p) => {
               const seat = SEAT_DEFINITIONS[p.color];
               const isActive =
@@ -421,6 +489,9 @@ export const MobileNocturneDrawer = memo(function MobileNocturneDrawer({
               ).length;
               const avatar = playerAvatars[p.userId];
               const emoteEntry = activeEmotes[p.userId];
+              const isEmoteActive =
+                Boolean(emoteEntry) &&
+                Date.now() - emoteEntry!.timestamp < EMOTE_LIFETIME_MS;
 
               return (
                 <div
@@ -467,7 +538,7 @@ export const MobileNocturneDrawer = memo(function MobileNocturneDrawer({
                         </span>
                       )}
 
-                      {emoteEntry && (
+                      {isEmoteActive && emoteEntry && (
                         <div
                           key={`${emoteEntry.emoji}-${emoteEntry.timestamp}`}
                           className={styles.floatingEmote}
@@ -557,8 +628,9 @@ export const MobileNocturneDrawer = memo(function MobileNocturneDrawer({
               );
             })}
           </div>
-        )}
+        </div>
       </div>
-    </>
+    </div>,
+    document.body,
   );
 });

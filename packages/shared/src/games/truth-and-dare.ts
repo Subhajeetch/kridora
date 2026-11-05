@@ -34,7 +34,7 @@ export interface TruthAndDareState {
   }>;
   currentPlayerIndex: number;
   round: number;
-  phase: "choosing" | "selecting" | "challenge";
+  phase: "setup" | "choosing" | "selecting" | "challenge";
   settings: {
     ageGroup: TruthAndDareAgeGroup;
     spinner: TruthAndDareSpinner;

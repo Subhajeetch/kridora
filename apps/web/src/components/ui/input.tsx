@@ -31,7 +31,7 @@ export function Input({
     ?.replace(/\bh-(?:8|9|10|11|12|14)\b/g, "")
     ?.replace(/\bborder(?:-[0-9a-z/]+)?\b/g, "")
     ?.replace(/\bpixel-corners-[a-z]+\b/g, "")
-    ?.replace(/\bbg-[a-z0-9/\[\]#]+\b/g, "")
+    ?.replace(/\bbg-[a-z0-9/[\]#]+\b/g, "")
     ?.replace(/\brounded-[a-z0-9]+\b/g, "");
 
   return (

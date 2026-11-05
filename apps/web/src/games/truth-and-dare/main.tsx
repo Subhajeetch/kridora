@@ -6,17 +6,20 @@ import {
   type TruthAndDareState,
 } from "@kridora/shared";
 import {
+  ArrowLeft,
   Check,
   Compass,
   Heart,
+  LogOut,
+  Play,
   RotateCcw,
   ShieldCheck,
   Sparkles,
+  Users,
   Volume2,
   VolumeX,
   WandSparkles,
   Wine,
-  Users,
 } from "lucide-react";
 import {
   useCallback,
@@ -32,6 +35,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useInGameRoom, useGameAudio } from "@/games/hooks";
 import { describeError, request, socket } from "@/lib/socket";
 import {
   updateTruthAndDarePreferences,
@@ -64,7 +68,7 @@ const AGE_OPTIONS: Array<{
     id: "family",
     label: "Family",
     ages: "8+",
-    detail: "All-ages prompts",
+    detail: "All-ages friendly prompts",
     mark: "☀",
   },
   {
@@ -193,29 +197,102 @@ function vibrate(duration: number) {
   try {
     navigator.vibrate(duration);
   } catch {
-    // Vibration is optional on browsers and devices.
+    // Optional on supported browsers/devices.
   }
 }
 
+function InGameNav({
+  roomCode,
+  playerCount,
+  maxPlayers,
+  onBackToRoom,
+  onLeaveRoom,
+  isLeaving,
+  soundEnabled,
+  onToggleSound,
+}: {
+  roomCode: string;
+  playerCount: number;
+  maxPlayers: number;
+  onBackToRoom: () => void;
+  onLeaveRoom: () => void;
+  isLeaving: boolean;
+  soundEnabled: boolean;
+  onToggleSound: () => void;
+}) {
+  return (
+    <nav className={styles.inGameNav} aria-label="Game navigation">
+      <div className={styles.navLeft}>
+        <button
+          type="button"
+          onClick={onBackToRoom}
+          className={styles.navBtn}
+          title="Return to room overview"
+        >
+          <ArrowLeft className="size-3.5" />
+          <span>Room</span>
+        </button>
+        <span className={`${styles.navPill} ${styles.navPillCode}`}>
+          ROOM: {roomCode}
+        </span>
+      </div>
+      <div className={styles.navRight}>
+        <span className={styles.navPill}>
+          <Users className="size-3.5" />
+          <span>
+            {playerCount}/{maxPlayers}
+          </span>
+        </span>
+        <button
+          type="button"
+          onClick={onToggleSound}
+          className={styles.navBtn}
+          title={soundEnabled ? "Mute game sounds" : "Enable game sounds"}
+          aria-pressed={soundEnabled}
+        >
+          {soundEnabled ? (
+            <Volume2 className="size-3.5" />
+          ) : (
+            <VolumeX className="size-3.5" />
+          )}
+        </button>
+        <button
+          type="button"
+          onClick={onLeaveRoom}
+          disabled={isLeaving}
+          className={`${styles.navBtn} ${styles.navBtnDanger}`}
+          title="Leave room"
+        >
+          <LogOut className="size-3.5" />
+          <span>{isLeaving ? "Leaving…" : "Leave"}</span>
+        </button>
+      </div>
+    </nav>
+  );
+}
+
 export default function TruthAndDareGame({ room, userId }: GameComponentProps) {
+  const inGame = useInGameRoom();
+  const { isMuted, toggleMute } = useGameAudio();
+
   const [state, setState] = useState<TruthAndDareState | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [spinningChallengeId, setSpinningChallengeId] = useState<number | null>(
-    null,
-  );
+  const [animatingSpinId, setAnimatingSpinId] = useState<number | null>(null);
+  const [prevSpinId, setPrevSpinId] = useState<number | null>(null);
+  const [clockTick, setClockTick] = useState(() => Date.now());
+
   const [mobilePanel, setMobilePanel] = useState<"players" | "rules">(
     "players",
   );
-  const [dareSeconds, setDareSeconds] = useState(30);
   const [showConfetti, setShowConfetti] = useState(false);
   const [spicyConfirmOpen, setSpicyConfirmOpen] = useState(false);
   const [ageConfirmed, setAgeConfirmed] = useState(false);
   const [pendingAdultMode, setPendingAdultMode] = useState<"couples" | "spicy">(
     "spicy",
   );
+
   const preferences = useTruthAndDarePreferences();
-  const spinTimer = useRef<number | null>(null);
   const confettiTimer = useRef<number | null>(null);
   const audioContext = useRef<AudioContext | null>(null);
   const previousState = useRef<TruthAndDareState | null>(null);
@@ -232,45 +309,41 @@ export default function TruthAndDareGame({ room, userId }: GameComponentProps) {
     refresh();
     return () => {
       socket.off("truth-and-dare:state", onState);
-      if (spinTimer.current !== null) window.clearTimeout(spinTimer.current);
     };
   }, [refresh]);
 
   const spinId = state?.selection?.createdAt ?? null;
-  const spinIsAnimating = spinId !== null && spinId === spinningChallengeId;
+  if (spinId !== prevSpinId) {
+    setPrevSpinId(spinId);
+    setAnimatingSpinId(spinId);
+  }
+
+  const spinIsAnimating = spinId !== null && spinId === animatingSpinId;
+
   useEffect(() => {
-    if (spinId === null) {
-      setSpinningChallengeId(null);
-      return;
-    }
-    setSpinningChallengeId(spinId);
-    if (spinTimer.current !== null) window.clearTimeout(spinTimer.current);
-    spinTimer.current = window.setTimeout(() => {
-      setSpinningChallengeId((active) => (active === spinId ? null : active));
+    if (!spinId) return;
+    const timer = window.setTimeout(() => {
+      setAnimatingSpinId(null);
       vibrate(35);
-      spinTimer.current = null;
     }, 2300);
-    return () => {
-      if (spinTimer.current !== null) window.clearTimeout(spinTimer.current);
-    };
+    return () => window.clearTimeout(timer);
   }, [spinId]);
 
   useEffect(() => {
-    const challenge = state?.challenge;
-    if (!challenge || challenge.type !== "dare") {
-      setDareSeconds(30);
-      return;
-    }
-    const updateTimer = () => {
-      const revealAt = challenge.createdAt + 650;
-      setDareSeconds(
-        Math.max(0, Math.ceil((revealAt + 30_000 - Date.now()) / 1000)),
-      );
-    };
-    updateTimer();
-    const timer = window.setInterval(updateTimer, 1000);
-    return () => window.clearInterval(timer);
-  }, [state?.challenge?.createdAt, state?.challenge?.type]);
+    if (state?.challenge?.type !== "dare") return;
+    const interval = window.setInterval(() => setClockTick(Date.now()), 1000);
+    return () => window.clearInterval(interval);
+  }, [state?.challenge?.type, state?.challenge?.createdAt]);
+
+  const dareSeconds =
+    state?.challenge?.type === "dare"
+      ? Math.max(
+          0,
+          Math.ceil(
+            (state.challenge.createdAt + 650 + 30_000 - clockTick) / 1000,
+          ),
+        )
+      : 30;
 
   useEffect(() => {
     if (!state) return;
@@ -302,7 +375,7 @@ export default function TruthAndDareGame({ room, userId }: GameComponentProps) {
     let timer = 0;
     const tick = () => {
       if (cancelled) return;
-      if (preferences.soundEnabled)
+      if (preferences.soundEnabled && !isMuted)
         playTick(audioContext.current, 760 - Math.min(step * 15, 420));
       step += 1;
       if (step < 12) timer = window.setTimeout(tick, 85 + step * 13);
@@ -312,7 +385,7 @@ export default function TruthAndDareGame({ room, userId }: GameComponentProps) {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [spinIsAnimating, preferences.soundEnabled]);
+  }, [spinIsAnimating, preferences.soundEnabled, isMuted]);
 
   const submit = async (action: () => Promise<TruthAndDareState>) => {
     setBusy(true);
@@ -326,21 +399,492 @@ export default function TruthAndDareGame({ room, userId }: GameComponentProps) {
     }
   };
 
+  function unlockSpinAudio() {
+    if (typeof window === "undefined") return;
+    if (!audioContext.current) {
+      const AudioContextConstructor = window.AudioContext;
+      if (AudioContextConstructor)
+        audioContext.current = new AudioContextConstructor();
+    }
+    if (audioContext.current?.state === "suspended") {
+      void audioContext.current.resume().catch(() => undefined);
+    }
+  }
+
+  const isHost =
+    room.ownerId === userId || inGame.owner?.userId === userId;
+
+  const handleConfigure = (
+    ageGroup: TruthAndDareAgeGroup,
+    spinner: TruthAndDareSpinner,
+    mode: TruthAndDareMode = state?.settings.mode ?? "funny",
+  ) => {
+    if (mode === "spicy" || mode === "couples") {
+      setPendingAdultMode(mode);
+      setSpicyConfirmOpen(true);
+      return;
+    }
+    void submit(() =>
+      request("truth-and-dare:configure", {
+        ageGroup,
+        spinner,
+        mode,
+      }),
+    );
+  };
+
+  const handleStartGame = () => {
+    void submit(() => request("truth-and-dare:start-game", {}));
+  };
+
+  const handleSetCharacter = (character: TruthAndDareCharacter) => {
+    void submit(() =>
+      request("truth-and-dare:set-character", {
+        character,
+      }),
+    );
+  };
+
+  function confirmSpicyMode() {
+    if (!ageConfirmed) return;
+    void submit(() =>
+      request("truth-and-dare:configure", {
+        ageGroup: "adult",
+        spinner: state?.settings.spinner ?? "bottle",
+        mode: pendingAdultMode,
+      }),
+    );
+    updateTruthAndDarePreferences({
+      mode: pendingAdultMode,
+      ageGroup: "adult",
+    });
+    setAgeConfirmed(false);
+    setSpicyConfirmOpen(false);
+  }
+
+  function choosePrompt(type: "truth" | "dare") {
+    void submit(() => request("truth-and-dare:choose", { choice: type }));
+  }
+
+  function spinBottle() {
+    unlockSpinAudio();
+    vibrate(14);
+    void submit(() => request("truth-and-dare:spin", {}));
+  }
+
   if (!state) {
     return (
-      <section className={styles.loading}>
-        <Sparkles className="mx-auto size-8 animate-pulse text-pink-300" />
-        <h1>Setting up the circle…</h1>
-        {error && <p role="alert">{error}</p>}
-        <Button className="mt-4" variant="outline" onClick={refresh}>
-          Reconnect
-        </Button>
-      </section>
+      <main
+        className={styles.gameShell}
+        data-theme="arcade"
+        data-tone="dark"
+        onPointerDown={unlockSpinAudio}
+      >
+        <InGameNav
+          roomCode={inGame.roomCode}
+          playerCount={inGame.playerCount}
+          maxPlayers={inGame.maxPlayers}
+          onBackToRoom={inGame.onBackToRoom}
+          onLeaveRoom={inGame.onLeaveRoom}
+          isLeaving={inGame.isLeaving}
+          soundEnabled={preferences.soundEnabled && !isMuted}
+          onToggleSound={() => {
+            toggleMute();
+            updateTruthAndDarePreferences({
+              soundEnabled: !preferences.soundEnabled,
+            });
+          }}
+        />
+        <section className={styles.loading}>
+          <Sparkles className="mx-auto size-8 animate-pulse text-pink-300" />
+          <h1>Setting up the circle…</h1>
+          {error && <p role="alert">{error}</p>}
+          <Button className="mt-4" variant="outline" onClick={refresh}>
+            Reconnect
+          </Button>
+        </section>
+      </main>
     );
   }
 
-  const currentPlayer = state.players[state.currentPlayerIndex];
   const me = state.players.find((player) => player.userId === userId);
+
+  // Phase 1: Setup Phase
+  if (state.phase === "setup") {
+    const visibleModeOptions =
+      state.settings.ageGroup === "adult"
+        ? MODE_OPTIONS
+        : MODE_OPTIONS.filter(
+            (mode) => mode.id !== "couples" && mode.id !== "spicy",
+          );
+
+    return (
+      <main
+        className={styles.gameShell}
+        data-theme="arcade"
+        data-tone="dark"
+        onPointerDown={unlockSpinAudio}
+      >
+        <InGameNav
+          roomCode={inGame.roomCode}
+          playerCount={inGame.playerCount}
+          maxPlayers={inGame.maxPlayers}
+          onBackToRoom={inGame.onBackToRoom}
+          onLeaveRoom={inGame.onLeaveRoom}
+          isLeaving={inGame.isLeaving}
+          soundEnabled={preferences.soundEnabled && !isMuted}
+          onToggleSound={() => {
+            toggleMute();
+            updateTruthAndDarePreferences({
+              soundEnabled: !preferences.soundEnabled,
+            });
+          }}
+        />
+
+        {isHost ? (
+          // Room Owner / Host Configuration View
+          <div className={styles.setupContainer}>
+            <div className={styles.setupHero}>
+              <div>
+                <div className={styles.setupHeroTitle}>
+                  <span className={styles.setupHeroBadge}>Room Host</span>
+                  <h1>Party Setup & Rules</h1>
+                </div>
+                <p>
+                  Choose the age pack, mood, and centerpiece spinner. Other
+                  players will wait until you start!
+                </p>
+              </div>
+              <Button
+                disabled={busy || state.players.length < 2}
+                onClick={handleStartGame}
+                className={styles.startGameBtn}
+              >
+                <Play className="size-4 fill-current" />
+                <span>Start Game</span>
+              </Button>
+            </div>
+
+            {error && (
+              <p role="alert" className={styles.error}>
+                {error}
+              </p>
+            )}
+
+            {/* Age Pack */}
+            <div className={styles.setupCard}>
+              <div className={styles.setupCardHeader}>
+                <h2>
+                  <ShieldCheck className="size-4" /> 1. Select Age Pack
+                </h2>
+                <span>Defines prompt safety levels</span>
+              </div>
+              <div className={styles.ageOptionGrid}>
+                {AGE_OPTIONS.map((opt) => {
+                  const isSelected = state.settings.ageGroup === opt.id;
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      disabled={busy}
+                      className={`${styles.ageOptionCard} ${isSelected ? styles.ageOptionCardSelected : ""}`}
+                      onClick={() =>
+                        handleConfigure(
+                          opt.id,
+                          state.settings.spinner,
+                          opt.id !== "adult" &&
+                            (state.settings.mode === "couples" ||
+                              state.settings.mode === "spicy")
+                            ? "funny"
+                            : state.settings.mode,
+                        )
+                      }
+                    >
+                      <div className={styles.ageOptionTop}>
+                        <strong>{opt.label}</strong>
+                        <span className={styles.ageOptionAges}>{opt.ages}</span>
+                      </div>
+                      <span className={styles.ageOptionDetail}>
+                        {opt.detail}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Content Vibe */}
+            <div className={styles.setupCard}>
+              <div className={styles.setupCardHeader}>
+                <h2>
+                  <Sparkles className="size-4" /> 2. Choose Content Vibe
+                </h2>
+                <span>
+                  {state.settings.ageGroup === "adult"
+                    ? "Includes Adult-only packs"
+                    : "Safe for selected age pack"}
+                </span>
+              </div>
+              <div className={styles.vibeGrid}>
+                {visibleModeOptions.map((mode) => {
+                  const isSelected = state.settings.mode === mode.id;
+                  const isSpicy = mode.id === "spicy" || mode.id === "couples";
+                  return (
+                    <button
+                      key={mode.id}
+                      type="button"
+                      disabled={busy}
+                      className={`${styles.vibeChip} ${isSpicy ? styles.vibeChipSpicy : ""} ${isSelected ? styles.vibeChipSelected : ""}`}
+                      onClick={() =>
+                        handleConfigure(
+                          state.settings.ageGroup,
+                          state.settings.spinner,
+                          mode.id,
+                        )
+                      }
+                    >
+                      <strong>
+                        {mode.id === "spicy"
+                          ? "🌶️ Spicy"
+                          : mode.id === "couples"
+                            ? "💞 Couples"
+                            : mode.label}
+                      </strong>
+                      <small>{mode.age}</small>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Spinner Centerpiece */}
+            <div className={styles.setupCard}>
+              <div className={styles.setupCardHeader}>
+                <h2>
+                  <RotateCcw className="size-4" /> 3. Select Spinner
+                </h2>
+                <span>What takes the center of the table</span>
+              </div>
+              <div className={styles.spinnerChoiceGrid}>
+                {SPINNER_OPTIONS.map((opt) => {
+                  const isSelected = state.settings.spinner === opt.id;
+                  const Icon =
+                    opt.id === "bottle"
+                      ? Wine
+                      : opt.id === "wand"
+                        ? WandSparkles
+                        : Compass;
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      disabled={busy}
+                      className={`${styles.spinnerChoiceCard} ${isSelected ? styles.spinnerChoiceCardSelected : ""}`}
+                      onClick={() =>
+                        handleConfigure(
+                          state.settings.ageGroup,
+                          opt.id,
+                          state.settings.mode,
+                        )
+                      }
+                    >
+                      <div className={styles.spinnerChoiceIcon}>
+                        <Icon className="size-5" />
+                      </div>
+                      <div>
+                        <strong>{opt.label}</strong>
+                        <small>{opt.detail}</small>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Host Character Selection */}
+            <div className={styles.setupCard}>
+              <div className={styles.setupCardHeader}>
+                <h2>Pick Your Character</h2>
+                <span>Your avatar at the table</span>
+              </div>
+              <div className={styles.characterGrid}>
+                {CHARACTER_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    disabled={busy}
+                    className={`${styles.characterOption} ${me?.character === opt.id ? styles.characterSelected : ""}`}
+                    onClick={() => handleSetCharacter(opt.id)}
+                  >
+                    <span>{opt.face}</span>
+                    <small>{opt.label}</small>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Table Roster Preview */}
+            <div className={styles.setupCard}>
+              <div className={styles.setupCardHeader}>
+                <h2>Players Seated ({state.players.length})</h2>
+                <span>
+                  {state.players.length < 2
+                    ? "Need at least 2 players to start"
+                    : "Ready to launch!"}
+                </span>
+              </div>
+              <div className={styles.rosterChips}>
+                {state.players.map((p) => (
+                  <span
+                    key={p.userId}
+                    className={`${styles.rosterChip} ${p.userId === room.ownerId ? styles.rosterChipHost : ""}`}
+                  >
+                    <CharacterFace character={p.character} />
+                    <strong>{p.name}</strong>
+                    {p.userId === userId && <small>(You)</small>}
+                    {p.userId === room.ownerId && <small>HOST</small>}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* Bottom Launch Bar */}
+            <div className={styles.setupFooter}>
+              <div className={styles.setupFooterInfo}>
+                {state.players.length < 2 ? (
+                  <>
+                    <strong>Waiting for players to join…</strong>
+                    <span>
+                      Share room code <b>{inGame.roomCode}</b> with your friends
+                      to fill the table.
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <strong>Everything configured?</strong>
+                    <span>
+                      Click Start Game to transition everyone into the circle.
+                    </span>
+                  </>
+                )}
+              </div>
+              <Button
+                disabled={busy || state.players.length < 2}
+                onClick={handleStartGame}
+                className={styles.startGameBtn}
+              >
+                <Play className="size-4 fill-current" />
+                <span>{busy ? "Starting…" : "Start Game"}</span>
+              </Button>
+            </div>
+          </div>
+        ) : (
+          // Non-Host / Player Waiting Screen
+          <div className={styles.waitingContainer}>
+            <div className={styles.waitingIconWrapper}>
+              <SpinnerIcon spinner={state.settings.spinner} />
+            </div>
+            <h1 className={styles.waitingTitle}>
+              Waiting for <span>{inGame.owner?.name ?? "Host"}</span> to start
+              the game…
+            </h1>
+            <p className={styles.waitingSubtitle}>
+              The room owner is setting the party vibe, age pack, and spinner.
+              Sit tight or choose your character look below!
+            </p>
+
+            <div className={styles.waitingPillsRow}>
+              <span className={styles.waitingPill}>
+                Age: <b>{state.settings.ageGroup.toUpperCase()}</b>
+              </span>
+              <span className={styles.waitingPill}>
+                Mode: <b>{state.settings.mode.toUpperCase()}</b>
+              </span>
+              <span className={styles.waitingPill}>
+                Spinner: <b>{state.settings.spinner.toUpperCase()}</b>
+              </span>
+            </div>
+
+            <div className={styles.waitingCharacterSection}>
+              <h3>Choose your character look:</h3>
+              <div className={styles.characterGrid}>
+                {CHARACTER_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    disabled={busy}
+                    className={`${styles.characterOption} ${me?.character === opt.id ? styles.characterSelected : ""}`}
+                    onClick={() => handleSetCharacter(opt.id)}
+                  >
+                    <span>{opt.face}</span>
+                    <small>{opt.label}</small>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className={styles.waitingCharacterSection}>
+              <h3>Players at the table ({state.players.length})</h3>
+              <div className={styles.rosterChips}>
+                {state.players.map((p) => (
+                  <span
+                    key={p.userId}
+                    className={`${styles.rosterChip} ${p.userId === room.ownerId ? styles.rosterChipHost : ""}`}
+                  >
+                    <CharacterFace character={p.character} />
+                    <strong>{p.name}</strong>
+                    {p.userId === userId && <small>(You)</small>}
+                    {p.userId === room.ownerId && <small>HOST</small>}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        <Dialog
+          open={spicyConfirmOpen}
+          onOpenChange={(open) => {
+            setSpicyConfirmOpen(open);
+            if (!open) setAgeConfirmed(false);
+          }}
+        >
+          <DialogContent className={styles.ageDialog}>
+            <div className={styles.spicyConfirm}>
+              <span aria-hidden="true">🌶️</span>
+              <DialogTitle>
+                {pendingAdultMode === "spicy"
+                  ? "Spicy mode is for adults"
+                  : "Couples mode is for adults"}
+              </DialogTitle>
+              <DialogDescription>
+                Every player must be 18 or older. Prompts stay respectful, and
+                anyone can skip.
+              </DialogDescription>
+              <label className={styles.ageCheck}>
+                <input
+                  type="checkbox"
+                  checked={ageConfirmed}
+                  onChange={(event) => setAgeConfirmed(event.target.checked)}
+                />
+                I confirm every player is 18 or older.
+              </label>
+              <Button
+                disabled={!ageConfirmed || busy}
+                onClick={confirmSpicyMode}
+              >
+                Continue to{" "}
+                {pendingAdultMode === "spicy" ? "Spicy" : "Couples"} (18+)
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </main>
+    );
+  }
+
+  // Phase 2: Active Gameplay (choosing, selecting, challenge)
+  const currentPlayer = state.players[state.currentPlayerIndex];
   const isMyTurn = currentPlayer?.userId === userId;
   const lockedSettings = state.history.length > 0 || state.phase !== "choosing";
   const visibleModeOptions =
@@ -363,63 +907,6 @@ export default function TruthAndDareGame({ room, userId }: GameComponentProps) {
   const selectedAgeOption = AGE_OPTIONS.find(
     (option) => option.id === state.settings.ageGroup,
   );
-  const handleConfigure = (
-    ageGroup: TruthAndDareAgeGroup,
-    spinner: TruthAndDareSpinner,
-    mode: TruthAndDareMode = state.settings.mode,
-  ) => {
-    if (mode === "spicy" || mode === "couples") {
-      setPendingAdultMode(mode);
-      setSpicyConfirmOpen(true);
-      return;
-    }
-    void submit(() =>
-      request("truth-and-dare:configure", {
-        ageGroup,
-        spinner,
-        mode,
-      }),
-    );
-  };
-
-  function unlockSpinAudio() {
-    if (typeof window === "undefined") return;
-    if (!audioContext.current) {
-      const AudioContextConstructor = window.AudioContext;
-      if (AudioContextConstructor)
-        audioContext.current = new AudioContextConstructor();
-    }
-    if (audioContext.current?.state === "suspended") {
-      void audioContext.current.resume().catch(() => undefined);
-    }
-  }
-
-  function choosePrompt(type: "truth" | "dare") {
-    void submit(() => request("truth-and-dare:choose", { choice: type }));
-  }
-
-  function spinBottle() {
-    unlockSpinAudio();
-    vibrate(14);
-    void submit(() => request("truth-and-dare:spin", {}));
-  }
-
-  function confirmSpicyMode() {
-    if (!ageConfirmed) return;
-    void submit(() =>
-      request("truth-and-dare:configure", {
-        ageGroup: "adult",
-        spinner: state?.settings.spinner ?? "bottle",
-        mode: pendingAdultMode,
-      }),
-    );
-    updateTruthAndDarePreferences({
-      mode: pendingAdultMode,
-      ageGroup: "adult",
-    });
-    setAgeConfirmed(false);
-    setSpicyConfirmOpen(false);
-  }
 
   return (
     <main
@@ -428,6 +915,22 @@ export default function TruthAndDareGame({ room, userId }: GameComponentProps) {
       data-tone="dark"
       onPointerDown={unlockSpinAudio}
     >
+      <InGameNav
+        roomCode={inGame.roomCode}
+        playerCount={inGame.playerCount}
+        maxPlayers={inGame.maxPlayers}
+        onBackToRoom={inGame.onBackToRoom}
+        onLeaveRoom={inGame.onLeaveRoom}
+        isLeaving={inGame.isLeaving}
+        soundEnabled={preferences.soundEnabled && !isMuted}
+        onToggleSound={() => {
+          toggleMute();
+          updateTruthAndDarePreferences({
+            soundEnabled: !preferences.soundEnabled,
+          });
+        }}
+      />
+
       <header className={styles.gameHeader}>
         <div className={styles.brandLockup}>
           <span className={styles.brandIcon}>
@@ -454,27 +957,6 @@ export default function TruthAndDareGame({ room, userId }: GameComponentProps) {
           <span className={styles.playerCount}>
             {state.players.length} at the table
           </span>
-          <button
-            type="button"
-            className={styles.headerControl}
-            aria-label={
-              preferences.soundEnabled
-                ? "Mute spin sounds"
-                : "Enable spin sounds"
-            }
-            aria-pressed={preferences.soundEnabled}
-            onClick={() =>
-              updateTruthAndDarePreferences({
-                soundEnabled: !preferences.soundEnabled,
-              })
-            }
-          >
-            {preferences.soundEnabled ? (
-              <Volume2 aria-hidden="true" />
-            ) : (
-              <VolumeX aria-hidden="true" />
-            )}
-          </button>
         </div>
       </header>
 
@@ -508,7 +990,7 @@ export default function TruthAndDareGame({ room, userId }: GameComponentProps) {
             </span>
             <div>
               <h2>Players in lobby</h2>
-              <p>{state.players.length} of 8 seats filled</p>
+              <p>{state.players.length} seats filled</p>
             </div>
           </div>
           <ol className={styles.playerRoster}>
@@ -544,7 +1026,7 @@ export default function TruthAndDareGame({ room, userId }: GameComponentProps) {
             })}
           </ol>
           <div className={styles.roomInviteHint}>
-            <strong>ROOM {room.code}</strong>
+            <strong>ROOM {inGame.roomCode}</strong>
             <span>Invite your friends to fill the table.</span>
           </div>
         </aside>
@@ -554,7 +1036,7 @@ export default function TruthAndDareGame({ room, userId }: GameComponentProps) {
             <span>
               <i className={styles.liveDot} /> LIVE PARTY
             </span>
-            <span className={styles.roomCode}>ROOM {room.code}</span>
+            <span className={styles.roomCode}>ROOM {inGame.roomCode}</span>
           </div>
 
           <div className={styles.arena}>
@@ -611,11 +1093,7 @@ export default function TruthAndDareGame({ room, userId }: GameComponentProps) {
                 className={`${styles.spinnerTrack} ${spinIsAnimating ? styles.spinning : ""}`}
                 style={{ "--target-angle": targetAngle } as CSSProperties}
                 onAnimationEnd={() => {
-                  setSpinningChallengeId(null);
-                  if (spinTimer.current !== null) {
-                    window.clearTimeout(spinTimer.current);
-                    spinTimer.current = null;
-                  }
+                  setAnimatingSpinId(null);
                   vibrate(35);
                 }}
               >
@@ -825,7 +1303,7 @@ export default function TruthAndDareGame({ room, userId }: GameComponentProps) {
               <span className={styles.panelNumber}>01</span>
               <div>
                 <h2>Age pack</h2>
-                <p>Selected on the first page.</p>
+                <p>Selected by the host.</p>
               </div>
             </div>
             <div className={styles.agePackSummary} role="status">
@@ -834,7 +1312,7 @@ export default function TruthAndDareGame({ room, userId }: GameComponentProps) {
                 <strong>
                   {selectedAgeOption?.label} · {selectedAgeOption?.ages}
                 </strong>
-                <small>This pack was chosen on the first page.</small>
+                <small>{selectedAgeOption?.detail}</small>
               </span>
             </div>
           </section>
@@ -843,14 +1321,14 @@ export default function TruthAndDareGame({ room, userId }: GameComponentProps) {
             <div className={styles.panelTitle}>
               <span className={styles.panelNumber}>02</span>
               <div>
-                <h2>Choose the spinner</h2>
-                <p>What takes the center?</p>
+                <h2>Center spinner</h2>
+                <p>What is in the middle of the table.</p>
               </div>
             </div>
             <div
               className={styles.spinnerOptions}
               role="group"
-              aria-label="Choose spinner object"
+              aria-label="Current spinner object"
             >
               {SPINNER_OPTIONS.map((option) => {
                 const Icon =
@@ -865,7 +1343,7 @@ export default function TruthAndDareGame({ room, userId }: GameComponentProps) {
                     type="button"
                     aria-label={`${option.label}: ${option.detail}`}
                     aria-pressed={state.settings.spinner === option.id}
-                    disabled={busy || lockedSettings}
+                    disabled={busy || lockedSettings || !isHost}
                     className={`${styles.spinnerOption} ${state.settings.spinner === option.id ? styles.spinnerSelected : ""}`}
                     onClick={() =>
                       handleConfigure(state.settings.ageGroup, option.id)
@@ -878,8 +1356,7 @@ export default function TruthAndDareGame({ room, userId }: GameComponentProps) {
               })}
             </div>
             <div className={styles.modePickerHeading}>
-              <span>Content mode</span>
-              <small>Set before the first spin</small>
+              <span>Content mode: <b>{state.settings.mode.toUpperCase()}</b></span>
             </div>
             <div
               className={styles.modePicker}
@@ -891,7 +1368,7 @@ export default function TruthAndDareGame({ room, userId }: GameComponentProps) {
                   key={mode.id}
                   type="button"
                   aria-pressed={state.settings.mode === mode.id}
-                  disabled={busy || lockedSettings}
+                  disabled={busy || lockedSettings || !isHost}
                   className={`${styles.modeButton} ${state.settings.mode === mode.id ? styles.modeButtonSelected : ""}`}
                   onClick={() =>
                     handleConfigure(
@@ -917,7 +1394,7 @@ export default function TruthAndDareGame({ room, userId }: GameComponentProps) {
             <div className={styles.panelTitle}>
               <span className={styles.panelNumber}>03</span>
               <div>
-                <h2>Pick your character</h2>
+                <h2>Your character</h2>
                 <p>Everyone chooses their own look.</p>
               </div>
             </div>
@@ -933,13 +1410,7 @@ export default function TruthAndDareGame({ room, userId }: GameComponentProps) {
                   aria-pressed={me?.character === option.id}
                   disabled={busy}
                   className={`${styles.characterOption} ${me?.character === option.id ? styles.characterSelected : ""}`}
-                  onClick={() =>
-                    void submit(() =>
-                      request("truth-and-dare:set-character", {
-                        character: option.id,
-                      }),
-                    )
-                  }
+                  onClick={() => handleSetCharacter(option.id)}
                 >
                   <span>{option.face}</span>
                   <small>{option.label}</small>

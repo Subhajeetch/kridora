@@ -34,7 +34,13 @@ export function getGameDefinition(slug: GameSlug): GameDefinition {
 
 export { GAME_DEFINITIONS, isKnownGameSlug } from "./registry";
 export type { GameSlug } from "./registry";
-export type { GameDefinition, StartContext } from "./types";
+export type {
+  GameDefinition,
+  StartContext,
+  GameScreenshot,
+  GameHowToPlayStep,
+  GameControlHint,
+} from "./types";
 export { evaluateStartRequirements } from "./requirements";
 export type {
   StartCheck,

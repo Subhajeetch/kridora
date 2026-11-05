@@ -48,6 +48,36 @@ export const truthAndDareConfigureSchema = z.object({
   spinner: z.enum(TRUTH_AND_DARE_SPINNERS),
   mode: z.enum(TRUTH_AND_DARE_MODES).default("funny"),
 });
+export const ludoDebugEnableSchema = z.object({
+  enabled: z.boolean(),
+});
+export const ludoDebugSetDiceSchema = z.object({
+  dice: z.number().int().min(1).max(6),
+});
+export const ludoDebugSetPieceSchema = z.object({
+  playerIndex: z.number().int().min(0).max(3),
+  tokenIndex: z.number().int().min(0).max(3),
+  step: z.number().int().min(-1).max(56),
+});
+export const ludoDebugSetTurnSchema = z.object({
+  playerIndex: z.number().int().min(0).max(3),
+});
+export const ludoDebugSetupCutSchema = z.object({
+  attackerPlayerIndex: z.number().int().min(0).max(3),
+  attackerTokenIndex: z.number().int().min(0).max(3),
+  defenderPlayerIndex: z.number().int().min(0).max(3),
+  defenderTokenIndex: z.number().int().min(0).max(3),
+  distance: z.number().int().min(1).max(6),
+});
+export const ludoDebugScenarioSchema = z.object({
+  scenario: z.enum([
+    "all_yard",
+    "all_track",
+    "near_win",
+    "instant_win",
+    "scatter",
+  ]),
+});
 export const inviteUserSchema = z.object({
   targetNumericId: z
     .string()
@@ -78,6 +108,12 @@ export type TruthAndDareCharacterPayload = z.input<
 export type TruthAndDareConfigurePayload = z.input<
   typeof truthAndDareConfigureSchema
 >;
+export type LudoDebugEnablePayload = z.input<typeof ludoDebugEnableSchema>;
+export type LudoDebugSetDicePayload = z.input<typeof ludoDebugSetDiceSchema>;
+export type LudoDebugSetPiecePayload = z.input<typeof ludoDebugSetPieceSchema>;
+export type LudoDebugSetTurnPayload = z.input<typeof ludoDebugSetTurnSchema>;
+export type LudoDebugSetupCutPayload = z.input<typeof ludoDebugSetupCutSchema>;
+export type LudoDebugScenarioPayload = z.input<typeof ludoDebugScenarioSchema>;
 export type InviteUserPayload = z.input<typeof inviteUserSchema>;
 export type ChangeGamePayload = z.input<typeof changeGameSchema>;
 export type EmptyPayload = z.input<typeof emptySchema>;
@@ -149,6 +185,34 @@ export interface ClientToServerEvents {
     payload: TruthAndDareConfigurePayload,
     ack: AckFn<TruthAndDareState>,
   ) => void;
+  "truth-and-dare:start-game": (
+    payload: EmptyPayload,
+    ack: AckFn<TruthAndDareState>,
+  ) => void;
+  "ludo:debug-enable": (
+    payload: LudoDebugEnablePayload,
+    ack: AckFn<LudoGameState>,
+  ) => void;
+  "ludo:debug-set-dice": (
+    payload: LudoDebugSetDicePayload,
+    ack: AckFn<LudoGameState>,
+  ) => void;
+  "ludo:debug-set-piece": (
+    payload: LudoDebugSetPiecePayload,
+    ack: AckFn<LudoGameState>,
+  ) => void;
+  "ludo:debug-set-turn": (
+    payload: LudoDebugSetTurnPayload,
+    ack: AckFn<LudoGameState>,
+  ) => void;
+  "ludo:debug-setup-cut": (
+    payload: LudoDebugSetupCutPayload,
+    ack: AckFn<LudoGameState>,
+  ) => void;
+  "ludo:debug-scenario": (
+    payload: LudoDebugScenarioPayload,
+    ack: AckFn<LudoGameState>,
+  ) => void;
 }
 
 export type ClientToServerEventName = keyof ClientToServerEvents;
@@ -170,6 +234,7 @@ export interface ServerToClientEvents {
   "ludo:state": (state: LudoGameState) => void;
   "ludo:rolling": (payload: { color: LudoColor; userId: string }) => void;
   "ludo:emote": (payload: { userId: string; emoji: string }) => void;
+  "ludo:debug-enabled": (payload: { enabled: boolean }) => void;
   "truth-and-dare:state": (state: TruthAndDareState) => void;
 }
 

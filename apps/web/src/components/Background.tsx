@@ -1,4 +1,5 @@
 import type React from "react";
+import { cn } from "@/lib/utils";
 
 function PixelStarSvg({
   color = "#facc15",
@@ -68,16 +69,20 @@ function PixelCrossSvg({
  * Clean, lightweight retro dark background inspired by ui-ref.png.
  * Features deep charcoal black, subtle scanlines, scattered pixel stars,
  * and 3 designated stars that animate like Claude AI icon (expanding from a point in pixels).
+ * Scrolls naturally with page content instead of remaining fixed.
  * Pure CSS hardware-accelerated transforms; zero JS animation overhead.
  */
-export function Background() {
+export function Background({ className }: { className?: string } = {}) {
   return (
     <div
       aria-hidden="true"
-      className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-[#090a0f]"
+      className={cn(
+        "pointer-events-none absolute inset-0 -z-10 overflow-hidden bg-[#090a0f]",
+        className,
+      )}
     >
-      {/* Subtle radial ambient vignette */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,#11121c_0%,#08090d_80%)]" />
+      {/* Subtle radial ambient vignette at top */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,#11121c_0%,#090a0f_65%,#090a0f_100%)]" />
 
       {/* Ultra lightweight scanline texture */}
       <div className="scanlines absolute inset-0 opacity-40 pointer-events-none" />

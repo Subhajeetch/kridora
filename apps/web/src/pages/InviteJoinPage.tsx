@@ -7,6 +7,7 @@ import {
   AlertCircle,
   ArrowRight,
   Crown,
+  Gamepad2,
   Loader2,
   LogOut,
   Users,
@@ -17,6 +18,7 @@ import { AuthDialog, GoogleIcon } from "@/components/AuthDialog";
 import { GameThumbnail } from "@/components/games/GameThumbnail";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/input";
+import { RetroProgressBar } from "@/components/ui/retro-progress-bar";
 import { authClient, startGuestSession } from "@/lib/auth-client";
 import { fetchInvitePreview } from "@/lib/room-preview";
 import {
@@ -216,15 +218,27 @@ export default function InviteJoinPage() {
 
   if (loading) {
     return (
-      <section className="mx-auto flex min-h-[60vh] max-w-md flex-col items-center justify-center py-16 px-4 text-center">
-        <div className="w-full rounded-3xl border border-white/10 bg-panel/85 p-8 backdrop-blur-2xl shadow-2xl">
-          <Loader2 className="mx-auto size-10 animate-spin text-primary" />
-          <h2 className="mt-4 font-display text-xl uppercase tracking-wider text-foreground">
-            Verifying Invitation...
-          </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Connecting to the game room
-          </p>
+      <section className="mx-auto flex min-h-[60vh] max-w-sm flex-col items-center justify-center py-16 px-4 text-center">
+        <div className="pixel-corners-sm bg-[#facc15] p-[2px] shadow-[0_0_20px_rgba(250,204,21,0.35)]">
+          <div className="pixel-corners-sm size-14 sm:size-16 bg-[#0a0b10] grid place-items-center text-[#facc15]">
+            <Gamepad2 className="size-8" />
+          </div>
+        </div>
+
+        <h2 className="mt-4 font-retro text-xl sm:text-2xl font-bold uppercase tracking-wide text-white drop-shadow-[0_2px_0_#1f2937]">
+          Verifying Invitation...
+        </h2>
+
+        <p className="mt-1.5 font-retro text-xs text-gray-400 tracking-wider">
+          Connecting to room...
+        </p>
+
+        <div className="mt-6 w-56 sm:w-64">
+          <RetroProgressBar
+            progress={75}
+            showPercent={false}
+            heightClass="h-2 sm:h-2.5"
+          />
         </div>
       </section>
     );
