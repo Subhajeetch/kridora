@@ -250,6 +250,68 @@ export const GAME_DEFINITIONS = {
       },
     ],
   },
+  "truth-and-dare": {
+    slug: "truth-and-dare",
+    name: "Truth and Dare",
+    tagline: "Round the table. Spin for a story.",
+    description:
+      "Choose your character, set an age-friendly prompt pack, then spin the bottle, a magic wand, or a compass to pick who plays next.",
+    accent: "#f472b6",
+    playTime: "10-30 min",
+    minPlayers: 2,
+    maxPlayers: 8,
+    requirements: { allPlayersReady: true, allPlayersConnected: true },
+    genre: [
+      "Party Game",
+      "Social Icebreaker",
+      "Casual Fun",
+      "Turn-Based",
+    ],
+    difficulty: "Casual & Good Vibes",
+    overview: [
+      "Truth and Dare brings the classic party circle directly into your browser with zero awkwardness and 100% good vibes.",
+      "Gather your friends around a retro-styled interactive table, choose between a bottle, magic wand, or compass centerpiece, and take turns spinning to select who takes the floor.",
+      "The host configures age packs and content vibes (from chill and family-friendly to teen and spicy adult modes), with full control to answer truthfully or take on lighthearted dares with a 30-second live timer.",
+    ],
+    howToPlay: [
+      {
+        step: 1,
+        title: "Join the Table & Pick a Character",
+        description:
+          "Gather your party in the room and choose your custom character look.",
+      },
+      {
+        step: 2,
+        title: "Host Sets the Vibe",
+        description:
+          "The room host enters the game and selects the age pack, content mode, and spinner.",
+      },
+      {
+        step: 3,
+        title: "Spin the Centerpiece",
+        description:
+          "Take turns spinning the bottle, wand, or compass to select the next player.",
+      },
+      {
+        step: 4,
+        title: "Truth or Dare?",
+        description:
+          "The selected player picks Truth or Dare, completes the prompt, or skips with zero penalty.",
+      },
+    ],
+    rulesSummary: [
+      "Good vibes only: prompts are playful, respectful, and completely optional to answer or perform.",
+      "Anyone can skip a prompt at any time without penalty.",
+      "Adult and spicy packs require explicit 18+ confirmation.",
+      "Turns rotate clockwise after each completed or skipped prompt.",
+    ],
+    controls: [
+      {
+        key: "Click / Tap",
+        action: "Spin the bottle, select Truth or Dare, or pick your character",
+      },
+    ],
+  },
 } satisfies Record<string, GameDefinition>;
 
 export type GameSlug = keyof typeof GAME_DEFINITIONS;

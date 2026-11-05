@@ -3,6 +3,13 @@ import type { AckFn } from "./errors";
 import type { RoomSnapshot } from "./room";
 import { roomCodeSchema } from "./validation";
 import type { LudoColor, LudoGameState } from "./games/ludo";
+import {
+  TRUTH_AND_DARE_AGE_GROUPS,
+  TRUTH_AND_DARE_CHARACTERS,
+  TRUTH_AND_DARE_MODES,
+  TRUTH_AND_DARE_SPINNERS,
+  type TruthAndDareState,
+} from "./games/truth-and-dare";
 
 export const createRoomSchema = z.object({
   gameSlug: z.string().min(1).max(40),
@@ -26,6 +33,20 @@ export const ludoMoveSchema = z.object({
 });
 export const ludoEmoteSchema = z.object({
   emoji: z.string().min(1).max(10),
+});
+export const truthAndDareChoiceSchema = z.object({
+  choice: z.enum(["truth", "dare"]),
+});
+export const truthAndDareFinishSchema = z.object({
+  result: z.enum(["done", "skip"]),
+});
+export const truthAndDareCharacterSchema = z.object({
+  character: z.enum(TRUTH_AND_DARE_CHARACTERS),
+});
+export const truthAndDareConfigureSchema = z.object({
+  ageGroup: z.enum(TRUTH_AND_DARE_AGE_GROUPS),
+  spinner: z.enum(TRUTH_AND_DARE_SPINNERS),
+  mode: z.enum(TRUTH_AND_DARE_MODES).default("funny"),
 });
 export const ludoDebugEnableSchema = z.object({
   enabled: z.boolean(),
@@ -75,6 +96,18 @@ export type SetReadyPayload = z.input<typeof setReadySchema>;
 export type TargetPlayerPayload = z.input<typeof targetPlayerSchema>;
 export type LudoMovePayload = z.input<typeof ludoMoveSchema>;
 export type LudoEmotePayload = z.input<typeof ludoEmoteSchema>;
+export type TruthAndDareChoicePayload = z.input<
+  typeof truthAndDareChoiceSchema
+>;
+export type TruthAndDareFinishPayload = z.input<
+  typeof truthAndDareFinishSchema
+>;
+export type TruthAndDareCharacterPayload = z.input<
+  typeof truthAndDareCharacterSchema
+>;
+export type TruthAndDareConfigurePayload = z.input<
+  typeof truthAndDareConfigureSchema
+>;
 export type LudoDebugEnablePayload = z.input<typeof ludoDebugEnableSchema>;
 export type LudoDebugSetDicePayload = z.input<typeof ludoDebugSetDiceSchema>;
 export type LudoDebugSetPiecePayload = z.input<typeof ludoDebugSetPieceSchema>;
@@ -128,6 +161,34 @@ export interface ClientToServerEvents {
     payload: LudoEmotePayload,
     ack: AckFn<{ ok: boolean }>,
   ) => void;
+  "truth-and-dare:get-state": (
+    payload: EmptyPayload,
+    ack: AckFn<TruthAndDareState>,
+  ) => void;
+  "truth-and-dare:spin": (
+    payload: EmptyPayload,
+    ack: AckFn<TruthAndDareState>,
+  ) => void;
+  "truth-and-dare:choose": (
+    payload: TruthAndDareChoicePayload,
+    ack: AckFn<TruthAndDareState>,
+  ) => void;
+  "truth-and-dare:finish": (
+    payload: TruthAndDareFinishPayload,
+    ack: AckFn<TruthAndDareState>,
+  ) => void;
+  "truth-and-dare:set-character": (
+    payload: TruthAndDareCharacterPayload,
+    ack: AckFn<TruthAndDareState>,
+  ) => void;
+  "truth-and-dare:configure": (
+    payload: TruthAndDareConfigurePayload,
+    ack: AckFn<TruthAndDareState>,
+  ) => void;
+  "truth-and-dare:start-game": (
+    payload: EmptyPayload,
+    ack: AckFn<TruthAndDareState>,
+  ) => void;
   "ludo:debug-enable": (
     payload: LudoDebugEnablePayload,
     ack: AckFn<LudoGameState>,
@@ -174,6 +235,7 @@ export interface ServerToClientEvents {
   "ludo:rolling": (payload: { color: LudoColor; userId: string }) => void;
   "ludo:emote": (payload: { userId: string; emoji: string }) => void;
   "ludo:debug-enabled": (payload: { enabled: boolean }) => void;
+  "truth-and-dare:state": (state: TruthAndDareState) => void;
 }
 
 export type InterServerEvents = Record<never, never>;

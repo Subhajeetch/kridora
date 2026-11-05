@@ -1,0 +1,200 @@
+{
+  "packs": {
+    "chill": {
+      "family": {
+        "truth": [
+          "What small thing helps you feel calm after a busy day?",
+          "Which place makes you feel most comfortable?",
+          "What song always puts you in a good mood?",
+          "What is your favorite way to spend a quiet afternoon?",
+          "Which snack would you happily eat on a movie night?",
+          "What is one kind thing someone did for you recently?",
+          "Which season feels most like you, and why?",
+          "What hobby would you like to make more time for?",
+          "What sound do you find relaxing?",
+          "What is your favorite memory from a peaceful day?",
+          "Which animal would make the coziest imaginary roommate?",
+          "What is something you are looking forward to this week?",
+          "What is your favorite way to recharge with friends?",
+          "Which color makes you feel relaxed?",
+          "What is one little comfort you are grateful for?"
+        ],
+        "dare": [
+          "Take one slow, silly victory bow, then sit back down.",
+          "Describe your ideal cozy day in exactly five words.",
+          "Hum a calm tune for ten seconds; the group can guess it.",
+          "Make a tiny heart with your hands and dedicate it to the snacks.",
+          "Name three things in the room that have your favorite color.",
+          "Do your best impression of a sleepy cat stretching.",
+          "Give the group a weather report for your current mood.",
+          "Invent a relaxing name for the room you are in.",
+          "Say a friendly compliment to the person on your left.",
+          "Pretend to stir an enormous cup of imaginary cocoa.",
+          "Share a two-second shoulder shimmy, if comfortable.",
+          "Point to an object and give it a peaceful new name.",
+          "Take a deep breath and make the gentlest drumroll on your knees.",
+          "Describe a favorite snack as if it were a cozy blanket.",
+          "Make a tiny wave to everyone around the table."
+        ]
+      },
+      "teen": { "extends": "family" },
+      "adult": { "extends": "family" }
+    },
+    "funny": {
+      "family": {
+        "truth": [
+          "What harmless word do you always find funny?",
+          "Which fictional character would be the silliest classmate?",
+          "What is the funniest animal to imagine wearing shoes?",
+          "Have you ever laughed at a joke before you understood it?",
+          "Which food has the funniest name?",
+          "What is the goofiest sound you can make without using words?",
+          "Which everyday object would make a ridiculous hat?",
+          "What is the silliest thing you believed when you were younger?",
+          "Which cartoon character would make the funniest sports coach?",
+          "What is a funny name for a very small dragon?",
+          "Which dance move would a penguin invent?",
+          "What is the funniest thing a pet could announce at dinner?",
+          "Which vegetable would be the best stand-up comedian?",
+          "What would you call a turtle that is always in a hurry?",
+          "What harmless thing makes you giggle every time?"
+        ],
+        "dare": [
+          "Say your name like a very surprised game-show host.",
+          "Do a tiny robot dance for five seconds.",
+          "Invent a silly sound effect for passing a potato.",
+          "Make your best friendly frog impression.",
+          "Pretend to be a penguin introducing a new dance.",
+          "Give an imaginary spoon a dramatic movie-star introduction.",
+          "Say 'the spaghetti is plotting' in a serious voice.",
+          "Mime opening a very stubborn invisible jar.",
+          "Make up a three-word slogan for a sleepy banana.",
+          "Do a slow-motion celebration for finding an imaginary sock.",
+          "Speak like a cheerful pirate for your next sentence.",
+          "Give a weather report for an imaginary cheese planet.",
+          "Pretend to interview your shoe about its big plans.",
+          "Make the face of someone who just met a polite alien.",
+          "Invent a new silly name for the bottle or spinner."
+        ]
+      },
+      "teen": { "extends": "family" },
+      "adult": { "extends": "family" }
+    },
+    "family": {
+      "family": {
+        "truth": [
+          "What is a family tradition you enjoy or would like to start?",
+          "Which meal reminds you of a happy time?",
+          "What is one thing you have learned from someone in your family?",
+          "Which board game or group activity do you enjoy most?",
+          "What is a kind way your family makes people feel welcome?",
+          "What is something you like teaching to other people?",
+          "Which family story always makes you smile?",
+          "What is one job at home you are surprisingly good at?",
+          "What is your favorite way to celebrate a small success?",
+          "Which place would you like your family or friends to visit together?",
+          "What is one quality you appreciate in the people close to you?",
+          "What is a helpful skill you would like to learn?",
+          "Which song would you choose for a group sing-along?",
+          "What is a fun activity you would like everyone to try once?",
+          "What is one thing that makes a group feel like a team?"
+        ],
+        "dare": [
+          "Lead a ten-second imaginary parade around your chair.",
+          "Give everyone a friendly nickname based on a color or animal.",
+          "Act out making your favorite snack without using words.",
+          "Say one encouraging sentence to the whole group.",
+          "Make a two-beat rhythm and invite the group to copy it.",
+          "Draw an imaginary star in the air for someone at the table.",
+          "Pretend to be a tour guide showing the group your chair.",
+          "Name three things the group could do together on a sunny day.",
+          "Make up a cheerful team name for the players here.",
+          "Show your best safe, seated dance move for five seconds.",
+          "Describe the person across from you using three kind words.",
+          "Give a dramatic thumbs-up to the next player.",
+          "Mime planting and watering an imaginary giant flower.",
+          "Invent a friendly handshake motion that needs no touching.",
+          "Tell the group a made-up motto for a helpful team."
+        ]
+      },
+      "teen": { "extends": "family" },
+      "adult": { "extends": "family" }
+    },
+    "couples": {
+      "adult": {
+        "truth": [
+          "What small gesture makes you feel appreciated in a relationship?",
+          "What would your ideal no-pressure date night include?",
+          "Which quality do you value most in a partner or close companion?",
+          "What is a fun activity you would like to try together?",
+          "What kind of compliment makes your day better?",
+          "Which song would you add to a shared road-trip playlist?",
+          "What is a little thing you enjoy doing as a pair?",
+          "What is your favorite way to make time for someone you care about?",
+          "Which fictional couple has a teamwork style you admire?",
+          "What is a place you would enjoy exploring together?",
+          "What is one thoughtful question you like being asked?",
+          "What is a silly tradition you could start as a couple?",
+          "What makes you feel listened to during a conversation?",
+          "Which dessert would you choose to share on a relaxed evening?",
+          "What is one thing you appreciate about your partner or date?"
+        ],
+        "dare": [
+          "Give your partner a sincere compliment, if they are comfortable receiving it.",
+          "Invent a playful name for your next imaginary date night.",
+          "Describe your partner as a movie genre in one kind sentence.",
+          "Choose a song that would make a fun shared entrance tune.",
+          "Offer two no-pressure ideas for a future activity together.",
+          "Make a tiny toast to good communication and shared snacks.",
+          "Create a three-word slogan for your team as a couple.",
+          "Say one thing you admire about how your partner treats people.",
+          "Plan an imaginary date with a budget of exactly zero.",
+          "Give your partner a friendly wave like you just spotted them across a cafe.",
+          "Make up a gentle, funny award for your partner's best quality.",
+          "Describe your partner's ideal superpower in a kind sentence.",
+          "Share a favorite shared memory, only if you both feel like it.",
+          "Invent a secret team motto that is safe to say in public.",
+          "Ask your partner which snack should represent your team."
+        ]
+      }
+    },
+    "spicy": {
+      "adult": {
+        "truth": [
+          "What is your favorite kind of confident, playful compliment?",
+          "What would make a date feel exciting while still comfortable?",
+          "Which charming fictional character has great conversation skills?",
+          "What is a flirty-but-kind opening line you have heard or invented?",
+          "What detail can make someone seem especially charismatic to you?",
+          "What is a playful way to show someone you enjoy their company?",
+          "What kind of date-night atmosphere helps you feel relaxed?",
+          "What is a romantic comedy moment you would happily reenact as a joke?",
+          "What is one boundary that makes a social game more comfortable for you?",
+          "What is a lighthearted way you like to break the ice?",
+          "Which song would you pick for a dramatic, movie-style entrance?",
+          "What is your favorite way to keep flirting respectful and fun?",
+          "What would your ideal playful celebration with a partner look like?",
+          "Which style of date sounds most adventurous: food, art, or outdoors?",
+          "What is a charming quality you notice before anything else?"
+        ],
+        "dare": [
+          "Deliver a fictional, PG-rated pickup line to an imaginary movie star.",
+          "Give a ten-second trailer voice-over for your dream date night.",
+          "Offer someone a respectful, specific compliment, if they welcome it.",
+          "Invent a playful name for a fancy mocktail made for a date.",
+          "Strike a confident red-carpet pose from your chair, if comfortable.",
+          "Make up a smooth but silly line to invite someone to a dance floor.",
+          "Describe a romantic comedy scene using only three dramatic words.",
+          "Choose a song for an imaginary slow-motion entrance.",
+          "Give the group a confident wink or a friendly wave, whichever feels right.",
+          "Create a two-line toast to kindness, chemistry, and clear communication.",
+          "Invent a playful but respectful dating-show catchphrase.",
+          "Share a no-pressure idea for a memorable first date.",
+          "Read an imaginary love note to your favorite dessert.",
+          "Describe your most charming fictional alter ego in one sentence.",
+          "Make a dramatic, movie-style invitation to share a snack."
+        ]
+      }
+    }
+  }
+}
