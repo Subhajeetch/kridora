@@ -1,6 +1,6 @@
 # Kridora
 
-Modern real-time multiplayer gaming platform built for ultra-low latency, seamless room matchmaking, and edge-native scalability. Powered by **Cloudflare Workers**, **Hono**, **Cloudflare Durable Objects**, **React**, and **PostgreSQL (Drizzle ORM)**.
+Modern real-time multiplayer gaming platform built for ultra-low latency, seamless room matchmaking, and edge-native scalability. Powered by **Cloudflare Workers**, **Hono**, **Cloudflare Durable Objects**, **React**, and **Cloudflare D1 (Drizzle ORM)**.
 
 ---
 
@@ -11,7 +11,7 @@ graph TD
     Client["React 19 Web App (Vite + Tailwind CSS v4)"]
     API["API Gateway (Hono on Cloudflare Workers)"]
     DO["RealtimeHub (Cloudflare Durable Object)"]
-    DB[("PostgreSQL Database (Drizzle ORM)")]
+    DB[("Cloudflare D1 Database (Drizzle ORM)")]
     Auth["Better Auth (Sessions / OAuth / Guest)"]
 
     Client -- "HTTP / REST (/api/*)" --> API
@@ -168,17 +168,21 @@ To create a new game module for the platform:
 
 ## Production Deployment
 
-### 1. Database (Cloudflare Hyperdrive / Managed Postgres)
+### 1. Database (Cloudflare D1)
 
-- Deploy a managed PostgreSQL instance (e.g. Neon, Supabase, AWS RDS, or Crunchy Data).
-- Configure **Cloudflare Hyperdrive** in your Cloudflare dashboard pointing to your PostgreSQL connection string for pooled, low-latency queries from the edge.
+- Cloudflare D1 is a serverless SQL database natively integrated with Workers.
+- Ensure your production D1 database is created and bound in `apps/api/wrangler.jsonc`:
+  ```bash
+  npx wrangler d1 create kridora
+  ```
+- Apply remote database migrations to production Cloudflare D1:
+  ```bash
+  pnpm db:migrate:remote
+  ```
 
 ### 2. Deploy API Worker
 
 ```bash
-# Run database migrations
-pnpm db:migrate
-
 # Deploy Cloudflare Worker & Durable Objects
 pnpm --filter @kridora/api deploy
 ```
@@ -187,7 +191,6 @@ Set required secrets in Cloudflare Workers:
 
 ```bash
 npx wrangler secret put BETTER_AUTH_SECRET
-npx wrangler secret put DATABASE_URL
 ```
 
 ### 3. Deploy Web Frontend
