@@ -143,7 +143,9 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
   const emoteTimersRef = useRef<Map<string, number>>(new Map());
 
   const stateRef = useRef<LudoGameState | null>(null);
-  stateRef.current = state;
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
 
   const autoMoveTimerRef = useRef<number | null>(null);
   const autoPassTimerRef = useRef<number | null>(null);
@@ -636,7 +638,6 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
 
   useEffect(() => {
     if (!passKey || !state) {
-      setShowManualPass(false);
       if (autoPassTimerRef.current) {
         window.clearTimeout(autoPassTimerRef.current);
         autoPassTimerRef.current = null;
@@ -667,6 +668,7 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
     }
 
     return () => {
+      setShowManualPass(false);
       if (autoPassTimerRef.current) {
         window.clearTimeout(autoPassTimerRef.current);
         autoPassTimerRef.current = null;
@@ -676,7 +678,7 @@ export default function LudoGame({ room, userId }: GameComponentProps) {
         manualPassTimerRef.current = null;
       }
     };
-  }, [passKey, userId, handlePass]);
+  }, [passKey, state, userId, handlePass]);
 
   const handleConfirmLeave = useCallback(async () => {
     setIsLeaving(true);

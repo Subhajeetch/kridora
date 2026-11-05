@@ -11,7 +11,10 @@ interface SplashScreenProps {
   onComplete?: () => void;
 }
 
-export function SplashScreen({ isReady = true, onComplete }: SplashScreenProps) {
+export function SplashScreen({
+  isReady = true,
+  onComplete,
+}: SplashScreenProps) {
   const reduce = useReducedMotion();
   const [progress, setProgress] = useState(() => (reduce ? 100 : 0));
   const completedRef = useRef(false);

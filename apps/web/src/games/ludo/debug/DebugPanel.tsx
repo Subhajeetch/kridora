@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useCallback, useMemo, useRef, useState } from "react";
 import {
+  type ClientToServerEvents,
   getLudoMovableTokens,
   LUDO_HOME_STEP,
   LUDO_YARD_STEP,
@@ -31,6 +32,39 @@ import { SEAT_DEFINITIONS } from "../constants";
 import type { DebugPanelProps, DebugTab, SoundEffectItem } from "./debug-types";
 
 const DICE_FACES = [1, 2, 3, 4, 5, 6] as const;
+
+const PRESET_SCENARIOS = [
+  {
+    id: "near_win",
+    title: "Near Win (1 Step Away)",
+    desc: "3 pieces in goal, 1 piece at 55. Next roll of 1 wins match.",
+    color: "text-amber-300 border-amber-400/40 bg-amber-400/10",
+  },
+  {
+    id: "instant_win",
+    title: "Instant Victory",
+    desc: "All 4 pieces home, triggers championship modal.",
+    color: "text-emerald-300 border-emerald-400/40 bg-emerald-400/10",
+  },
+  {
+    id: "all_track",
+    title: "All on Track",
+    desc: "Pawn spread on shared ring (steps 0, 8, 16, 24).",
+    color: "text-sky-300 border-sky-400/40 bg-sky-400/10",
+  },
+  {
+    id: "scatter",
+    title: "Multi-player Scatter",
+    desc: "Distributes all players tokens along outer ring.",
+    color: "text-purple-300 border-purple-400/40 bg-purple-400/10",
+  },
+  {
+    id: "all_yard",
+    title: "Reset All to Yard",
+    desc: "Resets all 16 pieces back to base yard.",
+    color: "text-rose-300 border-rose-400/40 bg-rose-400/10",
+  },
+] as const;
 
 export default function DebugPanel({
   state,
@@ -148,7 +182,12 @@ export default function DebugPanel({
         onApplyStateOverride(optimisticUpdater(state));
       }
       try {
-        const nextState = await request(actionName as any, payload as any);
+        const nextState = await request(
+          actionName as keyof ClientToServerEvents,
+          payload as Parameters<
+            ClientToServerEvents[keyof ClientToServerEvents]
+          >[0],
+        );
         if (
           nextState &&
           typeof nextState === "object" &&
@@ -1017,48 +1056,11 @@ export default function DebugPanel({
         {/* ================= TAB 5: PRESETS ================= */}
         {activeTab === "presets" && (
           <div className="space-y-2">
-            {[
-              {
-                id: "near_win",
-                title: "Near Win (1 Step Away)",
-                desc: "3 pieces in goal, 1 piece at 55. Next roll of 1 wins match.",
-                action: () => handleTriggerScenario("near_win"),
-                color: "text-amber-300 border-amber-400/40 bg-amber-400/10",
-              },
-              {
-                id: "instant_win",
-                title: "Instant Victory",
-                desc: "All 4 pieces home, triggers championship modal.",
-                action: () => handleTriggerScenario("instant_win"),
-                color:
-                  "text-emerald-300 border-emerald-400/40 bg-emerald-400/10",
-              },
-              {
-                id: "all_track",
-                title: "All on Track",
-                desc: "Pawn spread on shared ring (steps 0, 8, 16, 24).",
-                action: () => handleTriggerScenario("all_track"),
-                color: "text-sky-300 border-sky-400/40 bg-sky-400/10",
-              },
-              {
-                id: "scatter",
-                title: "Multi-player Scatter",
-                desc: "Distributes all players tokens along outer ring.",
-                action: () => handleTriggerScenario("scatter"),
-                color: "text-purple-300 border-purple-400/40 bg-purple-400/10",
-              },
-              {
-                id: "all_yard",
-                title: "Reset All to Yard",
-                desc: "Resets all 16 pieces back to base yard.",
-                action: () => handleTriggerScenario("all_yard"),
-                color: "text-rose-300 border-rose-400/40 bg-rose-400/10",
-              },
-            ].map((p) => (
+            {PRESET_SCENARIOS.map((p) => (
               <button
                 key={p.id}
                 type="button"
-                onClick={p.action}
+                onClick={() => handleTriggerScenario(p.id)}
                 className={cn(
                   "flex w-full items-start justify-between rounded-xl border p-2.5 text-left transition-all hover:brightness-125 active:scale-98",
                   p.color,

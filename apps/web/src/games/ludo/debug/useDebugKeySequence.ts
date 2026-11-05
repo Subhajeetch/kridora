@@ -26,7 +26,10 @@ export function useDebugKeySequence({
   const stepIndexRef = useRef(0);
   const timerRef = useRef<number | null>(null);
   const onTriggerRef = useRef(onTrigger);
-  onTriggerRef.current = onTrigger;
+
+  useEffect(() => {
+    onTriggerRef.current = onTrigger;
+  }, [onTrigger]);
 
   useEffect(() => {
     function clearSequenceTimer() {

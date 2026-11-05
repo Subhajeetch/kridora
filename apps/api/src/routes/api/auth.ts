@@ -49,7 +49,10 @@ authRoutes.post("/auth/sign-out", async (c) => {
       try {
         await discardGuestAccount(db, currentUserId);
       } catch (err) {
-        console.error("[auth] Failed to discard guest account on sign-out:", err);
+        console.error(
+          "[auth] Failed to discard guest account on sign-out:",
+          err,
+        );
       }
     }
   }

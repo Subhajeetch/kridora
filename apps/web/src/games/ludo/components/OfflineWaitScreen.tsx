@@ -59,12 +59,8 @@ export function OfflineWaitScreen({
 
   // 5-second countdown for End Game dialog button
   useEffect(() => {
-    if (!endGameDialogOpen) {
-      setEndGameCountdown(5);
-      return;
-    }
+    if (!endGameDialogOpen) return;
 
-    setEndGameCountdown(5);
     const interval = window.setInterval(() => {
       setEndGameCountdown((prev) => {
         if (prev <= 1) {
@@ -77,6 +73,18 @@ export function OfflineWaitScreen({
 
     return () => window.clearInterval(interval);
   }, [endGameDialogOpen]);
+
+  function handleOpenEndGameDialog() {
+    setEndGameCountdown(5);
+    setEndGameDialogOpen(true);
+  }
+
+  function handleEndGameOpenChange(open: boolean) {
+    if (open) {
+      setEndGameCountdown(5);
+    }
+    setEndGameDialogOpen(open);
+  }
 
   if (!primaryOffline) return null;
 
@@ -191,7 +199,7 @@ export function OfflineWaitScreen({
                 {/* End Game Button */}
                 <Button
                   variant="outline"
-                  onClick={() => setEndGameDialogOpen(true)}
+                  onClick={handleOpenEndGameDialog}
                   className="flex-1 h-10 gap-1.5 rounded-xl border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 hover:border-amber-400 text-xs font-bold"
                 >
                   <DoorOpen className="size-4" />
@@ -265,7 +273,7 @@ export function OfflineWaitScreen({
       </Dialog>
 
       {/* 2. END GAME CONFIRMATION DIALOG (DISABLED FOR 5 SECONDS) */}
-      <Dialog open={endGameDialogOpen} onOpenChange={setEndGameDialogOpen}>
+      <Dialog open={endGameDialogOpen} onOpenChange={handleEndGameOpenChange}>
         <DialogContent className="max-w-md border-amber-500/30 bg-slate-900 text-slate-100">
           <div className="flex items-center gap-2.5">
             <div className="grid size-10 place-items-center rounded-xl bg-amber-500/15 text-amber-400">

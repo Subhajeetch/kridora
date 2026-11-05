@@ -235,9 +235,7 @@ export async function mergeGuestProfileIntoUser(
       .update(matchPlayers)
       .set({ userId: newUserId })
       .where(eq(matchPlayers.userId, guestUserId)),
-    db
-      .delete(playerProfiles)
-      .where(eq(playerProfiles.userId, guestUserId)),
+    db.delete(playerProfiles).where(eq(playerProfiles.userId, guestUserId)),
     db.delete(account).where(eq(account.userId, guestUserId)),
     db.delete(session).where(eq(session.userId, guestUserId)),
     db.delete(user).where(eq(user.id, guestUserId)),
@@ -256,18 +254,14 @@ export async function discardGuestAccount(
 
   await db.batch([
     // Delete ephemeral guest ring transactions so onDelete: restrict doesn't block deletion
-    db
-      .delete(ringTransactions)
-      .where(eq(ringTransactions.userId, guestUserId)),
+    db.delete(ringTransactions).where(eq(ringTransactions.userId, guestUserId)),
     // Dissociate match_players
     db
       .update(matchPlayers)
       .set({ userId: null })
       .where(eq(matchPlayers.userId, guestUserId)),
     // Delete player profile
-    db
-      .delete(playerProfiles)
-      .where(eq(playerProfiles.userId, guestUserId)),
+    db.delete(playerProfiles).where(eq(playerProfiles.userId, guestUserId)),
     // Delete guest accounts (if any)
     db.delete(account).where(eq(account.userId, guestUserId)),
     // Delete guest user sessions
