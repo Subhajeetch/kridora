@@ -1,0 +1,169 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Code Quality (Format, Types, Lint)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Cache Turborepo
+        uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: ${{ runner.os }}-turbo-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-turbo-
+
+      - name: Check code formatting
+        run: pnpm format:check
+
+      - name: Check TypeScript types
+        run: pnpm check-types
+
+      - name: Run ESLint
+        run: pnpm lint
+
+  build:
+    name: Build Applications & Packages
+    runs-on: ubuntu-latest
+    needs: [quality]
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Cache Turborepo
+        uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: ${{ runner.os }}-turbo-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-turbo-
+
+      - name: Build monorepo packages and apps
+        run: pnpm build
+
+  security-audit:
+    name: Dependency Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: "pnpm"
+
+      - name: Audit production dependencies
+        run: pnpm audit --prod --audit-level=high
+
+  dependency-review:
+    name: Dependency Review
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Review pull request dependencies
+        uses: actions/dependency-review-action@v4
+
+  ci-passed:
+    name: CI passed
+    runs-on: ubuntu-latest
+    needs: [quality, build, security-audit, dependency-review]
+    if: always()
+    timeout-minutes: 5
+    steps:
+      - name: Verify all required checks
+        run: |
+          quality="${{ needs.quality.result }}"
+          build="${{ needs.build.result }}"
+          audit="${{ needs.security-audit.result }}"
+          dep_review="${{ needs.dependency-review.result }}"
+
+          echo "Quality check status: $quality"
+          echo "Build status: $build"
+          echo "Security audit status: $audit"
+          echo "Dependency review status: $dep_review"
+
+          failed=0
+
+          if [[ "$quality" != "success" ]]; then
+            echo "::error::quality job failed or was cancelled (status: $quality)"
+            failed=1
+          fi
+
+          if [[ "$build" != "success" ]]; then
+            echo "::error::build job failed or was cancelled (status: $build)"
+            failed=1
+          fi
+
+          if [[ "$audit" != "success" ]]; then
+            echo "::error::security-audit job failed or was cancelled (status: $audit)"
+            failed=1
+          fi
+
+          if [[ "$dep_review" != "success" && "$dep_review" != "skipped" ]]; then
+            echo "::error::dependency-review job failed or was cancelled (status: $dep_review)"
+            failed=1
+          fi
+
+          if [[ "$failed" -ne 0 ]]; then
+            echo "One or more required CI jobs did not complete successfully."
+            exit 1
+          fi
+
+          echo "All required CI jobs succeeded."
