@@ -166,23 +166,23 @@ pnpm --filter @kridora/api dev
 
 ### Required Quality Checks
 
-Before committing and opening a pull request, run all checks to make sure everything passes:
+Before committing and opening a pull request, run all checks locally to make sure everything passes:
 
-1. **Verify TypeScript types**:
+1. **Verify code formatting**:
+
+   ```bash
+   pnpm format:check
+   ```
+
+   Verifies that all TypeScript, CSS, and Markdown files comply with Prettier code style without modifying them. Run `pnpm format` to automatically apply formatting.
+
+2. **Verify TypeScript types**:
 
    ```bash
    pnpm check-types
    ```
 
-   Ensures there are no type errors across the entire monorepo.
-
-2. **Format your code**:
-
-   ```bash
-   pnpm format
-   ```
-
-   Formats TypeScript, CSS, and Markdown files using Prettier.
+   Ensures there are no type errors across the entire monorepo. Type safety is strictly enforced across all client events, server actions, and database schemas.
 
 3. **Check for lint errors**:
 
@@ -190,7 +190,10 @@ Before committing and opening a pull request, run all checks to make sure everyt
    pnpm lint
    ```
 
-   Runs ESLint across frontend and backend packages.
+   Runs ESLint across frontend and backend packages. We enforce strict React 19 hook guidelines:
+   - **No synchronous state updates in effect bodies** (`react-hooks/set-state-in-effect`): Do not call `setState()` directly inside an effect body. Reset state in event handlers or defer to asynchronous microtasks (`queueMicrotask`).
+   - **No ref access or mutation during render** (`react-hooks/refs`): Never read or update ref values during rendering. Synchronize refs within `useEffect` or event handlers.
+   - **Complete dependency arrays** (`react-hooks/exhaustive-deps`): Always declare all referenced variables and callback handlers.
 
 4. **Test the production build**:
 
@@ -198,7 +201,34 @@ Before committing and opening a pull request, run all checks to make sure everyt
    pnpm build
    ```
 
-   Verifies that the web app compiles cleanly and the worker bundle builds without errors.
+   Verifies that the React web app compiles cleanly and the Cloudflare Worker bundle builds without dry-run errors.
+
+5. **Run dependency security audit**:
+
+   ```bash
+   pnpm audit --prod --audit-level=high
+   ```
+
+   Verifies that production dependencies contain zero high or critical security advisories. (Always put CLI and build tools like `shadcn` in `devDependencies`).
+
+---
+
+## CI/CD Pipeline & Quality Gates
+
+Every pull request and push to the `main` branch triggers automated GitHub Actions workflows:
+
+1. **Continuous Integration (`.github/workflows/ci.yml`)**:
+   - **`quality`**: Runs `pnpm format:check`, `pnpm check-types`, and `pnpm lint`.
+   - **`build`**: Runs `pnpm build` after the quality job passes.
+   - **`security-audit`**: Runs `pnpm audit --prod --audit-level=high`.
+   - **`dependency-review`**: Scans pull request dependency changes for new vulnerabilities.
+   - **`ci-passed`**: An aggregate status check that evaluates all jobs. **`CI passed` is the required status check in repository branch protection rules**.
+2. **CodeQL Analysis (`.github/workflows/codeql.yml`)**:
+   - Performs deep static analysis for JavaScript and TypeScript security vulnerabilities on all PRs and weekly schedules.
+3. **Automated Dependabot Updates (`.github/dependabot.yml`)**:
+   - Scans weekly for dependency security advisories and version updates for npm packages and GitHub Actions.
+4. **Automated Deployment**:
+   - Deployment is handled automatically by Cloudflare's native Git integration, which builds and deploys from `main` once all CI checks pass. Pull requests cannot be merged until `CI passed` succeeds.
 
 ---
 

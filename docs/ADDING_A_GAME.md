@@ -336,3 +336,16 @@ To build your in-game navigation, player badges, audio controls, or pause menu, 
 | Game screen mounted once `room.status === "in_progress"`                             | `RoomPage.tsx` -> `<InGameRoomProvider>`          |
 | A `matches` row + `match_players` rows created on start (`room.matchId`)             | `@kridora/db`                                     |
 | End-of-match economy rewards (Rings & XP)                                            | `ctx.completeMatch({ winnerUserId, placements })` |
+
+---
+
+## Game Module CI/CD Quality Checklist
+
+Before submitting a pull request for a new game or game logic updates, verify that all CI pipeline checks pass locally:
+
+1. **Format Check**: `pnpm format:check` (or `pnpm format` to auto-format files with Prettier).
+2. **Type Safety**: `pnpm check-types` (0 errors across the monorepo; game socket events must be strictly typed using Zod and TypeScript interfaces in `@kridora/shared`).
+3. **Lint Compliance**: `pnpm lint` (React 19 hook rules are strictly enforced: no synchronous `setState` in effect bodies, no ref mutation during render, complete dependency arrays).
+4. **Production Build**: `pnpm build` (both Vite web client and Wrangler Worker dry-run must compile cleanly).
+5. **Dependency Audit**: `pnpm audit --prod --audit-level=high` (0 high or critical vulnerabilities; any new CLI or build dependencies must be placed in `devDependencies`).
+6. **Branch Rules**: Pull requests require the aggregate **`CI passed`** check to succeed before merging. Once merged into `main`, Cloudflare automatically deploys the platform.

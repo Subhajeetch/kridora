@@ -180,17 +180,19 @@ pnpm db:studio
 
 ## Available Monorepo Scripts
 
-| Command                  | Description                                                                   |
-| :----------------------- | :---------------------------------------------------------------------------- |
-| `pnpm dev`               | Starts the Vite web client and Wrangler API worker concurrently in watch mode |
-| `pnpm build`             | Builds production bundles for the web app and runs dry-run API build          |
-| `pnpm check-types`       | Runs TypeScript type-checks across all apps and packages in the workspace     |
-| `pnpm lint`              | Runs ESLint across all workspace packages                                     |
-| `pnpm format`            | Formats all code and markdown files with Prettier                             |
-| `pnpm db:generate`       | Generates new SQL migration files from Drizzle schema alterations             |
-| `pnpm db:migrate`        | Applies pending migrations to the local Cloudflare D1 database                |
-| `pnpm db:migrate:remote` | Applies pending migrations to the production Cloudflare D1 database           |
-| `pnpm db:studio`         | Launches Drizzle Studio browser visualizer for D1 schema/data                 |
+| Command                                | Description                                                                   |
+| :------------------------------------- | :---------------------------------------------------------------------------- |
+| `pnpm dev`                             | Starts the Vite web client and Wrangler API worker concurrently in watch mode |
+| `pnpm build`                           | Builds production bundles for the web app and runs dry-run API build          |
+| `pnpm check-types`                     | Runs TypeScript type-checks across all apps and packages in the workspace     |
+| `pnpm lint`                            | Runs ESLint across all workspace packages                                     |
+| `pnpm format`                          | Formats all code and markdown files with Prettier                             |
+| `pnpm format:check`                    | Checks formatting of all code and markdown files without modifying them       |
+| `pnpm audit --prod --audit-level=high` | Audits production dependencies for high and critical vulnerabilities          |
+| `pnpm db:generate`                     | Generates new SQL migration files from Drizzle schema alterations             |
+| `pnpm db:migrate`                      | Applies pending migrations to the local Cloudflare D1 database                |
+| `pnpm db:migrate:remote`               | Applies pending migrations to the production Cloudflare D1 database           |
+| `pnpm db:studio`                       | Launches Drizzle Studio browser visualizer for D1 schema/data                 |
 
 ---
 
