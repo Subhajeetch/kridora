@@ -1,19 +1,7 @@
 import { useSyncExternalStore } from "react";
 import type { TruthAndDareAgeGroup, TruthAndDareMode } from "@kridora/shared";
 
-export const TRUTH_AND_DARE_THEMES = [
-  { id: "neon", label: "Neon Party", icon: "💜" },
-  { id: "arcade", label: "Retro Arcade", icon: "🕹️" },
-  { id: "beach", label: "Beach Night", icon: "🌴" },
-  { id: "cozy", label: "Cozy Campfire", icon: "🔥" },
-  { id: "space", label: "Space", icon: "🪐" },
-] as const;
-
-export type TruthAndDareTheme = (typeof TRUTH_AND_DARE_THEMES)[number]["id"];
-
 export interface TruthAndDarePreferences {
-  theme: TruthAndDareTheme;
-  lightMode: boolean;
   ageGroup: TruthAndDareAgeGroup;
   mode: TruthAndDareMode;
   soundEnabled: boolean;
@@ -21,8 +9,6 @@ export interface TruthAndDarePreferences {
 
 const STORAGE_KEY = "kridora:truth-and-dare-preferences";
 const DEFAULTS: TruthAndDarePreferences = {
-  theme: "neon",
-  lightMode: false,
   ageGroup: "family",
   mode: "funny",
   soundEnabled: true,
@@ -35,10 +21,6 @@ function readPreferences(): TruthAndDarePreferences {
       window.localStorage.getItem(STORAGE_KEY) ?? "{}",
     ) as Partial<TruthAndDarePreferences>;
     return {
-      theme: TRUTH_AND_DARE_THEMES.some((theme) => theme.id === saved.theme)
-        ? (saved.theme as TruthAndDareTheme)
-        : DEFAULTS.theme,
-      lightMode: saved.lightMode === true,
       ageGroup:
         saved.ageGroup === "family" ||
         saved.ageGroup === "teen" ||

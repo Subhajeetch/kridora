@@ -9,11 +9,9 @@ import {
   Check,
   Compass,
   Heart,
-  Moon,
   RotateCcw,
   ShieldCheck,
   Sparkles,
-  Sun,
   Volume2,
   VolumeX,
   WandSparkles,
@@ -36,7 +34,6 @@ import {
 } from "@/components/ui/dialog";
 import { describeError, request, socket } from "@/lib/socket";
 import {
-  TRUTH_AND_DARE_THEMES,
   updateTruthAndDarePreferences,
   useTruthAndDarePreferences,
 } from "./preferences";
@@ -427,8 +424,8 @@ export default function TruthAndDareGame({ room, userId }: GameComponentProps) {
   return (
     <main
       className={styles.gameShell}
-      data-theme={preferences.theme}
-      data-tone={preferences.lightMode ? "light" : "dark"}
+      data-theme="arcade"
+      data-tone="dark"
       onPointerDown={unlockSpinAudio}
     >
       <header className={styles.gameHeader}>
@@ -457,41 +454,6 @@ export default function TruthAndDareGame({ room, userId }: GameComponentProps) {
           <span className={styles.playerCount}>
             {state.players.length} at the table
           </span>
-          <label className={styles.themeControl}>
-            <span className="sr-only">Choose a party theme</span>
-            <select
-              value={preferences.theme}
-              onChange={(event) =>
-                updateTruthAndDarePreferences({
-                  theme: event.target
-                    .value as (typeof TRUTH_AND_DARE_THEMES)[number]["id"],
-                })
-              }
-            >
-              {TRUTH_AND_DARE_THEMES.map((theme) => (
-                <option key={theme.id} value={theme.id}>
-                  {theme.icon} {theme.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button
-            type="button"
-            className={styles.headerControl}
-            aria-label={`Switch to ${preferences.lightMode ? "dark" : "light"} mode`}
-            aria-pressed={preferences.lightMode}
-            onClick={() =>
-              updateTruthAndDarePreferences({
-                lightMode: !preferences.lightMode,
-              })
-            }
-          >
-            {preferences.lightMode ? (
-              <Moon aria-hidden="true" />
-            ) : (
-              <Sun aria-hidden="true" />
-            )}
-          </button>
           <button
             type="button"
             className={styles.headerControl}

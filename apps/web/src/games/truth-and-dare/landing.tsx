@@ -4,11 +4,9 @@ import {
   DoorOpen,
   Hash,
   Heart,
-  Moon,
   Play,
   ShieldCheck,
   Sparkles,
-  Sun,
   Users,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -23,7 +21,6 @@ import {
 import styles from "./landing.module.css";
 import { AgeConfirmModal } from "./local-game-components";
 import {
-  TRUTH_AND_DARE_THEMES,
   updateTruthAndDarePreferences,
   useTruthAndDarePreferences,
 } from "./preferences";
@@ -188,8 +185,8 @@ export function TruthAndDareLanding({
     <section
       className={styles.page}
       aria-label="Truth and Dare main menu"
-      data-theme={preferences.theme}
-      data-tone={preferences.lightMode ? "light" : "dark"}
+      data-theme="arcade"
+      data-tone="dark"
     >
       <section className={styles.hero}>
         <div className={styles.backgroundGlow} aria-hidden="true" />
@@ -204,41 +201,6 @@ export function TruthAndDareLanding({
             <span className={styles.playerRange}>
               <Users aria-hidden="true" /> 2–8 PLAYERS
             </span>
-            <label className={styles.themeControl}>
-              <span className="sr-only">Choose a party theme</span>
-              <select
-                value={preferences.theme}
-                onChange={(event) =>
-                  updateTruthAndDarePreferences({
-                    theme: event.target
-                      .value as (typeof TRUTH_AND_DARE_THEMES)[number]["id"],
-                  })
-                }
-              >
-                {TRUTH_AND_DARE_THEMES.map((theme) => (
-                  <option key={theme.id} value={theme.id}>
-                    {theme.icon} {theme.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button
-              type="button"
-              className={styles.themeToggle}
-              aria-label={`Switch to ${preferences.lightMode ? "dark" : "light"} mode`}
-              aria-pressed={preferences.lightMode}
-              onClick={() =>
-                updateTruthAndDarePreferences({
-                  lightMode: !preferences.lightMode,
-                })
-              }
-            >
-              {preferences.lightMode ? (
-                <Moon aria-hidden="true" />
-              ) : (
-                <Sun aria-hidden="true" />
-              )}
-            </button>
           </div>
         </div>
 
