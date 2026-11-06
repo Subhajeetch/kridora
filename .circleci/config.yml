@@ -1,0 +1,75 @@
+version: 2.1
+
+executors:
+  node-executor:
+    docker:
+      - image: cimg/node:24.13
+    environment:
+      # Prevent interactive prompt from Corepack when downloading pnpm
+      COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+
+commands:
+  setup:
+    description: "Checkout code, enable pnpm via Corepack, restore and install dependencies"
+    steps:
+      - checkout
+      # Enable pnpm shim so the exact version from "packageManager" (pnpm@11.25.0) is used
+      - run:
+          name: Enable pnpm via Corepack
+          command: sudo corepack enable
+      - restore_cache:
+          name: Restore pnpm store cache
+          keys:
+            - pnpm-store-v1-{{ checksum "pnpm-lock.yaml" }}
+            - pnpm-store-v1-
+      - run:
+          name: Install dependencies
+          command: pnpm install --frozen-lockfile --store-dir ~/.pnpm-store
+      - save_cache:
+          name: Save pnpm store cache
+          key: pnpm-store-v1-{{ checksum "pnpm-lock.yaml" }}
+          paths:
+            - ~/.pnpm-store
+
+jobs:
+  quality:
+    executor: node-executor
+    resource_class: medium
+    steps:
+      - setup
+      - run:
+          name: Check TypeScript types
+          command: pnpm check-types
+      - run:
+          name: Run ESLint
+          command: pnpm lint
+      - run:
+          name: Check code formatting
+          command: pnpm format:check
+
+  build:
+    executor: node-executor
+    resource_class: medium
+    steps:
+      - setup
+      - run:
+          name: Build monorepo packages and apps
+          command: pnpm build
+
+  audit:
+    executor: node-executor
+    resource_class: small
+    steps:
+      - setup
+      - run:
+          name: Audit production dependencies
+          command: pnpm audit --prod --audit-level=high
+
+workflows:
+  ci:
+    jobs:
+      - quality
+      - audit
+      - build:
+          requires:
+            - quality
