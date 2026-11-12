@@ -15,7 +15,7 @@
   "dependencies": {
     "@kridora/db": "workspace:*",
     "@kridora/shared": "workspace:*",
-    "better-auth": "^1.2.7",
+    "better-auth": "^1.7.18",
     "hono": "^4.13.16",
     "zod": "^4.6.7"
   },
