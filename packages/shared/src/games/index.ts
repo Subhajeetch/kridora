@@ -49,5 +49,6 @@ export type {
 } from "./requirements";
 export * from "./ludo";
 export * from "./truth-and-dare";
+export * from "./business";
 export { developmentGames } from "./config.development";
 export { productionGames } from "./config.production";

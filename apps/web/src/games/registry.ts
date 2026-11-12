@@ -9,6 +9,7 @@ const gameLoaders: Record<GameSlug, GameLoader> = {
   fatebyai: () => import("./fatebyai/main"),
   ludo: () => import("./ludo/main"),
   "truth-and-dare": () => import("./truth-and-dare/main"),
+  business: () => import("./business/main"),
 };
 
 /** Preload game component code ahead of launch so that transition into active gameplay is instant. */
@@ -31,4 +32,5 @@ export const gameComponents: Record<
   fatebyai: lazy(gameLoaders.fatebyai),
   ludo: lazy(gameLoaders.ludo),
   "truth-and-dare": lazy(gameLoaders["truth-and-dare"]),
+  business: lazy(gameLoaders.business),
 };

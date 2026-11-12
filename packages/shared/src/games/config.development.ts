@@ -6,4 +6,5 @@ export const developmentGames: readonly GameSlug[] = [
   "fatebyai",
   "ludo",
   "truth-and-dare",
+  "business",
 ];
