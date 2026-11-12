@@ -307,6 +307,70 @@ export const GAME_DEFINITIONS = {
       },
     ],
   },
+  business: {
+    slug: "business",
+    name: "Business",
+    tagline:
+      "Roll the die, buy world cities, and hit the target net worth first!",
+    description:
+      "A fast, clean multiplayer real-estate board game. Roll a single die, hop across 28 global tiles, buy iconic cities, upgrade rent tiers, and race to the target net worth.",
+    accent: "#10b981",
+    playTime: "15-25 min",
+    minPlayers: 2,
+    maxPlayers: 4,
+    requirements: { allPlayersReady: true, allPlayersConnected: true },
+    genre: ["Board Game", "Strategy", "Economy"],
+    difficulty: "Easy",
+    overview: [
+      "Compete on a vibrant 28-tile global board featuring iconic cities from Rio and Delhi to Tokyo and New York.",
+      "Roll a single die (1–6) and watch your token hop automatically around the board.",
+      "Buy unowned cities directly in the center of the board, upgrade properties when you revisit them, and collect rent from rivals.",
+      "First player to reach the Target Net Worth ($5,000, $7,000, or $10,000) or last solvent player wins!",
+    ],
+    howToPlay: [
+      {
+        step: 1,
+        title: "Pick Target Net Worth & Capital",
+        description:
+          "The host selects the Target Net Worth and Starting Capital, then launches the match.",
+      },
+      {
+        step: 2,
+        title: "Roll the Die",
+        description:
+          "Click 'Roll the Die' on the right panel. Rolling a 6 grants an extra bonus roll!",
+      },
+      {
+        step: 3,
+        title: "Buy & Upgrade in the Center",
+        description:
+          "When your puck lands on an open city, buy or pass right in the center of the board.",
+      },
+      {
+        step: 4,
+        title: "Reach the Net Worth Goal",
+        description:
+          "Every city you own adds to your Net Worth. Hit the target Net Worth first to win!",
+      },
+    ],
+    rulesSummary: [
+      "Passing START awards a +$200 salary bonus.",
+      "Rolling a 6 gives you a bonus turn unless you land in Jail.",
+      "Landing on your own city lets you upgrade its rent level.",
+      "If you owe more rent than your cash on hand, sell a property back to the bank at 75% value to clear your debt.",
+    ],
+    controls: [
+      { key: "Click / Space", action: "Roll the Die" },
+      {
+        key: "Center Prompt",
+        action: "Buy or Pass when landing on a property",
+      },
+      {
+        key: "Click Owned Tile",
+        action: "Inspect rent or sell property if in debt",
+      },
+    ],
+  },
 } satisfies Record<string, GameDefinition>;
 
 export type GameSlug = keyof typeof GAME_DEFINITIONS;

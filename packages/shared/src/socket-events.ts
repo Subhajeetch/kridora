@@ -10,6 +10,11 @@ import {
   TRUTH_AND_DARE_SPINNERS,
   type TruthAndDareState,
 } from "./games/truth-and-dare";
+import type {
+  BusinessActionPayload,
+  BusinessState,
+  BusinessUpdateSettingsPayload,
+} from "./games/business";
 
 export const createRoomSchema = z.object({
   gameSlug: z.string().min(1).max(40),
@@ -87,6 +92,33 @@ export const inviteUserSchema = z.object({
 export const changeGameSchema = z.object({
   gameSlug: z.string().min(1).max(40),
 });
+
+export const businessUpdateSettingsSchema = z.object({
+  targetNetWorth: z
+    .union([z.literal(5000), z.literal(7000), z.literal(10000)])
+    .optional(),
+  startingCash: z
+    .union([z.literal(1000), z.literal(1500), z.literal(2000)])
+    .optional(),
+});
+
+export const businessActionSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("roll-die") }),
+  z.object({ type: z.literal("pay-bail") }),
+  z.object({ type: z.literal("pass-jail-turn") }),
+  z.object({ type: z.literal("buy-property") }),
+  z.object({ type: z.literal("pass-property") }),
+  z.object({ type: z.literal("upgrade-property") }),
+  z.object({ type: z.literal("skip-upgrade") }),
+  z.object({
+    type: z.literal("sell-property"),
+    tileIndex: z.number().int().min(0).max(27),
+  }),
+  z.object({ type: z.literal("acknowledge-mystery") }),
+  z.object({ type: z.literal("pay-debt") }),
+  z.object({ type: z.literal("declare-bankruptcy") }),
+  z.object({ type: z.literal("send-emote"), emoji: z.string().min(1).max(8) }),
+]);
 
 export type CreateRoomPayload = z.input<typeof createRoomSchema>;
 export type JoinRoomPayload = z.input<typeof joinRoomSchema>;
@@ -213,6 +245,22 @@ export interface ClientToServerEvents {
     payload: LudoDebugScenarioPayload,
     ack: AckFn<LudoGameState>,
   ) => void;
+  "business:get-state": (
+    payload: EmptyPayload,
+    ack: AckFn<BusinessState>,
+  ) => void;
+  "business:update-settings": (
+    payload: BusinessUpdateSettingsPayload,
+    ack: AckFn<BusinessState>,
+  ) => void;
+  "business:start-match": (
+    payload: EmptyPayload,
+    ack: AckFn<BusinessState>,
+  ) => void;
+  "business:action": (
+    payload: BusinessActionPayload,
+    ack: AckFn<BusinessState>,
+  ) => void;
 }
 
 export type ClientToServerEventName = keyof ClientToServerEvents;
@@ -236,6 +284,7 @@ export interface ServerToClientEvents {
   "ludo:emote": (payload: { userId: string; emoji: string }) => void;
   "ludo:debug-enabled": (payload: { enabled: boolean }) => void;
   "truth-and-dare:state": (state: TruthAndDareState) => void;
+  "business:state": (state: BusinessState) => void;
 }
 
 export type InterServerEvents = Record<never, never>;
