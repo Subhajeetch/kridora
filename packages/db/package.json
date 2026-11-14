@@ -17,7 +17,7 @@
     "drizzle-orm": "^0.45.4"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20260401.0",
+    "@cloudflare/workers-types": "^5.20261109.1",
     "@kridora/typescript-config": "workspace:*",
     "@types/node": "^26.6.6",
     "drizzle-kit": "^0.31.11",
