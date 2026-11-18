@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
+import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 
 interface ThreeDiceProps {
   value: number; // 1..6
@@ -11,7 +12,7 @@ interface ThreeDiceProps {
 }
 
 /**
- * Procedurally generates a crisp 256x256 die face canvas with rounded border & glossy pips.
+ * Procedurally generates a crisp 256x256 die face canvas with smooth porcelain gradient & glossy pips.
  */
 function createDiceFaceCanvas(value: number): HTMLCanvasElement {
   const canvas = document.createElement("canvas");
@@ -20,32 +21,18 @@ function createDiceFaceCanvas(value: number): HTMLCanvasElement {
   const ctx = canvas.getContext("2d");
   if (!ctx) return canvas;
 
-  // Background rounded square
-  const r = 38;
-  ctx.beginPath();
-  ctx.moveTo(r, 0);
-  ctx.lineTo(256 - r, 0);
-  ctx.quadraticCurveTo(256, 0, 256, r);
-  ctx.lineTo(256, 256 - r);
-  ctx.quadraticCurveTo(256, 256, 256 - r, 256);
-  ctx.lineTo(r, 256);
-  ctx.quadraticCurveTo(0, 256, 0, 256 - r);
-  ctx.lineTo(0, r);
-  ctx.quadraticCurveTo(0, 0, r, 0);
-  ctx.closePath();
-
-  // Subtle radial gradient for ivory look
+  // Background smooth porcelain fill
   const bgGrad = ctx.createRadialGradient(128, 128, 20, 128, 128, 160);
   bgGrad.addColorStop(0, "#ffffff");
-  bgGrad.addColorStop(0.85, "#f8fafc");
+  bgGrad.addColorStop(0.75, "#f8fafc");
   bgGrad.addColorStop(1, "#e2e8f0");
   ctx.fillStyle = bgGrad;
-  ctx.fill();
+  ctx.fillRect(0, 0, 256, 256);
 
-  // Soft inner border
-  ctx.lineWidth = 6;
-  ctx.strokeStyle = "rgba(148, 163, 184, 0.4)";
-  ctx.stroke();
+  // Soft subtle inner edge shadow to complement the 3D rounded geometry
+  ctx.lineWidth = 10;
+  ctx.strokeStyle = "rgba(148, 163, 184, 0.25)";
+  ctx.strokeRect(5, 5, 246, 246);
 
   // Draw Pips
   const isOne = value === 1;
@@ -55,16 +42,24 @@ function createDiceFaceCanvas(value: number): HTMLCanvasElement {
 
   const drawPip = (x: number, y: number) => {
     ctx.save();
+
+    // Subtle drop shadow under pip for tactile inset depth
+    ctx.beginPath();
+    ctx.arc(x, y + 1.5, pipRadius, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(0, 0, 0, 0.12)";
+    ctx.fill();
+
+    // Main pip body
     ctx.beginPath();
     ctx.arc(x, y, pipRadius, 0, Math.PI * 2);
     ctx.fillStyle = pipColor;
     ctx.fill();
 
-    // Specular highlight
+    // Specular highlight on top-left
     ctx.beginPath();
     ctx.arc(
-      x - pipRadius * 0.3,
-      y - pipRadius * 0.3,
+      x - pipRadius * 0.32,
+      y - pipRadius * 0.32,
       pipRadius * 0.35,
       0,
       Math.PI * 2,
@@ -122,23 +117,21 @@ function createDiceFaceCanvas(value: number): HTMLCanvasElement {
 }
 
 /**
- * Three.js BoxGeometry material face mapping:
+ * Three.js material face mapping:
  * Material Index 0: +X (Right) -> 4
  * Material Index 1: -X (Left)  -> 3
  * Material Index 2: +Y (Top)   -> 1
  * Material Index 3: -Y (Bottom)-> 6
  * Material Index 4: +Z (Front) -> 2
  * Material Index 5: -Z (Back)  -> 5
- *
- * To face the camera (which looks down the Z axis with slight perspective tilt):
  */
 const FACE_ROTATIONS: Record<number, [number, number, number]> = {
-  1: [-Math.PI / 2 + 0.15, 0, 0.15],
-  2: [0.15, 0, 0.15],
-  3: [0.15, Math.PI / 2, 0.15],
-  4: [0.15, -Math.PI / 2, 0.15],
-  5: [0.15, Math.PI, 0.15],
-  6: [Math.PI / 2 + 0.15, 0, 0.15],
+  1: [-Math.PI / 2 + 0.12, 0, 0.1],
+  2: [0.12, 0, 0.1],
+  3: [0.12, Math.PI / 2, 0.1],
+  4: [0.12, -Math.PI / 2, 0.1],
+  5: [0.12, Math.PI, 0.1],
+  6: [Math.PI / 2 + 0.12, 0, 0.1],
 };
 
 export function ThreeDice({
@@ -181,19 +174,19 @@ export function ThreeDice({
     camera.position.set(0, 0.3, 4.4);
     camera.lookAt(0, 0, 0);
 
-    // Illumination
-    const ambientLight = new THREE.AmbientLight(0xffffff, 1.4);
+    // Illumination: Ambient + Directional + Fill lights for soft specular glints
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1.5);
     scene.add(ambientLight);
 
-    const dirLight = new THREE.DirectionalLight(0xffffff, 1.8);
-    dirLight.position.set(4, 8, 6);
+    const dirLight = new THREE.DirectionalLight(0xffffff, 2.0);
+    dirLight.position.set(5, 9, 6);
     scene.add(dirLight);
 
-    const fillLight = new THREE.DirectionalLight(0xa5b4fc, 0.6);
-    fillLight.position.set(-4, -2, 2);
+    const fillLight = new THREE.DirectionalLight(0xa5b4fc, 0.7);
+    fillLight.position.set(-5, -2, 3);
     scene.add(fillLight);
 
-    // Create 6 face materials matching standard BoxGeometry ordering:
+    // Create 6 face materials matching standard Box ordering:
     // [ +X (4), -X (3), +Y (1), -Y (6), +Z (2), -Z (5) ]
     const faceValues = [4, 3, 1, 6, 2, 5];
     const materials: THREE.MeshStandardMaterial[] = faceValues.map((val) => {
@@ -203,13 +196,13 @@ export function ThreeDice({
       texture.minFilter = THREE.LinearMipmapLinearFilter;
       return new THREE.MeshStandardMaterial({
         map: texture,
-        roughness: 0.15,
-        metalness: 0.05,
+        roughness: 0.18,
+        metalness: 0.04,
       });
     });
 
-    // Box Geometry
-    const geometry = new THREE.BoxGeometry(1.6, 1.6, 1.6);
+    // Rounded Box Geometry with smooth curved edges
+    const geometry = new RoundedBoxGeometry(1.6, 1.6, 1.6, 6, 0.24);
     const mesh = new THREE.Mesh(geometry, materials);
     scene.add(mesh);
     meshRef.current = mesh;
@@ -233,19 +226,25 @@ export function ThreeDice({
         if (!wasRolling) {
           wasRolling = true;
           rollT = 0;
-          spinVelocityX = 15 + Math.random() * 8;
-          spinVelocityY = 18 + Math.random() * 8;
-          spinVelocityZ = 12 + Math.random() * 6;
+          // Slower, smoother tumbling speeds
+          spinVelocityX = 8 + Math.random() * 4;
+          spinVelocityY = 10 + Math.random() * 4;
+          spinVelocityZ = 6 + Math.random() * 3;
         }
 
-        rollT += 0.035;
-        mesh.rotation.x += spinVelocityX * 0.04;
-        mesh.rotation.y += spinVelocityY * 0.04;
-        mesh.rotation.z += spinVelocityZ * 0.04;
+        rollT += 0.025;
+        // Smooth deceleration
+        spinVelocityX = Math.max(2, spinVelocityX * 0.985);
+        spinVelocityY = Math.max(2, spinVelocityY * 0.985);
+        spinVelocityZ = Math.max(1.5, spinVelocityZ * 0.985);
 
-        // Jump physics arc
-        mesh.position.y = Math.sin(rollT * 4) * 0.35;
-        mesh.scale.set(1.08, 1.08, 1.08);
+        mesh.rotation.x += spinVelocityX * 0.035;
+        mesh.rotation.y += spinVelocityY * 0.035;
+        mesh.rotation.z += spinVelocityZ * 0.035;
+
+        // Smooth parabolic jump arc
+        mesh.position.y = Math.sin(Math.min(Math.PI, rollT * 2.8)) * 0.38;
+        mesh.scale.set(1.06, 1.06, 1.06);
       } else {
         if (wasRolling) {
           wasRolling = false;
@@ -254,28 +253,30 @@ export function ThreeDice({
         const targetRot =
           FACE_ROTATIONS[targetValueRef.current] ?? FACE_ROTATIONS[1]!;
 
-        // Smooth slerp/lerp toward final target face
-        mesh.rotation.x += (targetRot[0] - mesh.rotation.x) * 0.14;
-        mesh.rotation.y += (targetRot[1] - mesh.rotation.y) * 0.14;
-        mesh.rotation.z += (targetRot[2] - mesh.rotation.z) * 0.14;
-        mesh.position.y += (0 - mesh.position.y) * 0.15;
+        // Smooth, damped settling toward the rolled face
+        mesh.rotation.x += (targetRot[0] - mesh.rotation.x) * 0.1;
+        mesh.rotation.y += (targetRot[1] - mesh.rotation.y) * 0.1;
+        mesh.rotation.z += (targetRot[2] - mesh.rotation.z) * 0.1;
+        mesh.position.y += (0 - mesh.position.y) * 0.12;
 
         // "when it's our turn, our dice should shake and grow in a blink way.. so we know it's our turn.."
+        // Slower, smoother breathing and playful gentle wobble
         if (isMyTurnRef.current && canRollRef.current) {
-          const t = time * 0.005;
-          // Pulsing breathe scale: oscillating between 1.02 and 1.22
-          const breathe = 1.12 + Math.sin(t * 3.5) * 0.1;
+          // Gentle smooth breathe: oscillates between 1.02 and 1.14
+          const breathe = 1.08 + Math.sin(time * 0.0025) * 0.06;
           mesh.scale.set(breathe, breathe, breathe);
 
-          // Periodic wobble / shake: rapid jitter every 1.6 seconds
-          const shakePeriod = (time * 0.001) % 1.6;
-          if (shakePeriod < 0.3) {
-            const jitter = Math.sin(shakePeriod * Math.PI * 24) * 0.14;
-            mesh.rotation.z += jitter;
-            mesh.rotation.x += jitter * 0.5;
+          // Slower, smoother playful wobble every 2.4 seconds
+          const wobbleCycle = (time * 0.001) % 2.4;
+          if (wobbleCycle < 0.7) {
+            const progress = wobbleCycle / 0.7;
+            const decay = 1 - progress;
+            const wobble = Math.sin(progress * Math.PI * 4) * 0.09 * decay;
+            mesh.rotation.z += wobble;
+            mesh.rotation.x += wobble * 0.35;
           }
         } else {
-          mesh.scale.lerp(new THREE.Vector3(1, 1, 1), 0.1);
+          mesh.scale.lerp(new THREE.Vector3(1, 1, 1), 0.08);
         }
       }
 
@@ -306,9 +307,9 @@ export function ThreeDice({
       style={{ width: size, height: size }}
       title={canRoll ? "Click or tap to Roll the 3D Dice!" : `Dice: ${value}`}
     >
-      {/* Golden halo ring when it is our turn */}
+      {/* Soft golden halo glow when it is our turn */}
       {isMyTurn && canRoll && (
-        <span className="absolute inset-0 rounded-2xl bg-amber-400/25 blur-md animate-pulse pointer-events-none" />
+        <span className="absolute inset-0 rounded-3xl bg-amber-400/25 blur-lg animate-pulse pointer-events-none" />
       )}
 
       {/* 3D WebGL Canvas */}
