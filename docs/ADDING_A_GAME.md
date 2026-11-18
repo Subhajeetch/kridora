@@ -127,10 +127,10 @@ Add your slug **only** to `developmentGames` in `packages/shared/src/games/confi
 
 ```ts
 export const developmentGames: readonly GameSlug[] = [
-  "monopoly",
+  "business",
   "ludo",
   "fatebyai",
-  "truth-and-dare",
+  "truthAndDare",
   // "your-game-slug",
 ];
 ```

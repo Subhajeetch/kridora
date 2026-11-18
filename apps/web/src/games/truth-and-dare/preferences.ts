@@ -7,7 +7,8 @@ export interface TruthAndDarePreferences {
   soundEnabled: boolean;
 }
 
-const STORAGE_KEY = "kridora:truth-and-dare-preferences";
+const STORAGE_KEY = "kridora:truthAndDare-preferences";
+const LEGACY_STORAGE_KEY = "kridora:truth-and-dare-preferences";
 const DEFAULTS: TruthAndDarePreferences = {
   ageGroup: "family",
   mode: "funny",
@@ -17,9 +18,11 @@ const DEFAULTS: TruthAndDarePreferences = {
 function readPreferences(): TruthAndDarePreferences {
   if (typeof window === "undefined") return DEFAULTS;
   try {
-    const saved = JSON.parse(
-      window.localStorage.getItem(STORAGE_KEY) ?? "{}",
-    ) as Partial<TruthAndDarePreferences>;
+    const raw =
+      window.localStorage.getItem(STORAGE_KEY) ??
+      window.localStorage.getItem(LEGACY_STORAGE_KEY) ??
+      "{}";
+    const saved = JSON.parse(raw) as Partial<TruthAndDarePreferences>;
     return {
       ageGroup:
         saved.ageGroup === "family" ||

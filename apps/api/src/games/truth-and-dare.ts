@@ -306,9 +306,9 @@ function requireCurrentTurn(state: TruthAndDareState, userId: string): void {
 }
 
 export const truthAndDareGameModule: ServerGameModule<TruthAndDareState> = {
-  slug: "truth-and-dare",
-  eventPrefix: "truth-and-dare",
-  stateEvent: "truth-and-dare:state",
+  slug: "truthAndDare",
+  eventPrefix: "truthAndDare",
+  stateEvent: "truthAndDare:state",
 
   createInitialState(players) {
     return {

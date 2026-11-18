@@ -9,86 +9,6 @@ import type { GameDefinition } from "./types";
  * React component in apps/web/src/games/registry.ts.
  */
 export const GAME_DEFINITIONS = {
-  monopoly: {
-    slug: "monopoly",
-    name: "Monopoly",
-    tagline: "Buy, trade and bankrupt your friends.",
-    description:
-      "Roll the dice, buy properties, build houses and drive everyone else into bankruptcy. Last player standing wins.",
-    accent: "#f43f5e",
-    playTime: "60-120 min",
-    minPlayers: 2,
-    maxPlayers: 6,
-    requirements: { allPlayersReady: true, allPlayersConnected: true },
-    genre: [
-      "Economic Strategy",
-      "Property Trading",
-      "Turn-Based",
-      "Competitive",
-    ],
-    difficulty: "Strategic & Cutthroat",
-    overview: [
-      "Monopoly is the classic board game of empire building, shrewd trading, and merciless bankruptcies. Navigate the 40-square perimeter board acquiring iconic properties, railroads, and utilities while forcing competitors to pay escalating rents.",
-      "Assemble full color property groups to construct houses and towering skyscrapers. Negotiate live trades directly with rivals, manage mortgages when cash runs tight, and leverage Chance and Community Chest cards to flip the game on its head.",
-      "With automated banking, live trading consoles, and real-time turn synchronization, Kridora Monopoly eliminates manual bookkeeping so you can focus entirely on financial domination.",
-    ],
-    howToPlay: [
-      {
-        step: 1,
-        title: "Roll & Traverse",
-        description:
-          "Roll the dice pair to navigate clock-wise around the 40-tile perimeter board.",
-      },
-      {
-        step: 2,
-        title: "Acquire Deeds",
-        description:
-          "Purchase unowned properties you land on or send them to an open player auction.",
-      },
-      {
-        step: 3,
-        title: "Develop & Build",
-        description:
-          "Once you own all properties of a color group, construct houses and hotels to escalate rent.",
-      },
-      {
-        step: 4,
-        title: "Bankrupt Opponents",
-        description:
-          "Deplete opponents' cash and mortgages until you stand as the sole surviving tycoon.",
-      },
-    ],
-    rulesSummary: [
-      "Passing 'GO' awards a recurring salary bonus to fund your real estate expansion.",
-      "Rolling doubles grants an extra roll; 3 consecutive doubles sends you straight to Jail.",
-      "Mortgaged properties cannot collect rent until the mortgage loan is repaid with interest.",
-      "Unpayable debt transfers all remaining assets directly to the creditor upon bankruptcy.",
-    ],
-    controls: [
-      {
-        key: "Click / Tap",
-        action: "Roll dice, purchase deeds, or configure trade offers",
-      },
-      {
-        key: "Drag & Drop",
-        action: "Organize deed cards in trade negotiation screens",
-      },
-    ],
-    screenshots: [
-      {
-        url: "/games/thumbs/monopoly.webp",
-        title: "Retro Tycoon Cover",
-        caption:
-          "Iconic retro board layout with deed cards, tokens, and city properties.",
-      },
-      {
-        url: "/games/ss/monopoly-gameplay.webp",
-        title: "Live Match Action Deck",
-        caption:
-          "Real-time bank balances, mini houses, deed portfolios, and active turn controls.",
-      },
-    ],
-  },
   fatebyai: {
     slug: "fatebyai",
     name: "Fate by AI",
@@ -250,8 +170,8 @@ export const GAME_DEFINITIONS = {
       },
     ],
   },
-  "truth-and-dare": {
-    slug: "truth-and-dare",
+  truthAndDare: {
+    slug: "truthAndDare",
     name: "Truth and Dare",
     tagline: "Round the table. Spin for a story.",
     description:
@@ -377,9 +297,9 @@ export type GameSlug = keyof typeof GAME_DEFINITIONS;
 
 // Fail fast (at import time) on slugs that would collide with real routes or break URLs.
 for (const slug of Object.keys(GAME_DEFINITIONS)) {
-  if (!/^[a-z0-9-]+$/.test(slug)) {
+  if (!/^[a-zA-Z0-9-]+$/.test(slug)) {
     throw new Error(
-      `Invalid game slug "${slug}": use lowercase letters, numbers and dashes only.`,
+      `Invalid game slug "${slug}": use alphanumeric characters and dashes only.`,
     );
   }
   if ((RESERVED_SLUGS as readonly string[]).includes(slug)) {

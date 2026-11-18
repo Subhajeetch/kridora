@@ -43,12 +43,12 @@ check("foreign origin rejected", foreign === "rejected", foreign);
 let lastB: any = null;
 sb.on("room:state", (r) => (lastB = r));
 
-let r = await call(sa, "room:create", { gameSlug: "monopoly" });
+let r = await call(sa, "room:create", { gameSlug: "business" });
 check("create room", r.ok && r.data.visibility === "private" && r.data.players.length === 1, r);
 const code = r.data.code as string;
 check("code is 6 chars", /^[A-HJ-NP-Z2-9]{6}$/.test(code), code);
 
-r = await call(sa, "room:create", { gameSlug: "monopoly" });
+r = await call(sa, "room:create", { gameSlug: "business" });
 check("cannot create second room", !r.ok && r.error.code === "ALREADY_IN_ROOM", r);
 r = await call(sb, "room:create", { gameSlug: "nope" });
 check("unknown game rejected", !r.ok && r.error.code === "GAME_NOT_FOUND", r);
@@ -59,13 +59,13 @@ check("join malformed code", !r.ok && r.error.code === "VALIDATION_ERROR", r);
 
 r = await call(sb, "room:join", { code: code.toLowerCase() });
 check("join by code (case-insensitive)", r.ok && r.data.players.length === 2, r);
-r = await call(sc, "room:join-public", { gameSlug: "monopoly" });
+r = await call(sc, "room:join-public", { gameSlug: "business" });
 check("private room not joinable publicly", !r.ok && r.error.code === "NO_PUBLIC_ROOM", r);
 r = await call(sb, "room:set-visibility", { visibility: "public" });
 check("non-owner cannot change visibility", !r.ok && r.error.code === "NOT_ROOM_OWNER", r);
 r = await call(sa, "room:set-visibility", { visibility: "public" });
 check("owner makes room public", r.ok && r.data.visibility === "public", r);
-r = await call(sc, "room:join-public", { gameSlug: "monopoly" });
+r = await call(sc, "room:join-public", { gameSlug: "business" });
 check("join public room", r.ok && r.data.code === code && r.data.players.length === 3, r);
 
 r = await call(sa, "room:start");
@@ -89,9 +89,9 @@ check("owner changes game to ludo", r.ok && r.data.gameSlug === "ludo" && r.data
 await sleep(200);
 check("change game broadcast reached guest", lastB?.gameSlug === "ludo", lastB);
 check("ready status was reset on game change", lastB?.players?.every((p: any) => !p.isReady), lastB);
-// change back to monopoly for the rest of tests
-r = await call(sa, "room:change-game", { gameSlug: "monopoly" });
-check("owner changes game back to monopoly", r.ok && r.data.gameSlug === "monopoly", r);
+// change back to business for the rest of tests
+r = await call(sa, "room:change-game", { gameSlug: "business" });
+check("owner changes game back to business", r.ok && r.data.gameSlug === "business", r);
 await call(sb, "room:set-ready", { ready: true });
 await call(sc, "room:set-ready", { ready: true });
 

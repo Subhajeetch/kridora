@@ -4,7 +4,7 @@ export const CenterBankIllustration: FC = () => (
   <svg
     viewBox="0 0 260 240"
     fill="none"
-    className="h-44 w-44 select-none drop-shadow-md sm:h-56 sm:w-56 pointer-events-none"
+    className="h-24 w-24 select-none drop-shadow-md sm:h-36 sm:w-36 md:h-48 md:w-48 lg:h-60 lg:w-60 pointer-events-none"
   >
     {/* Isometric Base Platform */}
     <polygon points="130,218 28,162 130,106 232,162" fill="#8b857c" />
@@ -38,9 +38,12 @@ export const SpecialTileArtwork: FC<{ tileIndex: number; name: string }> = ({
   switch (name) {
     case "START":
       return (
-        <div className="flex h-full w-full flex-col items-center justify-between bg-white p-1">
+        <div className="flex h-full w-full flex-col items-center justify-between bg-white p-0.5 sm:p-1">
           <div className="flex flex-1 items-center justify-center">
-            <svg viewBox="0 0 40 30" className="h-6 w-8">
+            <svg
+              viewBox="0 0 40 30"
+              className="h-4 w-5 sm:h-6 sm:w-8 md:h-7 md:w-9"
+            >
               <path
                 d="M8 22 A10 10 0 1 1 24 12 L29 12 L22 20 L15 12 L20 12"
                 fill="none"
@@ -50,7 +53,7 @@ export const SpecialTileArtwork: FC<{ tileIndex: number; name: string }> = ({
               />
             </svg>
           </div>
-          <span className="rounded-full bg-slate-400 px-2 py-0.5 text-[9px] font-black tracking-wider text-white">
+          <span className="rounded-full bg-slate-400 px-1 py-0.2 text-[6.5px] font-black tracking-wider text-white sm:px-2 sm:py-0.5 sm:text-[9px] md:text-[10px] lg:px-2.5 lg:text-[11.5px] xl:text-[12.5px]">
             START
           </span>
         </div>
@@ -58,11 +61,14 @@ export const SpecialTileArtwork: FC<{ tileIndex: number; name: string }> = ({
 
     case "HARBOR":
       return (
-        <div className="flex h-full w-full flex-col items-center justify-between bg-white p-1">
-          <span className="text-[8px] font-black tracking-wider text-lime-600">
+        <div className="flex h-full w-full flex-col items-center justify-between bg-white p-0.5 sm:p-1">
+          <span className="text-[6.5px] font-black tracking-tight text-lime-600 sm:text-[8px] sm:tracking-wider md:text-[10px] lg:text-[11.5px] xl:text-[12.5px]">
             HARBOR
           </span>
-          <svg viewBox="0 0 36 36" className="h-7 w-7">
+          <svg
+            viewBox="0 0 36 36"
+            className="h-4 w-4 sm:h-7 sm:w-7 md:h-8 md:w-8"
+          >
             <path d="M18 5 L18 25 L8 25 Z" fill="#38bdf8" />
             <path d="M19 8 L29 25 L19 25 Z" fill="#bae6fd" />
             <path d="M6 26 L30 26 L26 31 L10 31 Z" fill="#ea580c" />
@@ -72,20 +78,25 @@ export const SpecialTileArtwork: FC<{ tileIndex: number; name: string }> = ({
 
     case "MYSTERY":
       return (
-        <div className="flex h-full w-full items-center justify-center bg-white p-1.5">
+        <div className="flex h-full w-full items-center justify-center bg-white p-0.5 sm:p-1.5">
           <div className="flex h-full w-full items-center justify-center rounded border border-slate-200 shadow-inner">
-            <span className="text-2xl font-black text-slate-400">?</span>
+            <span className="text-base font-black text-slate-400 sm:text-2xl md:text-3xl">
+              ?
+            </span>
           </div>
         </div>
       );
 
     case "RAILWAY":
       return (
-        <div className="flex h-full w-full flex-col items-center justify-between bg-white p-1">
-          <span className="text-[8px] font-black tracking-wider text-emerald-700">
+        <div className="flex h-full w-full flex-col items-center justify-between bg-white p-0.5 sm:p-1">
+          <span className="text-[6.5px] font-black tracking-tight text-emerald-700 sm:text-[8px] sm:tracking-wider md:text-[10px] lg:text-[11.5px] xl:text-[12.5px]">
             RAILWAY
           </span>
-          <svg viewBox="0 0 36 36" className="h-7 w-7">
+          <svg
+            viewBox="0 0 36 36"
+            className="h-4 w-4 sm:h-7 sm:w-7 md:h-8 md:w-8"
+          >
             <rect x="8" y="8" width="20" height="18" rx="4" fill="#ef4444" />
             <rect x="11" y="11" width="14" height="6" rx="1" fill="#e2e8f0" />
             <path
@@ -99,8 +110,11 @@ export const SpecialTileArtwork: FC<{ tileIndex: number; name: string }> = ({
 
     case "JAIL":
       return (
-        <div className="flex h-full w-full flex-col items-center justify-between bg-white p-1">
-          <svg viewBox="0 0 36 28" className="h-6 w-8">
+        <div className="flex h-full w-full flex-col items-center justify-between bg-white p-0.5 sm:p-1">
+          <svg
+            viewBox="0 0 36 28"
+            className="h-4 w-5 sm:h-6 sm:w-8 md:h-7 md:w-9"
+          >
             <rect x="6" y="6" width="24" height="18" rx="2" fill="#93c5fd" />
             <path
               d="M11 6V24M16 6V24M21 6V24M26 6V24"
@@ -108,7 +122,7 @@ export const SpecialTileArtwork: FC<{ tileIndex: number; name: string }> = ({
               strokeWidth="1.8"
             />
           </svg>
-          <span className="rounded-full bg-slate-400 px-2 py-0.5 text-[9px] font-black tracking-wider text-white">
+          <span className="rounded-full bg-slate-400 px-1 py-0.2 text-[6.5px] font-black tracking-wider text-white sm:px-2 sm:py-0.5 sm:text-[9px] md:text-[10px] lg:px-2.5 lg:text-[11.5px] xl:text-[12.5px]">
             JAIL
           </span>
         </div>
@@ -116,11 +130,14 @@ export const SpecialTileArtwork: FC<{ tileIndex: number; name: string }> = ({
 
     case "ELECTRICITY":
       return (
-        <div className="flex h-full w-full flex-col items-center justify-between bg-white p-1">
-          <span className="text-[7px] font-black tracking-tight text-amber-600">
-            ELECTRICITY
+        <div className="flex h-full w-full flex-col items-center justify-between bg-white p-0.5 sm:p-1">
+          <span className="text-[6px] font-black tracking-tighter text-amber-600 sm:text-[7px] sm:tracking-tight md:text-[9px] lg:text-[10.5px] xl:text-[11.5px]">
+            ELECTRIC
           </span>
-          <svg viewBox="0 0 36 36" className="h-7 w-7">
+          <svg
+            viewBox="0 0 36 36"
+            className="h-4 w-4 sm:h-7 sm:w-7 md:h-8 md:w-8"
+          >
             <circle cx="18" cy="15" r="9" fill="#fde047" />
             <rect x="14" y="23" width="8" height="5" rx="1" fill="#94a3b8" />
             <path
@@ -135,8 +152,11 @@ export const SpecialTileArtwork: FC<{ tileIndex: number; name: string }> = ({
 
     case "AUCTION":
       return (
-        <div className="flex h-full w-full flex-col items-center justify-between bg-white p-1">
-          <svg viewBox="0 0 36 28" className="h-6 w-7">
+        <div className="flex h-full w-full flex-col items-center justify-between bg-white p-0.5 sm:p-1">
+          <svg
+            viewBox="0 0 36 28"
+            className="h-4 w-5 sm:h-6 sm:w-7 md:h-7 md:w-8"
+          >
             <rect
               x="14"
               y="4"
@@ -156,7 +176,7 @@ export const SpecialTileArtwork: FC<{ tileIndex: number; name: string }> = ({
             />
             <ellipse cx="12" cy="22" rx="7" ry="2.5" fill="#78350f" />
           </svg>
-          <span className="rounded-full bg-slate-400 px-1.5 py-0.5 text-[8px] font-black tracking-wider text-white">
+          <span className="rounded-full bg-slate-400 px-1 py-0.2 text-[6.5px] font-black tracking-wider text-white sm:px-1.5 sm:py-0.5 sm:text-[8px] md:text-[10px] lg:px-2.5 lg:text-[11.5px] xl:text-[12.5px]">
             AUCTION
           </span>
         </div>
@@ -165,11 +185,14 @@ export const SpecialTileArtwork: FC<{ tileIndex: number; name: string }> = ({
     case "AIRPORT":
     default:
       return (
-        <div className="flex h-full w-full flex-col items-center justify-between bg-white p-1">
-          <span className="text-[8px] font-black tracking-wider text-emerald-700">
+        <div className="flex h-full w-full flex-col items-center justify-between bg-white p-0.5 sm:p-1">
+          <span className="text-[6.5px] font-black tracking-tight text-emerald-700 sm:text-[8px] sm:tracking-wider md:text-[10px] lg:text-[11.5px] xl:text-[12.5px]">
             AIRPORT
           </span>
-          <svg viewBox="0 0 36 36" className="h-7 w-7">
+          <svg
+            viewBox="0 0 36 36"
+            className="h-4 w-4 sm:h-7 sm:w-7 md:h-8 md:w-8"
+          >
             <path
               d="M6 22 L30 12 L26 26 L18 21 L12 26 Z"
               fill="#38bdf8"

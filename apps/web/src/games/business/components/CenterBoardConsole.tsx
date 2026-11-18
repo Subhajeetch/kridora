@@ -109,35 +109,35 @@ export function CenterBoardConsole({
     const isCity = selectedTile.type === "city";
 
     return (
-      <div className="absolute inset-0 z-50 flex flex-col items-center justify-between rounded-xl bg-slate-950/98 p-3.5 text-center shadow-2xl backdrop-blur-md animate-in zoom-in-95 duration-150 sm:p-5 overflow-y-auto">
-        <div className="flex w-full items-center justify-between border-b border-white/10 pb-1.5">
-          <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+      <div className="absolute inset-0 z-50 flex flex-col items-center justify-between rounded-xl bg-slate-950/98 p-2.5 text-center shadow-2xl backdrop-blur-md animate-in zoom-in-95 duration-150 sm:p-5 overflow-y-auto">
+        <div className="flex w-full items-center justify-between border-b border-white/10 pb-1 sm:pb-1.5">
+          <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 sm:text-[10px]">
             PROPERTY DEED
           </span>
           <button
             onClick={() => onSelectTile(null)}
-            className="cursor-pointer rounded-lg p-1 text-slate-400 hover:bg-white/10 hover:text-white"
+            className="cursor-pointer rounded-lg p-0.5 text-slate-400 hover:bg-white/10 hover:text-white sm:p-1"
             title="Close"
           >
-            <X className="h-4 w-4" />
+            <X className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
           </button>
         </div>
 
         {/* City header */}
-        <div className="my-auto flex flex-col items-center gap-1">
+        <div className="my-auto flex flex-col items-center gap-0.5 sm:gap-1">
           <div
             style={{ backgroundColor: selectedTile.topBgHex ?? "#3b82f6" }}
-            className="rounded-full px-3.5 py-0.5 text-xs font-black uppercase tracking-wider text-white shadow"
+            className="rounded-full px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-white shadow sm:px-3.5 sm:text-xs"
           >
             {selectedTile.name}
           </div>
 
-          <div className="text-xl font-black text-white sm:text-2xl">
+          <div className="text-base font-black text-white sm:text-2xl">
             Value: ${cost + upgradeValue}
           </div>
 
           {selectedOwner && (
-            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-300">
+            <div className="flex items-center gap-1 text-[10px] font-bold text-slate-300 sm:gap-1.5 sm:text-xs">
               <span>Owner:</span>
               <span
                 style={{ color: selectedOwner.color }}
@@ -150,7 +150,7 @@ export function CenterBoardConsole({
 
           {/* Level / Stars info */}
           {isCity && (
-            <div className="text-xs font-bold text-amber-300">
+            <div className="text-[10px] font-bold text-amber-300 sm:text-xs">
               Tier:{" "}
               {currentLevel === 0
                 ? "Base Deed"
@@ -160,11 +160,11 @@ export function CenterBoardConsole({
 
           {/* Rent breakdown */}
           {selectedTile.rent && (
-            <div className="mt-1 flex flex-wrap justify-center gap-2 text-[10px] font-bold text-slate-300">
-              <span className="rounded bg-slate-900 px-2 py-0.5 border border-white/10">
+            <div className="mt-0.5 flex flex-wrap justify-center gap-1 text-[8.5px] font-bold text-slate-300 sm:mt-1 sm:gap-2 sm:text-[10px]">
+              <span className="rounded bg-slate-900 px-1.5 py-0.5 border border-white/10 sm:px-2">
                 Base Rent: ${selectedTile.rent[0]}
               </span>
-              <span className="rounded bg-slate-900 px-2 py-0.5 border border-white/10">
+              <span className="rounded bg-slate-900 px-1.5 py-0.5 border border-white/10 sm:px-2">
                 Max Rent: ${selectedTile.rent[3] ?? selectedTile.rent[0]}
               </span>
             </div>
@@ -172,17 +172,18 @@ export function CenterBoardConsole({
         </div>
 
         {/* Action Buttons */}
-        <div className="mt-3 flex w-full max-w-xs flex-col gap-2">
+        <div className="mt-2 flex w-full max-w-xs flex-col gap-1.5 sm:mt-3 sm:gap-2">
           {isSelectedOwnedByMe ? (
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-1.5 sm:gap-2">
               <button
                 onClick={() => {
                   onSellProperty(selectedTile.index);
                   onSelectTile(null);
                 }}
-                className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 py-2.5 text-xs font-black uppercase tracking-wider text-slate-950 shadow-lg shadow-amber-500/25 transition hover:brightness-110 active:scale-95 sm:py-3 sm:text-sm"
+                className="flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 py-2 text-[11px] font-black uppercase tracking-wider text-slate-950 shadow-lg shadow-amber-500/25 transition hover:brightness-110 active:scale-95 sm:gap-2 sm:py-3 sm:text-sm"
               >
-                <Coins className="h-4 w-4" /> SELL PROPERTY FOR +${refund}
+                <Coins className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> SELL PROPERTY
+                FOR +${refund}
               </button>
 
               {isMyTurn &&
@@ -196,14 +197,14 @@ export function CenterBoardConsole({
                       onUpgrade();
                       onSelectTile(null);
                     }}
-                    className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-sky-400 to-emerald-400 py-2 text-xs font-black uppercase text-slate-950 shadow disabled:opacity-40"
+                    className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-sky-400 to-emerald-400 py-1.5 text-[11px] font-black uppercase text-slate-950 shadow disabled:opacity-40 sm:py-2 sm:text-xs"
                   >
                     Upgrade City (${upgradeCost})
                   </button>
                 )}
             </div>
           ) : (
-            <div className="text-xs font-semibold text-slate-400">
+            <div className="text-[10px] font-semibold text-slate-400 sm:text-xs">
               {selectedOwner
                 ? `Owned by ${selectedOwner.username}. Rent is $${selectedTile.rent?.[selectedProp.level] ?? 40}.`
                 : `Unowned. Cost is $${cost}.`}
@@ -212,7 +213,7 @@ export function CenterBoardConsole({
 
           <button
             onClick={() => onSelectTile(null)}
-            className="cursor-pointer rounded-xl border border-white/15 bg-slate-800/80 py-2 text-xs font-bold text-white hover:bg-slate-700 active:scale-95"
+            className="cursor-pointer rounded-xl border border-white/15 bg-slate-800/80 py-1.5 text-[11px] font-bold text-white hover:bg-slate-700 active:scale-95 sm:py-2 sm:text-xs"
           >
             Back
           </button>
@@ -299,24 +300,24 @@ export function CenterBoardConsole({
     const canAfford = (me?.cash ?? 0) >= cost;
 
     return (
-      <div className="absolute inset-0 z-50 flex flex-col items-center justify-between rounded-xl bg-slate-950/98 p-3.5 text-center shadow-2xl backdrop-blur-md animate-in zoom-in-95 duration-150 sm:p-5 overflow-y-auto">
-        <div className="text-[10px] font-black uppercase tracking-widest text-emerald-400 sm:text-xs">
+      <div className="absolute inset-0 z-50 flex flex-col items-center justify-between rounded-xl bg-slate-950/98 p-2.5 text-center shadow-2xl backdrop-blur-md animate-in zoom-in-95 duration-150 sm:p-5 overflow-y-auto">
+        <div className="text-[9px] font-black uppercase tracking-widest text-emerald-400 sm:text-xs">
           ACQUIRE PROPERTY
         </div>
 
-        <div className="my-auto flex flex-col items-center gap-1">
+        <div className="my-auto flex flex-col items-center gap-0.5 sm:gap-1">
           <div
             style={{ backgroundColor: landedTile.topBgHex ?? "#10b981" }}
-            className="rounded-full px-3.5 py-0.5 text-xs font-black uppercase tracking-wider text-white shadow sm:text-sm sm:px-5 sm:py-1"
+            className="rounded-full px-2.5 py-0.5 text-[10.5px] font-black uppercase tracking-wider text-white shadow sm:text-sm sm:px-5 sm:py-1"
           >
             {landedTile.name}
           </div>
 
-          <div className="text-2xl font-black text-white sm:text-3xl">
+          <div className="text-xl font-black text-white sm:text-3xl">
             ${cost}
           </div>
 
-          <p className="text-[11px] text-slate-300 sm:text-xs">
+          <p className="text-[9.5px] text-slate-300 sm:text-xs">
             Base Rent:{" "}
             <strong className="text-emerald-400">
               ${landedTile.rent?.[0] ?? 35}
@@ -329,18 +330,18 @@ export function CenterBoardConsole({
         </div>
 
         {isMyTurn ? (
-          <div className="mt-2 flex w-full max-w-xs flex-col gap-2">
-            <div className="flex items-center gap-2.5">
+          <div className="mt-1 flex w-full max-w-xs flex-col gap-1.5 sm:mt-2 sm:gap-2">
+            <div className="flex items-center gap-1.5 sm:gap-2.5">
               <button
                 disabled={!canAfford}
                 onClick={onBuy}
-                className="flex-1 cursor-pointer rounded-xl bg-gradient-to-r from-emerald-500 to-lime-500 py-3 text-xs font-black uppercase tracking-wider text-slate-950 shadow-lg shadow-emerald-500/30 transition hover:brightness-110 active:scale-95 disabled:opacity-40 disabled:pointer-events-none sm:text-sm"
+                className="flex-1 cursor-pointer rounded-xl bg-gradient-to-r from-emerald-500 to-lime-500 py-2 text-xs font-black uppercase tracking-wider text-slate-950 shadow-lg shadow-emerald-500/30 transition hover:brightness-110 active:scale-95 disabled:opacity-40 disabled:pointer-events-none sm:py-3 sm:text-sm"
               >
                 {canAfford ? `BUY ($${cost})` : `Need $${cost}`}
               </button>
               <button
                 onClick={onPass}
-                className="cursor-pointer rounded-xl border border-white/20 bg-slate-800/90 px-5 py-3 text-xs font-bold uppercase tracking-wider text-white transition hover:bg-slate-700 active:scale-95 sm:text-sm"
+                className="cursor-pointer rounded-xl border border-white/20 bg-slate-800/90 px-3.5 py-2 text-xs font-bold uppercase tracking-wider text-white transition hover:bg-slate-700 active:scale-95 sm:px-5 sm:py-3 sm:text-sm"
               >
                 PASS
               </button>
@@ -350,17 +351,17 @@ export function CenterBoardConsole({
             {!canAfford && myProperties.length > 0 && (
               <button
                 onClick={() => setShowPortfolio(true)}
-                className="cursor-pointer rounded-lg border border-amber-400/30 bg-amber-500/10 py-1.5 text-[11px] font-black text-amber-300 hover:bg-amber-500/20 active:scale-95"
+                className="cursor-pointer rounded-lg border border-amber-400/30 bg-amber-500/10 py-1 text-[10px] font-black text-amber-300 hover:bg-amber-500/20 active:scale-95 sm:py-1.5 sm:text-[11px]"
               >
                 Sell Properties to Afford
               </button>
             )}
           </div>
         ) : (
-          <div className="mt-2 flex items-center justify-center gap-2 rounded-xl bg-slate-900/90 px-4 py-2.5 text-xs font-bold text-amber-300 border border-amber-400/20">
+          <div className="mt-1 flex items-center justify-center gap-1.5 rounded-xl bg-slate-900/90 px-3 py-1.5 text-[11px] font-bold text-amber-300 border border-amber-400/20 sm:mt-2 sm:gap-2 sm:px-4 sm:py-2.5 sm:text-xs">
             <span
               style={{ backgroundColor: activePlayer?.color ?? "#f59e0b" }}
-              className="inline-block h-2.5 w-2.5 rounded-full animate-ping"
+              className="inline-block h-2 w-2 rounded-full animate-ping sm:h-2.5 sm:w-2.5"
             />
             <span>
               <strong style={{ color: activePlayer?.color }}>
@@ -375,53 +376,57 @@ export function CenterBoardConsole({
   }
 
   // 4. UPGRADE PROPERTY CONSOLE IN THE MIDDLE
-  if (!isStillHopping && state.turnSubPhase === "upgrade_or_skip" && landedTile) {
+  if (
+    !isStillHopping &&
+    state.turnSubPhase === "upgrade_or_skip" &&
+    landedTile
+  ) {
     const upgradeCost = landedTile.upgradeCost ?? 0;
     const canAfford = (me?.cash ?? 0) >= upgradeCost;
     const currentLevel = propState?.level ?? 0;
     const nextRent = landedTile.rent?.[currentLevel + 1] ?? 50;
 
     return (
-      <div className="absolute inset-0 z-50 flex flex-col items-center justify-between rounded-xl bg-slate-950/98 p-3.5 text-center shadow-2xl backdrop-blur-md animate-in zoom-in-95 duration-150 sm:p-5 overflow-y-auto">
-        <div className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-widest text-sky-400 sm:text-xs">
-          <Sparkles className="h-4 w-4 text-sky-300" />
+      <div className="absolute inset-0 z-50 flex flex-col items-center justify-between rounded-xl bg-slate-950/98 p-2.5 text-center shadow-2xl backdrop-blur-md animate-in zoom-in-95 duration-150 sm:p-5 overflow-y-auto">
+        <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-sky-400 sm:text-xs">
+          <Sparkles className="h-3.5 w-3.5 text-sky-300 sm:h-4 sm:w-4" />
           UPGRADE PROPERTY
         </div>
 
-        <div className="my-auto flex flex-col items-center gap-1">
-          <h3 className="text-xl font-black text-white sm:text-2xl">
+        <div className="my-auto flex flex-col items-center gap-0.5 sm:gap-1">
+          <h3 className="text-lg font-black text-white sm:text-2xl">
             {landedTile.name}
           </h3>
-          <div className="text-xs font-bold text-amber-300">
+          <div className="text-[11px] font-bold text-amber-300 sm:text-xs">
             Current Tier: Level {currentLevel} {"★".repeat(currentLevel)}
           </div>
-          <p className="mt-1 text-xs text-slate-300">
-            Cost: <strong className="text-amber-300">${upgradeCost}</strong> • Next
-            Rent: <strong className="text-emerald-400">${nextRent}</strong>
+          <p className="mt-0.5 text-[10.5px] text-slate-300 sm:mt-1 sm:text-xs">
+            Cost: <strong className="text-amber-300">${upgradeCost}</strong> •
+            Next Rent: <strong className="text-emerald-400">${nextRent}</strong>
           </p>
         </div>
 
         {isMyTurn ? (
-          <div className="mt-2 flex w-full max-w-xs items-center justify-center gap-2.5">
+          <div className="mt-1 flex w-full max-w-xs items-center justify-center gap-2 sm:mt-2 sm:gap-2.5">
             <button
               disabled={!canAfford}
               onClick={onUpgrade}
-              className="flex-1 cursor-pointer rounded-xl bg-gradient-to-r from-sky-400 to-emerald-400 py-3 text-xs font-black uppercase tracking-wider text-slate-950 shadow-lg shadow-sky-500/30 transition hover:brightness-110 active:scale-95 disabled:opacity-40 disabled:pointer-events-none sm:text-sm"
+              className="flex-1 cursor-pointer rounded-xl bg-gradient-to-r from-sky-400 to-emerald-400 py-2 text-xs font-black uppercase tracking-wider text-slate-950 shadow-lg shadow-sky-500/30 transition hover:brightness-110 active:scale-95 disabled:opacity-40 disabled:pointer-events-none sm:py-3 sm:text-sm"
             >
               {canAfford ? `UPGRADE ($${upgradeCost})` : `Need $${upgradeCost}`}
             </button>
             <button
               onClick={onSkipUpgrade}
-              className="cursor-pointer rounded-xl border border-white/20 bg-slate-800/90 px-5 py-3 text-xs font-bold uppercase tracking-wider text-white transition hover:bg-slate-700 active:scale-95 sm:text-sm"
+              className="cursor-pointer rounded-xl border border-white/20 bg-slate-800/90 px-3.5 py-2 text-xs font-bold uppercase tracking-wider text-white transition hover:bg-slate-700 active:scale-95 sm:px-5 sm:py-3 sm:text-sm"
             >
               SKIP
             </button>
           </div>
         ) : (
-          <div className="mt-2 flex items-center justify-center gap-2 rounded-xl bg-slate-900/90 px-4 py-2.5 text-xs font-bold text-sky-300 border border-sky-400/20">
+          <div className="mt-1 flex items-center justify-center gap-1.5 rounded-xl bg-slate-900/90 px-3 py-1.5 text-[11px] font-bold text-sky-300 border border-sky-400/20 sm:mt-2 sm:gap-2 sm:px-4 sm:py-2.5 sm:text-xs">
             <span
               style={{ backgroundColor: activePlayer?.color ?? "#38bdf8" }}
-              className="inline-block h-2.5 w-2.5 rounded-full animate-ping"
+              className="inline-block h-2 w-2 rounded-full animate-ping sm:h-2.5 sm:w-2.5"
             />
             <span>
               <strong style={{ color: activePlayer?.color }}>
@@ -607,10 +612,10 @@ export function CenterBoardConsole({
       {myProperties.length > 0 && (
         <button
           onClick={() => setShowPortfolio(true)}
-          className="absolute top-2.5 right-2.5 z-30 flex items-center gap-1.5 rounded-xl border border-amber-400/40 bg-slate-950/90 px-2.5 py-1 text-[11px] font-black text-amber-300 shadow hover:bg-amber-500/20 active:scale-95"
+          className="absolute top-1.5 right-1.5 z-30 flex items-center gap-1 rounded-lg border border-amber-400/40 bg-slate-950/90 px-2 py-0.5 text-[9px] font-black text-amber-300 shadow hover:bg-amber-500/20 active:scale-95 sm:top-2.5 sm:right-2.5 sm:gap-1.5 sm:rounded-xl sm:px-2.5 sm:py-1 sm:text-[11px]"
           title="Inspect and Sell Properties"
         >
-          <Store className="h-3.5 w-3.5 text-amber-400" />
+          <Store className="h-3 w-3 text-amber-400 sm:h-3.5 sm:w-3.5" />
           <span>My Deeds ({myProperties.length})</span>
         </button>
       )}
@@ -618,9 +623,9 @@ export function CenterBoardConsole({
       {/* User-requested Rent Notification in the Middle:
           "[user (in color)] paid you [$amount (in Golden color)]" */}
       {isRecentTx && tx && (
-        <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 absolute bottom-2 z-30 mx-auto flex max-w-[90%] items-center gap-2 rounded-2xl border border-amber-400/50 bg-slate-950/95 px-3.5 py-2 shadow-2xl backdrop-blur-md sm:bottom-3 sm:px-4 sm:py-2.5">
-          <Coins className="h-4 w-4 shrink-0 text-amber-400 animate-spin sm:h-5 sm:w-5" />
-          <div className="text-[11px] font-extrabold sm:text-xs">
+        <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 absolute bottom-1.5 z-30 mx-auto flex max-w-[95%] items-center gap-1.5 rounded-xl border border-amber-400/50 bg-slate-950/95 px-2.5 py-1.5 shadow-2xl backdrop-blur-md sm:bottom-3 sm:gap-2 sm:rounded-2xl sm:px-4 sm:py-2.5">
+          <Coins className="h-3.5 w-3.5 shrink-0 text-amber-400 animate-spin sm:h-5 sm:w-5" />
+          <div className="text-[10px] font-extrabold sm:text-xs">
             {tx.payeeId === userId ? (
               <span>
                 <strong style={{ color: payer?.color ?? "#f59e0b" }}>

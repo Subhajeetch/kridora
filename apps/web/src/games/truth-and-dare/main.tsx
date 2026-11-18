@@ -298,17 +298,17 @@ export default function TruthAndDareGame({ room, userId }: GameComponentProps) {
   const previousState = useRef<TruthAndDareState | null>(null);
 
   const refresh = useCallback(() => {
-    void request("truth-and-dare:get-state", {})
+    void request("truthAndDare:get-state", {})
       .then(setState)
       .catch((err) => setError(describeError(err)));
   }, []);
 
   useEffect(() => {
     const onState = (next: TruthAndDareState) => setState(next);
-    socket.on("truth-and-dare:state", onState);
+    socket.on("truthAndDare:state", onState);
     refresh();
     return () => {
-      socket.off("truth-and-dare:state", onState);
+      socket.off("truthAndDare:state", onState);
     };
   }, [refresh]);
 
@@ -424,7 +424,7 @@ export default function TruthAndDareGame({ room, userId }: GameComponentProps) {
       return;
     }
     void submit(() =>
-      request("truth-and-dare:configure", {
+      request("truthAndDare:configure", {
         ageGroup,
         spinner,
         mode,
@@ -433,12 +433,12 @@ export default function TruthAndDareGame({ room, userId }: GameComponentProps) {
   };
 
   const handleStartGame = () => {
-    void submit(() => request("truth-and-dare:start-game", {}));
+    void submit(() => request("truthAndDare:start-game", {}));
   };
 
   const handleSetCharacter = (character: TruthAndDareCharacter) => {
     void submit(() =>
-      request("truth-and-dare:set-character", {
+      request("truthAndDare:set-character", {
         character,
       }),
     );
@@ -447,7 +447,7 @@ export default function TruthAndDareGame({ room, userId }: GameComponentProps) {
   function confirmSpicyMode() {
     if (!ageConfirmed) return;
     void submit(() =>
-      request("truth-and-dare:configure", {
+      request("truthAndDare:configure", {
         ageGroup: "adult",
         spinner: state?.settings.spinner ?? "bottle",
         mode: pendingAdultMode,
@@ -462,13 +462,13 @@ export default function TruthAndDareGame({ room, userId }: GameComponentProps) {
   }
 
   function choosePrompt(type: "truth" | "dare") {
-    void submit(() => request("truth-and-dare:choose", { choice: type }));
+    void submit(() => request("truthAndDare:choose", { choice: type }));
   }
 
   function spinBottle() {
     unlockSpinAudio();
     vibrate(14);
-    void submit(() => request("truth-and-dare:spin", {}));
+    void submit(() => request("truthAndDare:spin", {}));
   }
 
   if (!state) {
@@ -1160,7 +1160,7 @@ export default function TruthAndDareGame({ room, userId }: GameComponentProps) {
                       disabled={busy}
                       onClick={() =>
                         void submit(() =>
-                          request("truth-and-dare:finish", { result: "done" }),
+                          request("truthAndDare:finish", { result: "done" }),
                         )
                       }
                       className={styles.doneButton}
@@ -1172,7 +1172,7 @@ export default function TruthAndDareGame({ room, userId }: GameComponentProps) {
                       variant="outline"
                       onClick={() =>
                         void submit(() =>
-                          request("truth-and-dare:finish", { result: "skip" }),
+                          request("truthAndDare:finish", { result: "skip" }),
                         )
                       }
                       className={styles.skipButton}

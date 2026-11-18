@@ -251,7 +251,7 @@ Common types:
 - `perf`: Performance improvement
 - `chore`: Maintenance, config changes, or dependency upgrades
 
-Use workspace package names or game scopes: `web`, `api`, `db`, `shared`, `docs`, `game-monopoly`, `game-ludo`, `game-fatebyai`, or `game-truth-and-dare`.
+Use workspace package names or game scopes: `web`, `api`, `db`, `shared`, `docs`, `game-business`, `game-ludo`, `game-fatebyai`, or `game-truthAndDare`.
 
 ### Examples
 
