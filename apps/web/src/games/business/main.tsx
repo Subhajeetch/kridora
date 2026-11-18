@@ -50,6 +50,7 @@ export default function BusinessGame({ userId }: GameComponentProps) {
   const [isRollingAnim, setIsRollingAnim] = useState(false);
   const [isHopping, setIsHopping] = useState(false);
   const [hoppingPlayerId, setHoppingPlayerId] = useState<string | null>(null);
+  const [selectedTileIndex, setSelectedTileIndex] = useState<number | null>(null);
 
   // Authoritative visual positions rendered on the board (prevents teleporting!)
   const [visualPositions, setVisualPositions] = useState<
@@ -106,7 +107,7 @@ export default function BusinessGame({ userId }: GameComponentProps) {
     }, 0);
     const stopRollSpinTimer = window.setTimeout(() => {
       setIsRollingAnim(false);
-    }, 450);
+    }, 650);
 
     // If piece didn't move (e.g. rolled inside Jail and didn't roll a 6)
     if (roll.fromTile === roll.toTile) {
@@ -168,8 +169,10 @@ export default function BusinessGame({ userId }: GameComponentProps) {
       window.clearTimeout(stopRollSpinTimer);
       window.clearTimeout(hopStartTimer);
       window.clearInterval(hopInterval);
+      setIsHopping(false);
+      setHoppingPlayerId(null);
     };
-  }, [state?.lastRoll, isMuted, state?.lastTransaction]);
+  }, [state?.lastRoll, isMuted]);
 
   useEffect(() => {
     if (state?.phase === "game_over") {
@@ -538,18 +541,13 @@ export default function BusinessGame({ userId }: GameComponentProps) {
                       gridColumn: coords.gridColumn,
                     }}
                     onClick={() => {
-                      if (
-                        isMyTurn &&
-                        state.turnSubPhase === "debt_resolution" &&
-                        prop?.ownerId === userId
-                      ) {
-                        sendAction({
-                          type: "sell-property",
-                          tileIndex: tile.index,
-                        });
+                      if (prop) {
+                        setSelectedTileIndex(tile.index);
                       }
                     }}
-                    className="relative flex select-none flex-col overflow-hidden rounded-[5px] shadow-sm"
+                    className={`relative flex select-none flex-col overflow-hidden rounded-[5px] shadow-sm transition ${
+                      prop ? "cursor-pointer hover:brightness-110 active:scale-95" : ""
+                    }`}
                   >
                     {tile.type === "city" ? (
                       <>
@@ -626,9 +624,12 @@ export default function BusinessGame({ userId }: GameComponentProps) {
                   state={state}
                   userId={userId}
                   isHopping={isHopping}
+                  visualPosition={visualPositions[activePlayer?.userId ?? ""]}
                   activePlayer={activePlayer}
                   isMyTurn={isMyTurn}
                   me={me}
+                  selectedTileIndex={selectedTileIndex}
+                  onSelectTile={setSelectedTileIndex}
                   onBuy={() => sendAction({ type: "buy-property" })}
                   onPass={() => sendAction({ type: "pass-property" })}
                   onUpgrade={() => sendAction({ type: "upgrade-property" })}
@@ -642,9 +643,10 @@ export default function BusinessGame({ userId }: GameComponentProps) {
                   onDeclareBankruptcy={() =>
                     sendAction({ type: "declare-bankruptcy" })
                   }
-                  onSellProperty={(tileIndex) =>
-                    sendAction({ type: "sell-property", tileIndex })
-                  }
+                  onSellProperty={(tileIndex) => {
+                    sendAction({ type: "sell-property", tileIndex });
+                    setSelectedTileIndex(null);
+                  }}
                 />
               </div>
             </div>
