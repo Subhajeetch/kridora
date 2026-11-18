@@ -250,20 +250,17 @@ export function ThreeDice({
           wasRolling = false;
         }
 
-        const targetRot =
+        const baseRot =
           FACE_ROTATIONS[targetValueRef.current] ?? FACE_ROTATIONS[1]!;
-
-        // Smooth, damped settling toward the rolled face
-        mesh.rotation.x += (targetRot[0] - mesh.rotation.x) * 0.1;
-        mesh.rotation.y += (targetRot[1] - mesh.rotation.y) * 0.1;
-        mesh.rotation.z += (targetRot[2] - mesh.rotation.z) * 0.1;
-        mesh.position.y += (0 - mesh.position.y) * 0.12;
+        let targetRotX = baseRot[0];
+        const targetRotY = baseRot[1];
+        let targetRotZ = baseRot[2];
 
         // "when it's our turn, our dice should shake and grow in a blink way.. so we know it's our turn.."
-        // Slower, smoother breathing and playful gentle wobble
+        // Slower, smoother breathing and playful gentle wobble ONLY on our turn when we can roll
         if (isMyTurnRef.current && canRollRef.current) {
-          // Gentle smooth breathe: oscillates between 1.02 and 1.14
-          const breathe = 1.08 + Math.sin(time * 0.0025) * 0.06;
+          // Gentle smooth breathe: oscillates between 1.02 and 1.12
+          const breathe = 1.07 + Math.sin(time * 0.0025) * 0.05;
           mesh.scale.set(breathe, breathe, breathe);
 
           // Slower, smoother playful wobble every 2.4 seconds
@@ -272,12 +269,18 @@ export function ThreeDice({
             const progress = wobbleCycle / 0.7;
             const decay = 1 - progress;
             const wobble = Math.sin(progress * Math.PI * 4) * 0.09 * decay;
-            mesh.rotation.z += wobble;
-            mesh.rotation.x += wobble * 0.35;
+            targetRotZ += wobble;
+            targetRotX += wobble * 0.35;
           }
         } else {
           mesh.scale.lerp(new THREE.Vector3(1, 1, 1), 0.08);
         }
+
+        // Smooth, damped settling toward the face (deterministic, no rotational drift!)
+        mesh.rotation.x += (targetRotX - mesh.rotation.x) * 0.12;
+        mesh.rotation.y += (targetRotY - mesh.rotation.y) * 0.12;
+        mesh.rotation.z += (targetRotZ - mesh.rotation.z) * 0.12;
+        mesh.position.y += (0 - mesh.position.y) * 0.12;
       }
 
       renderer.render(scene, camera);

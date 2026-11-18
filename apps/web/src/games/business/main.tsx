@@ -6,7 +6,7 @@ import {
   type BusinessUpdateSettingsPayload,
 } from "@kridora/shared";
 import confetti from "canvas-confetti";
-import { Dices, Trophy, Volume2, VolumeX } from "lucide-react";
+import { ArrowLeft, Dices, Trophy, Volume2, VolumeX } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { request, socket } from "@/lib/socket";
 import { useInGameRoom } from "@/games/hooks";
@@ -50,7 +50,9 @@ export default function BusinessGame({ userId }: GameComponentProps) {
   const [isRollingAnim, setIsRollingAnim] = useState(false);
   const [isHopping, setIsHopping] = useState(false);
   const [hoppingPlayerId, setHoppingPlayerId] = useState<string | null>(null);
-  const [selectedTileIndex, setSelectedTileIndex] = useState<number | null>(null);
+  const [selectedTileIndex, setSelectedTileIndex] = useState<number | null>(
+    null,
+  );
 
   // Authoritative visual positions rendered on the board (prevents teleporting!)
   const [visualPositions, setVisualPositions] = useState<
@@ -61,6 +63,10 @@ export default function BusinessGame({ userId }: GameComponentProps) {
 
   useEffect(() => {
     const handleIncomingState = (next: BusinessState) => {
+      // Initialize lastRollIdRef on initial load so it does not trigger unwanted roll animation
+      if (!lastRollIdRef.current && next.lastRoll) {
+        lastRollIdRef.current = next.lastRoll.rollId;
+      }
       setState(next);
       if (next.phase === "setup") {
         visualPosRef.current = {};
@@ -101,19 +107,25 @@ export default function BusinessGame({ userId }: GameComponentProps) {
 
     businessAudio.playDieRoll(isMuted);
 
-    // Trigger 3D dice spin
-    const rollStartTimer = window.setTimeout(() => {
-      setIsRollingAnim(true);
-    }, 0);
-    const stopRollSpinTimer = window.setTimeout(() => {
-      setIsRollingAnim(false);
-    }, 650);
+    // Trigger 3D dice spin ONLY if the local player is the roller
+    // (Prevents the dice from automatically rolling/spinning when another player rolls!)
+    let rollStartTimer: number | undefined;
+    let stopRollSpinTimer: number | undefined;
+    if (roll.rollerId === userId) {
+      rollStartTimer = window.setTimeout(() => {
+        setIsRollingAnim(true);
+      }, 0);
+      stopRollSpinTimer = window.setTimeout(() => {
+        setIsRollingAnim(false);
+      }, 650);
+    }
 
     // If piece didn't move (e.g. rolled inside Jail and didn't roll a 6)
     if (roll.fromTile === roll.toTile) {
       return () => {
-        window.clearTimeout(rollStartTimer);
-        window.clearTimeout(stopRollSpinTimer);
+        if (rollStartTimer) window.clearTimeout(rollStartTimer);
+        if (stopRollSpinTimer) window.clearTimeout(stopRollSpinTimer);
+        setIsRollingAnim(false);
       };
     }
 
@@ -165,14 +177,15 @@ export default function BusinessGame({ userId }: GameComponentProps) {
     }, 200);
 
     return () => {
-      window.clearTimeout(rollStartTimer);
-      window.clearTimeout(stopRollSpinTimer);
+      if (rollStartTimer) window.clearTimeout(rollStartTimer);
+      if (stopRollSpinTimer) window.clearTimeout(stopRollSpinTimer);
       window.clearTimeout(hopStartTimer);
       window.clearInterval(hopInterval);
+      setIsRollingAnim(false);
       setIsHopping(false);
       setHoppingPlayerId(null);
     };
-  }, [state?.lastRoll, isMuted]);
+  }, [state?.lastRoll, isMuted, state?.lastTransaction, userId]);
 
   useEffect(() => {
     if (state?.phase === "game_over") {
@@ -225,17 +238,23 @@ export default function BusinessGame({ userId }: GameComponentProps) {
     (state?.turnSubPhase === "awaiting_roll" ||
       state?.turnSubPhase === "jail_choice");
 
+  const handleRollDie = useCallback(() => {
+    if (!canRollNow) return;
+    setIsRollingAnim(true);
+    sendAction({ type: "roll-die" });
+  }, [canRollNow, sendAction]);
+
   // Spacebar shortcut to roll
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.code === "Space" && state?.phase === "playing" && canRollNow) {
         e.preventDefault();
-        sendAction({ type: "roll-die" });
+        handleRollDie();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [state?.phase, canRollNow, sendAction]);
+  }, [state?.phase, canRollNow, handleRollDie]);
 
   /**
    * Corner Cards Placement (User Specification):
@@ -314,9 +333,10 @@ export default function BusinessGame({ userId }: GameComponentProps) {
           <div className="flex items-center justify-between border-b border-white/10 pb-3">
             <button
               onClick={onBackToRoom}
-              className="text-xs font-semibold text-slate-400 transition hover:text-white"
+              className="flex cursor-pointer items-center gap-1.5 text-xs font-semibold text-slate-400 transition hover:text-white"
             >
-              ← Room
+              <ArrowLeft className="h-3.5 w-3.5" />
+              <span>Room</span>
             </button>
             <button
               onClick={onLeaveRoom}
@@ -446,9 +466,11 @@ export default function BusinessGame({ userId }: GameComponentProps) {
       <header className="flex w-full max-w-6xl items-center justify-between gap-3 rounded-2xl border border-white/10 bg-[#0f172a]/90 px-4 py-2 shadow-lg backdrop-blur-md">
         <button
           onClick={onBackToRoom}
-          className="flex items-center gap-1 text-xs font-bold text-slate-300 transition hover:text-white"
+          className="flex cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-bold text-slate-300 transition hover:bg-white/10 hover:text-white"
+          title="Return to Room"
         >
-          ← Room
+          <ArrowLeft className="h-4 w-4" />
+          <span>Room</span>
         </button>
 
         <span className="text-xs font-bold text-slate-200 sm:text-sm">
@@ -482,11 +504,11 @@ export default function BusinessGame({ userId }: GameComponentProps) {
       </header>
 
       {/* Main Arena: Board + Corner Player Cards + Desktop Controls */}
-      <main className="flex min-h-0 w-full max-w-6xl flex-1 items-center justify-center gap-6 py-1">
-        {/* Board Arena with 4 Player Cards around the 4 corners */}
-        <div className="flex h-full w-full max-w-[min(82vh,620px)] flex-col items-center justify-between gap-2">
+      <main className="flex min-h-0 w-full max-w-6xl flex-1 items-center justify-center gap-3 pt-2 pb-28 sm:gap-4 sm:pt-4 sm:pb-32 lg:gap-6 lg:pt-6 lg:pb-4">
+        {/* Board Arena with 4 Player Cards snug around the 4 board corners */}
+        <div className="my-auto flex w-fit max-w-full flex-col items-center justify-center gap-1 sm:gap-1.5">
           {/* Top Row: Top-Left Card & Top-Right Card */}
-          <div className="flex w-full items-center justify-between gap-2 px-1">
+          <div className="flex w-full items-center justify-between gap-1 px-0.5 sm:gap-2 sm:px-1">
             {cornerPlayers.topLeft ? (
               <PlayerCornerCard
                 player={cornerPlayers.topLeft}
@@ -496,7 +518,7 @@ export default function BusinessGame({ userId }: GameComponentProps) {
                 position="top-left"
               />
             ) : (
-              <div className="invisible min-w-[140px]" />
+              <div className="invisible min-w-0 sm:min-w-[140px]" />
             )}
 
             {cornerPlayers.topRight ? (
@@ -508,12 +530,12 @@ export default function BusinessGame({ userId }: GameComponentProps) {
                 position="top-right"
               />
             ) : (
-              <div className="invisible min-w-[140px]" />
+              <div className="invisible min-w-0 sm:min-w-[140px]" />
             )}
           </div>
 
           {/* 8x8 Perimeter Board */}
-          <div className="flex h-full w-full flex-1 items-center justify-center">
+          <div className="flex items-center justify-center">
             <div className={styles.boardGrid}>
               {BUSINESS_BOARD.map((tile) => {
                 const coords = getGridCoords(tile.index);
@@ -528,10 +550,13 @@ export default function BusinessGame({ userId }: GameComponentProps) {
                     (visualPositions[p.userId] ?? p.position) === tile.index,
                 );
 
-                const displayCost =
-                  prop && prop.level > 0 && tile.rent
-                    ? tile.rent[prop.level]
-                    : tile.cost;
+                const isBought = Boolean(owner);
+                const rentPrice = tile.rent
+                  ? (tile.rent[prop?.level ?? 0] ?? tile.rent[0])
+                  : tile.cost
+                    ? Math.round(tile.cost * 0.2)
+                    : 0;
+                const displayPrice = isBought ? rentPrice : (tile.cost ?? 0);
 
                 return (
                   <div
@@ -546,7 +571,9 @@ export default function BusinessGame({ userId }: GameComponentProps) {
                       }
                     }}
                     className={`relative flex select-none flex-col overflow-hidden rounded-[5px] shadow-sm transition ${
-                      prop ? "cursor-pointer hover:brightness-110 active:scale-95" : ""
+                      prop
+                        ? "cursor-pointer hover:brightness-110 active:scale-95"
+                        : ""
                     }`}
                   >
                     {tile.type === "city" ? (
@@ -554,52 +581,78 @@ export default function BusinessGame({ userId }: GameComponentProps) {
                         {/* Top Price Ribbon */}
                         <div
                           style={{ backgroundColor: tile.topBgHex }}
-                          className="flex h-[38%] w-full items-center justify-center px-1"
+                          className="flex h-[38%] w-full items-center justify-center px-0.5"
                         >
-                          <span className="text-[10px] font-extrabold text-white drop-shadow sm:text-xs">
-                            ${displayCost}
-                          </span>
+                          {isBought && owner ? (
+                            <div
+                              style={{ backgroundColor: owner.color }}
+                              className="flex items-center justify-center rounded-[3px] border border-white/80 px-1 py-[0.5px] shadow-[0_1px_3px_rgba(0,0,0,0.6)] lg:rounded-md lg:border-white/90 lg:px-2 lg:py-0.5"
+                              title={`Rent: $${rentPrice} (Owned by ${owner.username})`}
+                            >
+                              <span className="text-[7px] font-black leading-none text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.9)] sm:text-[9.5px] md:text-[11px] lg:text-[13px] xl:text-[14px]">
+                                ${displayPrice}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-[7.5px] font-extrabold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] sm:text-[9.5px] md:text-xs lg:text-[13px] xl:text-[14px] lg:font-black">
+                              ${displayPrice}
+                            </span>
+                          )}
                         </div>
                         {/* Bottom City Name Block */}
                         <div
                           style={{ backgroundColor: tile.bottomBgHex }}
-                          className="flex h-[62%] w-full flex-col items-center justify-center px-1 text-center"
+                          className="flex h-[62%] w-full flex-col items-center justify-center px-0.5 text-center"
                         >
-                          <span className="text-[9px] font-black uppercase leading-tight tracking-wide text-white sm:text-[11px]">
+                          <span className="truncate max-w-full text-[6.5px] font-black uppercase leading-tight tracking-tight text-white sm:text-[8.5px] sm:tracking-wide md:text-[10px] lg:text-[12px] xl:text-[13px]">
                             {tile.name}
                           </span>
                           {prop && prop.level > 0 && (
-                            <span className="text-[8px] font-black text-amber-200">
+                            <span className="text-[6.5px] font-black leading-none text-amber-200 sm:text-[8px] md:text-[9.5px] lg:text-[12px]">
                               {"★".repeat(prop.level)}
                             </span>
                           )}
                         </div>
                       </>
                     ) : (
-                      <SpecialTileArtwork
-                        tileIndex={tile.index}
-                        name={tile.name}
-                      />
+                      <>
+                        <SpecialTileArtwork
+                          tileIndex={tile.index}
+                          name={tile.name}
+                        />
+                        {/* For purchasable transit/utility tiles, show rent price badge with owner color */}
+                        {isBought && owner && (
+                          <div
+                            style={{ backgroundColor: owner.color }}
+                            className="absolute top-0.5 left-0.5 z-10 flex items-center justify-center rounded-[3px] border border-white/80 px-1 py-[0.5px] shadow-[0_1px_3px_rgba(0,0,0,0.6)] lg:top-1 lg:left-1 lg:rounded-md lg:border-white/90 lg:px-2 lg:py-0.5"
+                            title={`Rent: $${rentPrice} (Owned by ${owner.username})`}
+                          >
+                            <span className="text-[6.5px] font-black leading-none text-white drop-shadow sm:text-[8px] md:text-[9.5px] lg:text-[12px] xl:text-[13px]">
+                              ${displayPrice}
+                            </span>
+                          </div>
+                        )}
+                      </>
                     )}
 
-                    {/* Owner Badge Ring */}
+                    {/* Owner Badge Dot Puck */}
                     {owner && (
                       <span
                         style={{ backgroundColor: owner.color }}
-                        className="absolute top-1 right-1 h-2.5 w-2.5 rounded-full border border-white shadow"
+                        className="absolute top-0.5 right-0.5 h-2 w-2 rounded-full border border-white shadow sm:top-1 sm:right-1 sm:h-2.5 sm:w-2.5 md:h-3 md:w-3 lg:h-3.5 lg:w-3.5"
                         title={`Owned by ${owner.username}`}
                       />
                     )}
 
                     {/* 3D Puck Tokens Sitting on the Tile */}
                     {occupants.length > 0 && (
-                      <div className="pointer-events-none absolute inset-0 flex flex-wrap items-center justify-center gap-1 bg-black/15 p-0.5">
+                      <div className="pointer-events-none absolute inset-0 flex flex-wrap items-center justify-center gap-0.5 bg-black/15 p-0.5">
                         {occupants.map((occ) => {
                           const isHoppingNow = hoppingPlayerId === occ.userId;
                           return (
                             <div
                               key={occ.userId}
-                              className={`flex h-5 w-5 items-center justify-center rounded-full bg-white p-[2px] shadow-[0_3px_0_#64748b,0_5px_8px_rgba(0,0,0,0.5)] transition-transform duration-150 sm:h-6 sm:w-6 ${
+                              className={`flex h-4 w-4 items-center justify-center rounded-full bg-white p-[1.5px] shadow-[0_2px_0_#64748b,0_3px_5px_rgba(0,0,0,0.5)] transition-transform duration-150 sm:h-5 sm:w-5 md:h-6 md:w-6 sm:p-[2px] ${
                                 isHoppingNow ? styles.hoppingToken : ""
                               }`}
                             >
@@ -653,7 +706,7 @@ export default function BusinessGame({ userId }: GameComponentProps) {
           </div>
 
           {/* Bottom Row: Bottom-Left Card (Me) & Bottom-Right Card */}
-          <div className="flex w-full items-center justify-between gap-2 px-1">
+          <div className="flex w-full items-center justify-between gap-1 px-0.5 sm:gap-2 sm:px-1">
             {cornerPlayers.bottomLeft ? (
               <PlayerCornerCard
                 player={cornerPlayers.bottomLeft}
@@ -665,7 +718,7 @@ export default function BusinessGame({ userId }: GameComponentProps) {
                 position="bottom-left"
               />
             ) : (
-              <div className="invisible min-w-[140px]" />
+              <div className="invisible min-w-0 sm:min-w-[140px]" />
             )}
 
             {cornerPlayers.bottomRight ? (
@@ -679,13 +732,13 @@ export default function BusinessGame({ userId }: GameComponentProps) {
                 position="bottom-right"
               />
             ) : (
-              <div className="invisible min-w-[140px]" />
+              <div className="invisible min-w-0 sm:min-w-[140px]" />
             )}
           </div>
         </div>
 
         {/* Desktop Controls Sidebar: 3D Dice + Roll CTA + Quick Emotes */}
-        <aside className="hidden h-full w-[310px] shrink-0 flex-col justify-between gap-4 rounded-3xl border border-white/10 bg-[#0f172a]/95 p-4 shadow-2xl backdrop-blur-xl lg:flex">
+        <aside className="my-auto hidden h-fit w-[290px] shrink-0 flex-col justify-center gap-4 rounded-3xl border border-white/10 bg-[#0f172a]/95 p-4 shadow-2xl backdrop-blur-xl lg:flex xl:w-[310px]">
           {/* Top Status & 3D Dice Display */}
           <div className="flex flex-col items-center gap-3 rounded-2xl border border-white/10 bg-slate-900/90 p-4 text-center shadow-inner">
             <div className="text-[11px] font-black uppercase tracking-widest text-[#ff6b72]">
@@ -698,7 +751,7 @@ export default function BusinessGame({ userId }: GameComponentProps) {
               isRolling={isRollingAnim}
               isMyTurn={isMyTurn}
               canRoll={canRollNow}
-              onRoll={() => sendAction({ type: "roll-die" })}
+              onRoll={handleRollDie}
               size={96}
             />
 
@@ -717,7 +770,7 @@ export default function BusinessGame({ userId }: GameComponentProps) {
           {/* Roll CTA Button */}
           <button
             disabled={!canRollNow}
-            onClick={() => sendAction({ type: "roll-die" })}
+            onClick={handleRollDie}
             className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#ff6b72] to-[#ff4757] py-3.5 text-xs font-black uppercase tracking-widest text-slate-950 shadow-lg shadow-rose-500/25 transition hover:brightness-110 active:scale-95 disabled:opacity-40 disabled:pointer-events-none"
           >
             <Dices className="h-4 w-4" /> ROLL THE DIE (SPACE)
@@ -761,7 +814,7 @@ export default function BusinessGame({ userId }: GameComponentProps) {
         canRoll={canRollNow}
         isRolling={isRollingAnim}
         diceValue={diceValue}
-        onRoll={() => sendAction({ type: "roll-die" })}
+        onRoll={handleRollDie}
         onSendEmote={(emoji) => sendAction({ type: "send-emote", emoji })}
       />
 

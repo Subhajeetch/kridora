@@ -193,31 +193,31 @@ export interface ClientToServerEvents {
     payload: LudoEmotePayload,
     ack: AckFn<{ ok: boolean }>,
   ) => void;
-  "truth-and-dare:get-state": (
+  "truthAndDare:get-state": (
     payload: EmptyPayload,
     ack: AckFn<TruthAndDareState>,
   ) => void;
-  "truth-and-dare:spin": (
+  "truthAndDare:spin": (
     payload: EmptyPayload,
     ack: AckFn<TruthAndDareState>,
   ) => void;
-  "truth-and-dare:choose": (
+  "truthAndDare:choose": (
     payload: TruthAndDareChoicePayload,
     ack: AckFn<TruthAndDareState>,
   ) => void;
-  "truth-and-dare:finish": (
+  "truthAndDare:finish": (
     payload: TruthAndDareFinishPayload,
     ack: AckFn<TruthAndDareState>,
   ) => void;
-  "truth-and-dare:set-character": (
+  "truthAndDare:set-character": (
     payload: TruthAndDareCharacterPayload,
     ack: AckFn<TruthAndDareState>,
   ) => void;
-  "truth-and-dare:configure": (
+  "truthAndDare:configure": (
     payload: TruthAndDareConfigurePayload,
     ack: AckFn<TruthAndDareState>,
   ) => void;
-  "truth-and-dare:start-game": (
+  "truthAndDare:start-game": (
     payload: EmptyPayload,
     ack: AckFn<TruthAndDareState>,
   ) => void;
@@ -283,7 +283,7 @@ export interface ServerToClientEvents {
   "ludo:rolling": (payload: { color: LudoColor; userId: string }) => void;
   "ludo:emote": (payload: { userId: string; emoji: string }) => void;
   "ludo:debug-enabled": (payload: { enabled: boolean }) => void;
-  "truth-and-dare:state": (state: TruthAndDareState) => void;
+  "truthAndDare:state": (state: TruthAndDareState) => void;
   "business:state": (state: BusinessState) => void;
 }
 

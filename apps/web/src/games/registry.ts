@@ -5,10 +5,9 @@ import type { GameComponentProps } from "./types";
 type GameLoader = () => Promise<{ default: ComponentType<GameComponentProps> }>;
 
 const gameLoaders: Record<GameSlug, GameLoader> = {
-  monopoly: () => import("./monopoly/main"),
   fatebyai: () => import("./fatebyai/main"),
   ludo: () => import("./ludo/main"),
-  "truth-and-dare": () => import("./truth-and-dare/main"),
+  truthAndDare: () => import("./truth-and-dare/main"),
   business: () => import("./business/main"),
 };
 
@@ -28,9 +27,8 @@ export const gameComponents: Record<
   GameSlug,
   LazyExoticComponent<ComponentType<GameComponentProps>>
 > = {
-  monopoly: lazy(gameLoaders.monopoly),
   fatebyai: lazy(gameLoaders.fatebyai),
   ludo: lazy(gameLoaders.ludo),
-  "truth-and-dare": lazy(gameLoaders["truth-and-dare"]),
+  truthAndDare: lazy(gameLoaders.truthAndDare),
   business: lazy(gameLoaders.business),
 };
