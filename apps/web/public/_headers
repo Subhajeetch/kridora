@@ -1,0 +1,18 @@
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: SAMEORIGIN
+  Referrer-Policy: strict-origin-when-cross-origin
+
+# Ensure HTML files and root index are never cached so releases are picked up immediately
+/*.html
+  Cache-Control: no-cache, no-store, must-revalidate
+
+/index.html
+  Cache-Control: no-cache, no-store, must-revalidate
+
+/
+  Cache-Control: no-cache, no-store, must-revalidate
+
+# Hashed assets are content-addressed and safe to cache immutably
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable

@@ -1,5 +1,6 @@
 import type { GameSlug } from "@kridora/shared";
-import { lazy, type ComponentType, type LazyExoticComponent } from "react";
+import type { ComponentType, LazyExoticComponent } from "react";
+import { lazyWithRetry } from "@/lib/chunk-reload";
 import type { GameComponentProps } from "./types";
 
 type GameLoader = () => Promise<{ default: ComponentType<GameComponentProps> }>;
@@ -27,8 +28,8 @@ export const gameComponents: Record<
   GameSlug,
   LazyExoticComponent<ComponentType<GameComponentProps>>
 > = {
-  fatebyai: lazy(gameLoaders.fatebyai),
-  ludo: lazy(gameLoaders.ludo),
-  truthAndDare: lazy(gameLoaders.truthAndDare),
-  business: lazy(gameLoaders.business),
+  fatebyai: lazyWithRetry(gameLoaders.fatebyai),
+  ludo: lazyWithRetry(gameLoaders.ludo),
+  truthAndDare: lazyWithRetry(gameLoaders.truthAndDare),
+  business: lazyWithRetry(gameLoaders.business),
 };
