@@ -1,15 +1,18 @@
-import { lazy, Suspense } from "react";
+import { Suspense } from "react";
 import { Route, Routes } from "react-router";
 import { AppShell } from "@/components/AppShell";
 import { RealtimeProvider } from "@/providers/RealtimeProvider";
+import { lazyWithRetry } from "@/lib/chunk-reload";
 
-const HomePage = lazy(() => import("@/pages/HomePage"));
-const GamesPage = lazy(() => import("@/pages/GamesPage"));
-const GameLobbyPage = lazy(() => import("@/pages/GameLobbyPage"));
-const RoomPage = lazy(() => import("@/pages/RoomPage"));
-const InviteJoinPage = lazy(() => import("@/pages/InviteJoinPage"));
-const ResetPasswordPage = lazy(() => import("@/pages/ResetPasswordPage"));
-const NotFoundPage = lazy(() => import("@/pages/NotFoundPage"));
+const HomePage = lazyWithRetry(() => import("@/pages/HomePage"));
+const GamesPage = lazyWithRetry(() => import("@/pages/GamesPage"));
+const GameLobbyPage = lazyWithRetry(() => import("@/pages/GameLobbyPage"));
+const RoomPage = lazyWithRetry(() => import("@/pages/RoomPage"));
+const InviteJoinPage = lazyWithRetry(() => import("@/pages/InviteJoinPage"));
+const ResetPasswordPage = lazyWithRetry(
+  () => import("@/pages/ResetPasswordPage"),
+);
+const NotFoundPage = lazyWithRetry(() => import("@/pages/NotFoundPage"));
 
 /**
  * Routes:

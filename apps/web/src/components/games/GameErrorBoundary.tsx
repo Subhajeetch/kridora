@@ -1,6 +1,7 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { AlertTriangle, ArrowLeft, LogOut, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { isChunkLoadError, safeReloadForNewVersion } from "@/lib/chunk-reload";
 
 interface Props {
   children: ReactNode;
@@ -30,27 +31,39 @@ export class GameErrorBoundary extends Component<Props, State> {
       error,
       errorInfo,
     );
+    if (isChunkLoadError(error)) {
+      safeReloadForNewVersion();
+    }
   }
 
   handleRetry = () => {
+    if (isChunkLoadError(this.state.error)) {
+      window.location.reload();
+      return;
+    }
     this.setState({ hasError: false, error: null });
   };
 
   override render() {
     if (this.state.hasError) {
+      const isChunkError = isChunkLoadError(this.state.error);
+
       return (
         <div className="mx-auto my-8 max-w-lg rounded-3xl border border-destructive/30 bg-panel/90 p-6 text-center shadow-2xl backdrop-blur-xl">
           <div className="mx-auto mb-4 grid size-14 place-items-center rounded-2xl bg-destructive/15 text-destructive">
             <AlertTriangle className="size-7 animate-bounce" />
           </div>
           <h2 className="font-display text-2xl uppercase tracking-wide text-foreground">
-            {this.props.gameName} Error
+            {isChunkError
+              ? `${this.props.gameName} Update Available`
+              : `${this.props.gameName} Error`}
           </h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            Something went wrong while running the game session. Don't worry,
-            your room is still open.
+            {isChunkError
+              ? "A new version of the game was released. Please reload to reconnect to your room with the latest update."
+              : "Something went wrong while running the game session. Don't worry, your room is still open."}
           </p>
-          {this.state.error?.message && (
+          {this.state.error?.message && !isChunkError && (
             <pre className="mt-4 max-h-24 w-full overflow-auto rounded-xl bg-black/40 p-3 text-left font-mono text-xs text-rose-300">
               {this.state.error.message}
             </pre>
@@ -61,7 +74,8 @@ export class GameErrorBoundary extends Component<Props, State> {
               onClick={this.handleRetry}
               className="gap-1.5 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90"
             >
-              <RotateCcw className="size-4" /> Reload Game
+              <RotateCcw className="size-4" />{" "}
+              {isChunkError ? "Update & Reconnect" : "Reload Game"}
             </Button>
             {this.props.onBackToRoom && (
               <Button
