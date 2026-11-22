@@ -290,6 +290,14 @@ export const GAME_DEFINITIONS = {
         action: "Inspect rent or sell property if in debt",
       },
     ],
+    screenshots: [
+      {
+        url: "/games/ss/business-gameplay.webp",
+        title: "In-Game Isometric Action",
+        caption:
+          "Live dice roll action, token hops, and multiplayer HUD indicators.",
+      },
+    ],
   },
 } satisfies Record<string, GameDefinition>;
 

@@ -10,10 +10,12 @@ import {
   TRUTH_AND_DARE_SPINNERS,
   type TruthAndDareState,
 } from "./games/truth-and-dare";
-import type {
-  BusinessActionPayload,
-  BusinessState,
-  BusinessUpdateSettingsPayload,
+import {
+  BUSINESS_CHAT_MAX_LENGTH,
+  type BusinessActionPayload,
+  type BusinessChatMessage,
+  type BusinessState,
+  type BusinessUpdateSettingsPayload,
 } from "./games/business";
 
 export const createRoomSchema = z.object({
@@ -95,7 +97,12 @@ export const changeGameSchema = z.object({
 
 export const businessUpdateSettingsSchema = z.object({
   targetNetWorth: z
-    .union([z.literal(5000), z.literal(7000), z.literal(10000)])
+    .union([
+      z.literal(3000),
+      z.literal(5000),
+      z.literal(7000),
+      z.literal(10000),
+    ])
     .optional(),
   startingCash: z
     .union([z.literal(1000), z.literal(1500), z.literal(2000)])
@@ -108,16 +115,35 @@ export const businessActionSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("pass-jail-turn") }),
   z.object({ type: z.literal("buy-property") }),
   z.object({ type: z.literal("pass-property") }),
-  z.object({ type: z.literal("upgrade-property") }),
+  z.object({
+    type: z.literal("upgrade-property"),
+    tileIndex: z.number().int().min(0).max(27).optional(),
+  }),
   z.object({ type: z.literal("skip-upgrade") }),
   z.object({
     type: z.literal("sell-property"),
     tileIndex: z.number().int().min(0).max(27),
   }),
-  z.object({ type: z.literal("acknowledge-mystery") }),
+  z.object({
+    type: z.literal("auction-select-tile"),
+    tileIndex: z.number().int().min(0).max(27),
+  }),
+  z.object({
+    type: z.literal("auction-propose-offer"),
+    offeredTileIndex: z.number().int().min(0).max(27),
+  }),
+  z.object({ type: z.literal("auction-decline") }),
+  z.object({
+    type: z.literal("auction-accept-offer"),
+    offerId: z.string().min(1).max(64),
+  }),
+  z.object({ type: z.literal("auction-skip") }),
   z.object({ type: z.literal("pay-debt") }),
   z.object({ type: z.literal("declare-bankruptcy") }),
-  z.object({ type: z.literal("send-emote"), emoji: z.string().min(1).max(8) }),
+  z.object({
+    type: z.literal("send-chat"),
+    text: z.string().trim().min(1).max(BUSINESS_CHAT_MAX_LENGTH),
+  }),
 ]);
 
 export type CreateRoomPayload = z.input<typeof createRoomSchema>;
@@ -285,6 +311,7 @@ export interface ServerToClientEvents {
   "ludo:debug-enabled": (payload: { enabled: boolean }) => void;
   "truthAndDare:state": (state: TruthAndDareState) => void;
   "business:state": (state: BusinessState) => void;
+  "business:chat": (message: BusinessChatMessage) => void;
 }
 
 export type InterServerEvents = Record<never, never>;
