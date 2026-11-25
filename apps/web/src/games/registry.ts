@@ -10,6 +10,7 @@ const gameLoaders: Record<GameSlug, GameLoader> = {
   ludo: () => import("./ludo/main"),
   truthAndDare: () => import("./truth-and-dare/main"),
   business: () => import("./business/main"),
+  "pocket-war": () => import("./pocket-war/main"),
 };
 
 /** Preload game component code ahead of launch so that transition into active gameplay is instant. */
@@ -32,4 +33,5 @@ export const gameComponents: Record<
   ludo: lazyWithRetry(gameLoaders.ludo),
   truthAndDare: lazyWithRetry(gameLoaders.truthAndDare),
   business: lazyWithRetry(gameLoaders.business),
+  "pocket-war": lazyWithRetry(gameLoaders["pocket-war"]),
 };

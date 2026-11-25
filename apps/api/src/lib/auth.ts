@@ -10,6 +10,23 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { anonymous } from "better-auth/plugins";
 import type { Env } from "../types";
 
+export function isLocalNetworkOrigin(origin: string): boolean {
+  try {
+    const url = new URL(origin);
+    const host = url.hostname;
+    return (
+      host === "localhost" ||
+      host === "127.0.0.1" ||
+      host.endsWith(".local") ||
+      /^192\.168\.\d{1,3}\.\d{1,3}$/.test(host) ||
+      /^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host) ||
+      /^172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}$/.test(host)
+    );
+  } catch {
+    return false;
+  }
+}
+
 export function getAllowedOrigins(env: Env): string[] {
   const raw = [env.WEB_URL, env.CORS_ORIGIN, env.BETTER_AUTH_URL]
     .filter((v): v is string => Boolean(v))
@@ -18,7 +35,12 @@ export function getAllowedOrigins(env: Env): string[] {
     .filter(Boolean);
 
   if (env.NODE_ENV !== "production") {
-    raw.push("http://localhost:5173", "http://localhost:2020");
+    raw.push(
+      "http://localhost:5173",
+      "http://localhost:2020",
+      "http://127.0.0.1:5173",
+      "http://127.0.0.1:2020",
+    );
   }
   return Array.from(new Set(raw));
 }
@@ -41,7 +63,15 @@ export function createAuth(db: Database, env: Env) {
     }),
     secret: env.BETTER_AUTH_SECRET,
     baseURL: env.BETTER_AUTH_URL,
-    trustedOrigins,
+    trustedOrigins: isProd
+      ? trustedOrigins
+      : [
+          ...trustedOrigins,
+          "http://192.168.*:*",
+          "http://10.*:*",
+          "http://172.*:*",
+          "http://*.local:*",
+        ],
     emailAndPassword: {
       enabled: true,
       minPasswordLength: 8,

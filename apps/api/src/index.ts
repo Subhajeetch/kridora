@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { secureHeaders } from "hono/secure-headers";
-import { getAllowedOrigins } from "./lib/auth";
+import { getAllowedOrigins, isLocalNetworkOrigin } from "./lib/auth";
 import { handleHttpError } from "./lib/errors";
 import {
   contextMiddleware,
@@ -28,7 +28,13 @@ app.use("*", async (c, next) => {
     origin: (origin) => {
       if (!origin) return allowedOrigins[0] ?? "";
       const clean = origin.replace(/\/+$/, "");
-      return allowedOrigins.includes(clean) ? origin : null;
+      if (
+        allowedOrigins.includes(clean) ||
+        (c.env.NODE_ENV !== "production" && isLocalNetworkOrigin(clean))
+      ) {
+        return origin;
+      }
+      return null;
     },
     allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization", "X-Requested-With"],

@@ -50,5 +50,6 @@ export type {
 export * from "./ludo";
 export * from "./truth-and-dare";
 export * from "./business";
+export * from "./pocket-war";
 export { developmentGames } from "./config.development";
 export { productionGames } from "./config.production";

@@ -299,6 +299,81 @@ export const GAME_DEFINITIONS = {
       },
     ],
   },
+  "pocket-war": {
+    slug: "pocket-war",
+    name: "Pocket War",
+    tagline: "Fly, shoot, survive. Pure 2D arena combat.",
+    description:
+      "Battle your friends in fast-paced 2D gravity-defying combat! Equip jetpacks, grab powerful weapons, dodge rockets, and fight for glory.",
+    accent: "#f97316",
+    playTime: "5-10 min",
+    minPlayers: 2,
+    maxPlayers: 8,
+    requirements: { allPlayersReady: true, allPlayersConnected: true },
+    genre: [
+      "2D Shooter",
+      "Multiplayer Action",
+      "Arcade Arena",
+      "Real-Time Combat",
+    ],
+    difficulty: "Fast-Paced & Tactical",
+    overview: [
+      "Pocket War is an adrenaline-fueled 2D side-scrolling multiplayer shooter inspired by classic mobile combat games like Mini Militia.",
+      "Take flight with jetpacks, master dual-stick controls or mouse aiming, and scavenge for an arsenal of lethal firearms—from snipers and shotguns to rocket launchers and plasma rifles.",
+      "Fly through interconnected tunnels, hide in foliage, master vertical platforming, and out-maneuver your friends in intense Free-For-All deathmatches or tactical squad skirmishes.",
+    ],
+    howToPlay: [
+      {
+        step: 1,
+        title: "Master the Jetpack",
+        description:
+          "Use your boost to hover, fly across gaps, and dodge incoming projectiles. Watch your fuel gauge!",
+      },
+      {
+        step: 2,
+        title: "Scavenge Weapons & Ammo",
+        description:
+          "Pick up snipers, shotguns, rocket launchers, and grenades scattered across floating platforms and crates.",
+      },
+      {
+        step: 3,
+        title: "Aim & Fire",
+        description:
+          "Use precision crosshair aiming and fire in bursts or throw timed grenades around corners.",
+      },
+      {
+        step: 4,
+        title: "Eliminate & Dominate",
+        description:
+          "Outlast your rivals, rack up kills, and top the leaderboard before the match timer expires.",
+      },
+    ],
+    rulesSummary: [
+      "Jetpack fuel regenerates automatically when grounded or resting.",
+      "Players spawn with basic secondary sidearms; tier-2 and explosive weapons spawn at fixed arena drop points.",
+      "Direct rocket and grenade hits cause splash area damage and knockback.",
+      "Health regenerates slowly after breaking line of sight and avoiding damage for 5 seconds.",
+    ],
+    controls: [
+      { key: "W / Space / Up", action: "Engage Jetpack Boost" },
+      { key: "A / D / Left / Right", action: "Move Left / Right" },
+      { key: "Mouse Aim + Left Click", action: "Aim weapon & Shoot" },
+      { key: "Right Click / G", action: "Throw Grenade" },
+      { key: "Q / E", action: "Switch Weapon / Melee Strike" },
+      {
+        key: "Touch Screen (Mobile)",
+        action: "Left Virtual Stick: Move/Fly, Right Virtual Stick: Aim/Fire",
+      },
+    ],
+    screenshots: [
+      {
+        url: "/games/ss/pocket-war-gameplay.webp",
+        title: "Intense 2D Dogfights",
+        caption:
+          "Jetpack boost skirmishes, bullet tracers, and platform tactical combat.",
+      },
+    ],
+  },
 } satisfies Record<string, GameDefinition>;
 
 export type GameSlug = keyof typeof GAME_DEFINITIONS;
