@@ -17,6 +17,10 @@ import {
   type BusinessState,
   type BusinessUpdateSettingsPayload,
 } from "./games/business";
+import type {
+  PocketWarActionPayload,
+  PocketWarState,
+} from "./games/pocket-war";
 
 export const createRoomSchema = z.object({
   gameSlug: z.string().min(1).max(40),
@@ -93,6 +97,17 @@ export const inviteUserSchema = z.object({
 });
 export const changeGameSchema = z.object({
   gameSlug: z.string().min(1).max(40),
+});
+
+export const pocketWarActionSchema = z.object({
+  action: z.string(),
+  payload: z.unknown().optional(),
+});
+export const pocketWarUpdateSettingsSchema = z.object({
+  mapId: z.enum(["outpost", "catacombs", "bunker"]).optional(),
+  gameMode: z.enum(["ffa", "team_deathmatch"]).optional(),
+  killLimit: z.number().int().min(5).max(50).optional(),
+  timeLimitSeconds: z.number().int().min(60).max(1200).optional(),
 });
 
 export const businessUpdateSettingsSchema = z.object({
@@ -174,6 +189,9 @@ export type LudoDebugSetupCutPayload = z.input<typeof ludoDebugSetupCutSchema>;
 export type LudoDebugScenarioPayload = z.input<typeof ludoDebugScenarioSchema>;
 export type InviteUserPayload = z.input<typeof inviteUserSchema>;
 export type ChangeGamePayload = z.input<typeof changeGameSchema>;
+export type PocketWarUpdateSettingsPayload = z.input<
+  typeof pocketWarUpdateSettingsSchema
+>;
 export type EmptyPayload = z.input<typeof emptySchema>;
 
 export interface ClientToServerEvents {
@@ -287,6 +305,22 @@ export interface ClientToServerEvents {
     payload: BusinessActionPayload,
     ack: AckFn<BusinessState>,
   ) => void;
+  "pocket-war:get-state": (
+    payload: EmptyPayload,
+    ack: AckFn<PocketWarState>,
+  ) => void;
+  "pocket-war:update-settings": (
+    payload: PocketWarUpdateSettingsPayload,
+    ack: AckFn<PocketWarState>,
+  ) => void;
+  "pocket-war:start-match": (
+    payload: EmptyPayload,
+    ack: AckFn<PocketWarState>,
+  ) => void;
+  "pocket-war:action": (
+    payload: PocketWarActionPayload,
+    ack: AckFn<PocketWarState>,
+  ) => void;
 }
 
 export type ClientToServerEventName = keyof ClientToServerEvents;
@@ -312,6 +346,7 @@ export interface ServerToClientEvents {
   "truthAndDare:state": (state: TruthAndDareState) => void;
   "business:state": (state: BusinessState) => void;
   "business:chat": (message: BusinessChatMessage) => void;
+  "pocket-war:state": (state: PocketWarState) => void;
 }
 
 export type InterServerEvents = Record<never, never>;

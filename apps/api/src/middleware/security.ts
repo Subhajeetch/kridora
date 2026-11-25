@@ -1,5 +1,9 @@
 import type { Context, MiddlewareHandler } from "hono";
-import { createAuth, getAllowedOrigins } from "../lib/auth";
+import {
+  createAuth,
+  getAllowedOrigins,
+  isLocalNetworkOrigin,
+} from "../lib/auth";
 import { createScopedDbAccessor, type WaitUntilContext } from "../lib/db";
 import { ApiError } from "../lib/errors";
 import type { AppContext, AuthSession, AuthSessionUser } from "../types";
@@ -165,7 +169,11 @@ export const originGuardMiddleware: MiddlewareHandler<AppContext> = async (
     if (origin) {
       const allowed = getAllowedOrigins(c.env);
       const normalizedOrigin = origin.replace(/\/+$/, "");
-      if (!allowed.includes(normalizedOrigin)) {
+      const isAllowed =
+        allowed.includes(normalizedOrigin) ||
+        (c.env.NODE_ENV !== "production" &&
+          isLocalNetworkOrigin(normalizedOrigin));
+      if (!isAllowed) {
         throw new ApiError(
           "FORBIDDEN",
           "Cross-origin request rejected by security policy.",

@@ -1,0 +1,434 @@
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  Award,
+  Crown,
+  Heart,
+  LogOut,
+  RotateCcw,
+  Skull,
+  Swords,
+  Trophy,
+} from "lucide-react";
+import {
+  CHARACTER_CATALOG,
+  MAP_CATALOG,
+} from "@kridora/shared/games/pocket-war";
+import { useInGameRoom } from "@/games/hooks";
+import { request as socketRequest, socket } from "@/lib/socket";
+import type { GameComponentProps } from "../types";
+import { ChatOverlay } from "./components/ChatOverlay";
+import { PocketWarArena } from "./components/PocketWarArena";
+import { SetupScreen } from "./components/SetupScreen";
+import { SoundFX } from "./engine/SoundFX";
+import type {
+  PocketWarActionPayload,
+  PocketWarCharacterId,
+  PocketWarMapId,
+  PocketWarState,
+} from "./types";
+
+export interface PocketWarMainProps {
+  state: PocketWarState;
+  currentUserId: string;
+  isHost: boolean;
+  roomCode: string;
+  request: (
+    event: "pocket-war:action",
+    payload: PocketWarActionPayload,
+  ) => void;
+  onRefreshState: () => void;
+  onBackToRoom?: () => void;
+  onLeaveMatch?: () => void;
+}
+
+function detectTouchDevice(): boolean {
+  if (typeof window === "undefined") return false;
+  return (
+    "ontouchstart" in window ||
+    navigator.maxTouchPoints > 0 ||
+    window.matchMedia("(pointer: coarse)").matches
+  );
+}
+
+export function PocketWarMain({
+  state,
+  currentUserId,
+  isHost,
+  roomCode,
+  request,
+  onRefreshState,
+  onBackToRoom,
+  onLeaveMatch,
+}: PocketWarMainProps) {
+  const [soundInstance] = useState<SoundFX>(() => new SoundFX());
+  const [isMobile] = useState<boolean>(detectTouchDevice);
+  const [muted, setMuted] = useState<boolean>(false);
+  const [chatOpen, setChatOpen] = useState<boolean>(false);
+  const [chatFocused, setChatFocused] = useState<boolean>(false);
+
+  useEffect(() => {
+    return () => {
+      soundInstance.destroy();
+    };
+  }, [soundInstance]);
+
+  const dispatchAction = useCallback(
+    (payload: PocketWarActionPayload) => {
+      request("pocket-war:action", payload);
+    },
+    [request],
+  );
+
+  const handleToggleMute = useCallback(() => {
+    soundInstance.unlock();
+    setMuted((prev) => {
+      const next = !prev;
+      soundInstance.setMuted(next);
+      return next;
+    });
+  }, [soundInstance]);
+
+  const handleSendChat = useCallback(
+    (text: string) => {
+      dispatchAction({ type: "send_chat", text });
+    },
+    [dispatchAction],
+  );
+
+  const handleOpenChat = useCallback(() => {
+    setChatOpen(true);
+  }, []);
+
+  const handleSelectCharacter = useCallback(
+    (characterId: PocketWarCharacterId) => {
+      dispatchAction({ type: "select_character", characterId });
+    },
+    [dispatchAction],
+  );
+
+  const handleToggleReady = useCallback(
+    (isReady: boolean) => {
+      dispatchAction({ type: "toggle_ready", isReady });
+    },
+    [dispatchAction],
+  );
+
+  const handleSelectMap = useCallback(
+    (mapId: PocketWarMapId) => {
+      if (!isHost) return;
+      dispatchAction({ type: "select_map", mapId });
+    },
+    [dispatchAction, isHost],
+  );
+
+  const handleForceStart = useCallback(() => {
+    if (!isHost) return;
+    dispatchAction({ type: "force_start" });
+  }, [dispatchAction, isHost]);
+
+  const handlePlayAgain = useCallback(() => {
+    if (!isHost) return;
+    soundInstance.unlock();
+    soundInstance.playUiConfirm();
+    dispatchAction({ type: "play_again" });
+  }, [dispatchAction, isHost, soundInstance]);
+
+  const playersList = useMemo(
+    () => Object.values(state.players),
+    [state.players],
+  );
+  const selectedMap = MAP_CATALOG[state.settings.mapId];
+
+  // --- PHASE 1: HERO-PICKER SETUP SCREEN ---
+  if (state.phase === "setup") {
+    return (
+      <div className="relative h-dvh w-screen overflow-hidden bg-slate-950">
+        <SetupScreen
+          state={state}
+          currentUserId={currentUserId}
+          isHost={isHost}
+          roomCode={roomCode}
+          soundFx={soundInstance}
+          muted={muted}
+          onToggleMute={handleToggleMute}
+          onSelectCharacter={handleSelectCharacter}
+          onToggleReady={handleToggleReady}
+          onSelectMap={handleSelectMap}
+          onForceStart={handleForceStart}
+          onRefreshState={onRefreshState}
+          onBackToRoom={onBackToRoom}
+        />
+
+        <ChatOverlay
+          messages={state.chatMessages}
+          currentUserId={currentUserId}
+          onSendMessage={handleSendChat}
+          isOpen={chatOpen}
+          onOpenChange={setChatOpen}
+          placement="setup"
+          isMobile={isMobile}
+        />
+      </div>
+    );
+  }
+
+  // --- PHASE 3: GAME OVER & MVP PODIUM ---
+  if (state.phase === "game_over") {
+    const ranked = [...playersList].sort(
+      (a, b) => (a.placement ?? 99) - (b.placement ?? 99),
+    );
+    const winner = state.winnerUserId
+      ? state.players[state.winnerUserId]
+      : ranked[0];
+    const mvp = state.mvpUserId ? state.players[state.mvpUserId] : null;
+
+    return (
+      <div className="relative flex min-h-dvh w-full flex-col items-center justify-center bg-gradient-to-b from-[#0f172a] via-[#132a2e] to-[#090d16] p-4 text-white sm:p-6">
+        <div className="w-full max-w-2xl rounded-3xl border border-amber-400/35 bg-slate-900/92 p-5 shadow-2xl backdrop-blur-md sm:p-7">
+          <div className="mb-5 flex flex-col items-center text-center">
+            <div className="mb-2 flex h-14 w-14 items-center justify-center rounded-2xl border border-amber-400/40 bg-amber-500/15 shadow-lg shadow-amber-500/15">
+              <Trophy className="h-8 w-8 text-amber-400" />
+            </div>
+            <span className="text-[11px] font-black tracking-widest text-emerald-300 uppercase">
+              {selectedMap.name} • Battle Complete
+            </span>
+            <h2 className="mt-1 text-2xl font-black text-white sm:text-3xl">
+              {winner ? `${winner.username} Wins!` : "Match Over"}
+            </h2>
+            <p className="mt-1 text-xs text-slate-400">
+              Rings & XP have been awarded automatically.
+            </p>
+
+            {mvp && (
+              <div className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-sky-400/40 bg-sky-500/15 px-3 py-1 text-xs font-black text-sky-200">
+                <Award className="h-3.5 w-3.5 text-amber-300" />
+                <span>
+                  Match MVP: {mvp.username} ({mvp.kills} Kills •{" "}
+                  {Math.round(mvp.damageDealt)} DMG)
+                </span>
+              </div>
+            )}
+          </div>
+
+          <div className="mb-6 space-y-2">
+            {ranked.map((p, idx) => {
+              const charDef = CHARACTER_CATALOG[p.characterId];
+              const isMvp = p.userId === state.mvpUserId;
+              const isMe = p.userId === currentUserId;
+              return (
+                <div
+                  key={p.userId}
+                  className={`flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3.5 py-2.5 text-sm ${
+                    idx === 0
+                      ? "border-amber-400/60 bg-amber-500/15"
+                      : isMe
+                        ? "border-sky-400/40 bg-sky-500/10"
+                        : "border-white/10 bg-slate-950/65"
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <span className="w-6 text-center font-mono text-sm font-black text-amber-300">
+                      #{p.placement ?? idx + 1}
+                    </span>
+                    {idx === 0 && (
+                      <Crown className="h-4 w-4 shrink-0 text-amber-400" />
+                    )}
+                    <span className="font-bold text-white">
+                      {p.username}
+                      {isMe ? " (You)" : ""}
+                    </span>
+                    <span
+                      className="rounded px-1.5 py-0.5 text-[10px] font-black text-slate-950"
+                      style={{ backgroundColor: charDef.palette.sashColor }}
+                    >
+                      {charDef.name}
+                    </span>
+                    {isMvp && (
+                      <span className="rounded-full bg-sky-500/25 px-2 py-0.5 text-[10px] font-black text-sky-300">
+                        MVP
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-3 text-xs text-slate-300">
+                    <span className="flex items-center gap-0.5" title="Lives left">
+                      <Heart className="h-3.5 w-3.5 fill-rose-500 text-rose-400" />
+                      <span className="font-bold">{p.livesLeft}</span>
+                    </span>
+                    <span className="flex items-center gap-1 font-bold text-amber-300">
+                      <Swords className="h-3.5 w-3.5" />
+                      {p.kills}
+                    </span>
+                    <span className="flex items-center gap-1 text-slate-400">
+                      <Skull className="h-3.5 w-3.5" />
+                      {p.deaths}
+                    </span>
+                    <span className="font-mono text-slate-300">
+                      {Math.round(p.damageDealt)} DMG
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="flex flex-wrap justify-center gap-2.5">
+            {isHost ? (
+              <button
+                type="button"
+                onClick={handlePlayAgain}
+                className="flex items-center gap-2 rounded-xl bg-[#1a95e8] px-6 py-2.5 text-sm font-black text-white shadow-lg shadow-sky-500/25 transition hover:bg-[#2aa5f8] active:scale-95"
+              >
+                <RotateCcw className="h-4 w-4" />
+                Play Again
+              </button>
+            ) : (
+              <div className="rounded-xl border border-white/10 bg-slate-950/60 px-4 py-2.5 text-xs font-semibold text-slate-400">
+                Waiting for host to start another match...
+              </div>
+            )}
+
+            {onBackToRoom && (
+              <button
+                type="button"
+                onClick={onBackToRoom}
+                className="rounded-xl border border-white/15 bg-slate-800 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-slate-700"
+              >
+                Return to Room
+              </button>
+            )}
+
+            {onLeaveMatch && (
+              <button
+                type="button"
+                onClick={onLeaveMatch}
+                className="flex items-center gap-1.5 rounded-xl bg-rose-600/85 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-rose-500"
+              >
+                <LogOut className="h-4 w-4" />
+                Leave
+              </button>
+            )}
+          </div>
+        </div>
+
+        <ChatOverlay
+          messages={state.chatMessages}
+          currentUserId={currentUserId}
+          onSendMessage={handleSendChat}
+          isOpen={chatOpen}
+          onOpenChange={setChatOpen}
+          placement="gameover"
+          isMobile={isMobile}
+        />
+      </div>
+    );
+  }
+
+  // --- PHASE 2: ACTIVE JUNGLE ARENA ---
+  return (
+    <div className="relative h-dvh w-screen overflow-hidden bg-sky-950 text-white">
+      <PocketWarArena
+        state={state}
+        currentUserId={currentUserId}
+        soundFx={soundInstance}
+        muted={muted}
+        chatFocused={chatFocused}
+        onDispatch={dispatchAction}
+        onToggleMute={handleToggleMute}
+        onOpenChat={handleOpenChat}
+        onBackToRoom={onBackToRoom}
+        onLeaveMatch={onLeaveMatch}
+      />
+
+      <ChatOverlay
+        messages={state.chatMessages}
+        currentUserId={currentUserId}
+        onSendMessage={handleSendChat}
+        onFocusChange={setChatFocused}
+        isOpen={chatOpen}
+        onOpenChange={setChatOpen}
+        placement="arena"
+        isMobile={isMobile}
+      />
+    </div>
+  );
+}
+
+export default function PocketWarGame({ room, userId }: GameComponentProps) {
+  const { roomCode, owner, onBackToRoom, onLeaveRoom } = useInGameRoom();
+  const isHost = room.ownerId === userId || owner?.userId === userId;
+
+  const [state, setState] = useState<PocketWarState | null>(null);
+
+  const refreshState = useCallback(() => {
+    socketRequest("pocket-war:get-state", {})
+      .then((s) => {
+        if (s) setState(s as PocketWarState);
+      })
+      .catch((err) => {
+        console.warn("Failed to refresh Pocket War state:", err);
+      });
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+
+    socketRequest("pocket-war:get-state", {})
+      .then((s) => {
+        if (mounted && s) setState(s as PocketWarState);
+      })
+      .catch((err) => {
+        console.warn("Failed to load initial Pocket War state:", err);
+      });
+
+    const handleState = (nextState: PocketWarState) => {
+      if (mounted) setState(nextState);
+    };
+
+    socket.on("pocket-war:state", handleState);
+
+    return () => {
+      mounted = false;
+      socket.off("pocket-war:state", handleState);
+    };
+  }, []);
+
+  const handleAction = useCallback(
+    (_event: "pocket-war:action", payload: PocketWarActionPayload) => {
+      socketRequest("pocket-war:action", payload)
+        .then((next) => {
+          if (next) setState(next as PocketWarState);
+        })
+        .catch((err) => {
+          console.error("Pocket War action error:", err);
+        });
+    },
+    [],
+  );
+
+  if (!state) {
+    return (
+      <div className="flex h-dvh w-screen items-center justify-center bg-slate-950 text-white">
+        <div className="flex flex-col items-center gap-3">
+          <div className="size-9 animate-spin rounded-full border-3 border-sky-400 border-t-transparent" />
+          <span className="text-xs font-bold tracking-wider text-slate-300 uppercase">
+            Entering Emerald Falls...
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <PocketWarMain
+      state={state}
+      currentUserId={userId}
+      isHost={isHost}
+      roomCode={roomCode}
+      request={handleAction}
+      onRefreshState={refreshState}
+      onBackToRoom={onBackToRoom}
+      onLeaveMatch={onLeaveRoom}
+    />
+  );
+}
