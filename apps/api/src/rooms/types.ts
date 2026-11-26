@@ -17,6 +17,7 @@ export interface InternalRoom {
   createdAt: number;
   ownerTransferAt: number | null;
   emptyCloseAt: number | null;
+  soloReturnAt?: number | null;
   disconnectDeadlines: Record<string, number>;
   matchId: string | null;
   matchCompleted: boolean;

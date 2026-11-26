@@ -11,6 +11,8 @@ export type SocketConnectionStatus =
 
 export type RequestErrorCode = ErrorCode | "TIMEOUT" | "OFFLINE";
 
+export type BinaryMessageListener = (bytes: Uint8Array) => void;
+
 export class RequestError extends Error {
   code: RequestErrorCode;
   details: Record<string, unknown> | undefined;
@@ -80,6 +82,7 @@ export class NativeRealtimeSocket {
   private status: SocketConnectionStatus = "idle";
   private statusListeners = new Set<() => void>();
   private listeners = new Map<string, Set<AnyFn>>();
+  private binaryListeners = new Set<BinaryMessageListener>();
   private pendingAcks = new Map<number, PendingAck>();
   private nextRequestId = 1;
   private shouldReconnect = false;
@@ -154,6 +157,42 @@ export class NativeRealtimeSocket {
     return this.on(event, wrapper);
   }
 
+  onBinary(listener: BinaryMessageListener): this {
+    this.binaryListeners.add(listener);
+    return this;
+  }
+
+  offBinary(listener: BinaryMessageListener): this {
+    this.binaryListeners.delete(listener);
+    return this;
+  }
+
+  sendBinary(bytes: Uint8Array): void {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+    try {
+      const payload =
+        bytes.buffer instanceof ArrayBuffer &&
+        bytes.byteOffset === 0 &&
+        bytes.byteLength === bytes.buffer.byteLength
+          ? bytes.buffer
+          : bytes.slice().buffer;
+      this.ws.send(payload);
+    } catch {
+      // Ignore transient send errors while closing
+    }
+  }
+
+  private emitBinary(bytes: Uint8Array): void {
+    if (this.binaryListeners.size === 0) return;
+    for (const fn of Array.from(this.binaryListeners)) {
+      try {
+        fn(bytes);
+      } catch (err) {
+        console.error("[ws] Error in binary listener:", err);
+      }
+    }
+  }
+
   private emitLocal(event: string, ...args: unknown[]): void {
     const set = this.listeners.get(event);
     if (!set) return;
@@ -225,6 +264,7 @@ export class NativeRealtimeSocket {
         : baseUrl;
 
       const ws = new WebSocket(wsUrl);
+      ws.binaryType = "arraybuffer";
       this.ws = ws;
 
       ws.onopen = () => {
@@ -232,11 +272,25 @@ export class NativeRealtimeSocket {
         this.connecting = false;
         this.reconnectAttempts = 0;
         this.startHeartbeat();
-        // Socket connection is established, mark ready immediately to avoid any lag
         this.markReady();
       };
 
       ws.onmessage = (event) => {
+        if (event.data instanceof ArrayBuffer) {
+          this.emitBinary(new Uint8Array(event.data));
+          return;
+        }
+        if (ArrayBuffer.isView(event.data)) {
+          this.emitBinary(
+            new Uint8Array(
+              event.data.buffer,
+              event.data.byteOffset,
+              event.data.byteLength,
+            ),
+          );
+          return;
+        }
+
         if (typeof event.data !== "string" || event.data === "pong") return;
         try {
           const msg = JSON.parse(event.data) as

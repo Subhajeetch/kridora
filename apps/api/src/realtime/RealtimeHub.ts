@@ -13,7 +13,7 @@ import {
 import { DurableObject } from "cloudflare:workers";
 import { recordMatchRewards } from "../games/match-rewards";
 import { getServerGameModule } from "../games/registry";
-import type { GameActionContext } from "../games/types";
+import type { GameActionContext, RealtimeTickContext } from "../games/types";
 import { ApiError, errAck, okAck, toErrorPayload } from "../lib/errors";
 import { RoomManager } from "../rooms/room-manager";
 import type { InternalRoom } from "../rooms/types";
@@ -26,12 +26,19 @@ import {
   type SocketAttachment,
 } from "./protocol";
 
+const REALTIME_TICK_INTERVAL_MS = 50; // 20 Hz network tick (60 Hz internal Planck substeps)
+
 export class RealtimeHub extends DurableObject<Env> {
   private readonly roomManager: RoomManager;
   private readonly usedTicketNonces = new Map<string, number>();
   private readonly wsLimiter = new SlidingWindowLimiter(5_000, 35);
+  /** Dedicated high-frequency limiter for unpersisted binary game input packets (75/sec). */
+  private readonly rtLimiter = new SlidingWindowLimiter(1_000, 75);
   private readonly nameChangeBuckets = new Map<string, number>();
   private scheduledAlarmTimestamp: number | null = null;
+  private realtimeLoopTimer: ReturnType<typeof setInterval> | null = null;
+  private lastRealtimeTickAt = 0;
+  private tickInFlight = false;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -58,7 +65,93 @@ export class RealtimeHub extends DurableObject<Env> {
         if (att?.user?.id) activeUserIds.add(att.user.id);
       }
       this.roomManager.hydrate(saved, activeUserIds);
+      this.syncRealtimeLoop();
     });
+  }
+
+  private hasActiveRealtimeRooms(): boolean {
+    for (const room of this.roomManager.rooms.values()) {
+      if (room.status !== "in_progress") continue;
+      const mod = getServerGameModule(room.gameSlug);
+      if (mod.onTick && room.players.some((p) => p.connected)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private syncRealtimeLoop(): void {
+    const shouldRun = this.hasActiveRealtimeRooms();
+    if (shouldRun && this.realtimeLoopTimer === null) {
+      this.lastRealtimeTickAt = Date.now();
+      this.realtimeLoopTimer = setInterval(() => {
+        void this.runRealtimeTick();
+      }, REALTIME_TICK_INTERVAL_MS);
+    } else if (!shouldRun && this.realtimeLoopTimer !== null) {
+      clearInterval(this.realtimeLoopTimer);
+      this.realtimeLoopTimer = null;
+    }
+  }
+
+  private async runRealtimeTick(): Promise<void> {
+    if (this.tickInFlight) return;
+    if (!this.hasActiveRealtimeRooms()) {
+      this.syncRealtimeLoop();
+      return;
+    }
+
+    this.tickInFlight = true;
+    const now = Date.now();
+    const dtSec = Math.min(
+      0.1,
+      Math.max(0.01, (now - this.lastRealtimeTickAt) / 1000),
+    );
+    this.lastRealtimeTickAt = now;
+
+    try {
+      for (const room of Array.from(this.roomManager.rooms.values())) {
+        if (room.status !== "in_progress" || room.gameState === null) continue;
+        const gameModule = getServerGameModule(room.gameSlug);
+        if (!gameModule.onTick) continue;
+
+        const tickCtx: RealtimeTickContext<unknown> = {
+          env: this.env,
+          roomCode: room.code,
+          ownerId: room.ownerId,
+          matchId: room.matchId,
+          players: room.players,
+          state: room.gameState,
+          setState: (nextState) => {
+            room.gameState = nextState;
+          },
+          broadcastState: () => {
+            this.broadcastGameState(room);
+          },
+          broadcastBinary: (bytes) => {
+            this.broadcastBinaryToRoom(room, bytes);
+          },
+          completeMatch: async (outcome) => {
+            if (room.matchCompleted || !room.matchId) return;
+            room.matchCompleted = true;
+            await recordMatchRewards(this.env, {
+              matchId: room.matchId,
+              gameSlug: room.gameSlug,
+              players: room.players,
+              outcome,
+            });
+          },
+          persistState: async () => {
+            await this.persistAndSchedule();
+          },
+        };
+
+        await gameModule.onTick(tickCtx, now, dtSec);
+      }
+    } catch (err) {
+      console.error("[RealtimeHub] Real-time tick error:", err);
+    } finally {
+      this.tickInFlight = false;
+    }
   }
 
   private async persistAndSchedule(): Promise<void> {
@@ -77,6 +170,7 @@ export class RealtimeHub extends DurableObject<Env> {
       this.scheduledAlarmTimestamp = null;
       await this.ctx.storage.deleteAlarm();
     }
+    this.syncRealtimeLoop();
   }
 
   async alarm(): Promise<void> {
@@ -86,6 +180,7 @@ export class RealtimeHub extends DurableObject<Env> {
       if (now > exp) this.usedTicketNonces.delete(nonce);
     }
     this.wsLimiter.prune();
+    this.rtLimiter.prune();
 
     const changed = this.roomManager.processAlarms(now);
     if (changed) {
@@ -97,13 +192,13 @@ export class RealtimeHub extends DurableObject<Env> {
         this.scheduledAlarmTimestamp = scheduled;
         await this.ctx.storage.setAlarm(scheduled);
       }
+      this.syncRealtimeLoop();
     }
   }
 
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
 
-    // 1. Internal RPC endpoints from Hono Worker
     if (
       url.pathname === "/internal/consume-nonce" &&
       request.method === "POST"
@@ -179,7 +274,6 @@ export class RealtimeHub extends DurableObject<Env> {
       return Response.json({ ok: true });
     }
 
-    // 2. WebSocket Upgrade Endpoint (/ws)
     if (
       url.pathname === "/ws" &&
       request.headers.get("Upgrade")?.toLowerCase() === "websocket"
@@ -224,7 +318,6 @@ export class RealtimeHub extends DurableObject<Env> {
         await this.persistAndSchedule();
       }
 
-      // Signal to client that initial room & game state sync is complete
       server.send(JSON.stringify({ type: "ready" }));
 
       return new Response(null, { status: 101, webSocket: client });
@@ -237,28 +330,39 @@ export class RealtimeHub extends DurableObject<Env> {
     ws: WebSocket,
     message: string | ArrayBuffer,
   ): Promise<void> {
-    const rawStr =
-      typeof message === "string" ? message : new TextDecoder().decode(message);
-
-    if (rawStr === "ping") {
-      ws.send("pong");
-      return;
-    }
-
-    if (rawStr.length > MAX_WS_FRAME_BYTES) {
-      ws.close(1009, "Message frame exceeds maximum size");
-      return;
-    }
-
     const attachment = ws.deserializeAttachment() as SocketAttachment | null;
     if (!attachment?.user) {
       ws.close(1008, "Unauthenticated connection");
       return;
     }
 
+    // --- FAST PATH: Unpersisted Binary Real-Time Frames (@msgpack/msgpack) ---
+    if (typeof message !== "string") {
+      if (message.byteLength > MAX_WS_FRAME_BYTES) {
+        ws.close(1009, "Binary frame exceeds maximum size");
+        return;
+      }
+      if (!this.rtLimiter.allow(attachment.user.id)) {
+        return;
+      }
+      this.handleBinaryMessage(attachment.user, new Uint8Array(message));
+      return;
+    }
+
+    // --- STANDARD JSON PATH (Room & Turn-Based Games) ---
+    if (message === "ping") {
+      ws.send("pong");
+      return;
+    }
+
+    if (message.length > MAX_WS_FRAME_BYTES) {
+      ws.close(1009, "Message frame exceeds maximum size");
+      return;
+    }
+
     let parsedJson: unknown;
     try {
-      parsedJson = JSON.parse(rawStr);
+      parsedJson = JSON.parse(message);
     } catch {
       return;
     }
@@ -298,6 +402,59 @@ export class RealtimeHub extends DurableObject<Env> {
         );
       }
     }
+  }
+
+  private handleBinaryMessage(user: SocketUser, bytes: Uint8Array): void {
+    const code = this.roomManager.userToRoom.get(user.id);
+    if (!code) return;
+    const room = this.roomManager.rooms.get(code);
+    if (!room || room.status !== "in_progress" || room.gameState === null) {
+      return;
+    }
+
+    const gameModule = getServerGameModule(room.gameSlug);
+    if (!gameModule.handleBinaryFrame) return;
+
+    const ctx: GameActionContext<unknown> = {
+      env: this.env,
+      user,
+      roomCode: room.code,
+      ownerId: room.ownerId,
+      matchId: room.matchId,
+      players: room.players,
+      state: room.gameState,
+      setState: (nextState) => {
+        room.gameState = nextState;
+      },
+      broadcastState: () => {
+        this.broadcastGameState(room);
+      },
+      broadcastEvent: (ev, data) => {
+        this.broadcastToRoom(room, ev, data);
+      },
+      sendToPlayer: (targetUserId, ev, data) => {
+        this.sendEventToUser(targetUserId, ev, data);
+      },
+      broadcastBinary: (frame) => {
+        this.broadcastBinaryToRoom(room, frame);
+      },
+      sendBinaryToPlayer: (targetUserId, frame) => {
+        this.sendBinaryToUser(targetUserId, frame);
+      },
+      completeMatch: async (outcome) => {
+        if (room.matchCompleted || !room.matchId) return;
+        room.matchCompleted = true;
+        await recordMatchRewards(this.env, {
+          matchId: room.matchId,
+          gameSlug: room.gameSlug,
+          players: room.players,
+          outcome,
+        });
+      },
+    };
+
+    gameModule.handleBinaryFrame(ctx, bytes);
+    this.syncRealtimeLoop();
   }
 
   async webSocketClose(
@@ -343,14 +500,12 @@ export class RealtimeHub extends DurableObject<Env> {
     const prefix = event.slice(0, colonIdx);
     const action = event.slice(colonIdx + 1);
 
-    // 1. Platform Room Events ("room:*")
     if (prefix === "room") {
       const result = await this.handleRoomAction(user, action, rawPayload);
       await this.persistAndSchedule();
       return result;
     }
 
-    // 2. Modular Game Events ("<gameSlug>:*")
     const room = this.roomManager.getRequiredRoomForUser(user.id);
     if (room.status !== "in_progress") {
       throw new ApiError(
@@ -393,6 +548,12 @@ export class RealtimeHub extends DurableObject<Env> {
       },
       sendToPlayer: (targetUserId, ev, data) => {
         this.sendEventToUser(targetUserId, ev, data);
+      },
+      broadcastBinary: (frame) => {
+        this.broadcastBinaryToRoom(room, frame);
+      },
+      sendBinaryToPlayer: (targetUserId, frame) => {
+        this.sendBinaryToUser(targetUserId, frame);
       },
       completeMatch: async (outcome) => {
         if (room.matchCompleted || !room.matchId) return;
@@ -531,8 +692,30 @@ export class RealtimeHub extends DurableObject<Env> {
         try {
           ws.send(encoded);
         } catch {
-          // Closed socket is cleaned up in webSocketClose
+          // Cleaned up on close
         }
+      }
+    }
+  }
+
+  private broadcastBinaryToRoom(room: InternalRoom, bytes: Uint8Array): void {
+    for (const p of room.players) {
+      for (const ws of this.getOpenSockets(p.userId)) {
+        try {
+          ws.send(bytes);
+        } catch {
+          // Cleaned up on close
+        }
+      }
+    }
+  }
+
+  private sendBinaryToUser(userId: string, bytes: Uint8Array): void {
+    for (const ws of this.getOpenSockets(userId)) {
+      try {
+        ws.send(bytes);
+      } catch {
+        // Ignore closed socket
       }
     }
   }

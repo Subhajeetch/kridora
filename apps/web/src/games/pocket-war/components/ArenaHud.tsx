@@ -1,8 +1,11 @@
-import { useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
+  AlertTriangle,
+  Bug,
   ChevronLeft,
   ChevronRight,
   Crosshair,
+  Eye,
   Flame,
   Hand,
   Heart,
@@ -12,1085 +15,943 @@ import {
   Minimize2,
   Pause,
   Play,
-  Repeat,
-  RotateCcw,
-  Shield,
-  ShieldAlert,
+  RotateCw,
   Skull,
-  Smartphone,
   Swords,
-  Users,
   Volume2,
   VolumeX,
-  Wrench,
+  WifiOff,
   Zap,
 } from "lucide-react";
 import {
   CHARACTER_CATALOG,
-  MAP_CATALOG,
   WEAPON_CATALOG,
-} from "@kridora/shared/games/pocket-war";
-import { getKillWeaponIconPath } from "../assets/AssetLoader";
-import type { SoundBusName } from "../engine/SoundFX";
-import styles from "../pocket-war.module.css";
-import type {
-  DebugOverlayOptions,
-  HudTelemetry,
-  KillWeaponIconId,
-  PocketWarPlayer,
-  PocketWarState,
-  SoundBusVolumes,
+  type ActiveChatFeedItem,
+  type ActiveKillFeedItem,
+  type DebugCoordToast,
+  type DebugOverlayOptions,
+  type HudTelemetry,
+  type PlayerScoreRow,
+  type SoundBusName,
+  type SoundBusVolumes,
+  type TouchControllerVisualState,
 } from "../types";
+import styles from "../pocket-war.module.css";
 
 export interface ArenaHudProps {
-  state: PocketWarState;
-  currentUserId: string;
   telemetry: HudTelemetry;
+  scoreRows: PlayerScoreRow[];
+  killFeed: ActiveKillFeedItem[];
+  chatFeed: ActiveChatFeedItem[];
+  touchVisual: TouchControllerVisualState;
+  currentUserId: string;
+  mapName: string;
   isMobile: boolean;
-  isPortrait: boolean;
   isFullscreen: boolean;
   isPaused: boolean;
   scoreboardOpen: boolean;
   muted: boolean;
   volumes: SoundBusVolumes;
   debug: DebugOverlayOptions;
+  debugCoordToast: DebugCoordToast | null;
   fps: number;
-  spectatingPlayer: PocketWarPlayer | null;
-  onUnlockAudio: () => void;
-  onLeftStick: (dx: number, dy: number) => void;
-  onRightStick: (dx: number, dy: number, active: boolean) => void;
-  onTapFire: (active: boolean) => void;
-  onGrenadeAimChange: (aiming: boolean) => void;
+  spectatingName: string | null;
+  soloWaitEndsAt: number | null;
+  soloBannerDismissed: boolean;
+  onDismissSoloBanner: () => void;
+  onReload: () => void;
   onThrowBomb: () => void;
   onMelee: () => void;
-  onReload: () => void;
+  onPickup: () => void;
   onSwitchWeapon: (slot?: 0 | 1) => void;
   onToggleScope: () => void;
+  onBindMoveStick: (el: HTMLElement | null) => void;
+  onBindAimStick: (el: HTMLElement | null) => void;
   onTogglePause: () => void;
   onToggleMute: () => void;
   onVolumeChange: (bus: SoundBusName, value: number) => void;
+  onToggleFullscreen: () => void;
   onToggleDebugCollisions: () => void;
   onToggleDebugSpawns: () => void;
-  onToggleFullscreen: () => void;
-  onToggleScoreboard: () => void;
   onSpectateStep: (delta: -1 | 1) => void;
   onOpenChat: () => void;
   onBackToRoom?: () => void;
   onLeaveMatch?: () => void;
 }
 
-function formatClip(value: number): string {
-  return String(Math.max(0, Math.round(value))).padStart(3, "0");
-}
-
-function WeaponImageOrGlyph({
-  weaponId,
-  className = "h-6 w-12",
-}: {
-  weaponId: KillWeaponIconId;
-  className?: string;
-}) {
-  const [failed, setFailed] = useState(false);
-  const src = getKillWeaponIconPath(weaponId);
-
-  if (failed) {
-    if (weaponId === "grenade" || weaponId === "barrel") {
-      return <Flame className="h-4 w-4 shrink-0 text-amber-300" />;
-    }
-    if (weaponId === "melee") {
-      return <Swords className="h-4 w-4 shrink-0 text-emerald-300" />;
-    }
-    return <Crosshair className="h-4 w-4 shrink-0 text-slate-200" />;
-  }
-
-  return (
-    <img
-      src={src}
-      alt={weaponId}
-      onError={() => setFailed(true)}
-      className={`${className} shrink-0 object-contain drop-shadow`}
-      draggable={false}
-    />
-  );
-}
-
-function MagazineGlyph() {
-  return (
-    <svg
-      viewBox="0 0 36 36"
-      className="h-7 w-7 text-white drop-shadow"
-      fill="currentColor"
-      aria-hidden="true"
-    >
-      {[6, 13, 20, 27].map((y) => (
-        <g key={y}>
-          <path d={`M7 ${y} L13 ${y - 2} L13 ${y + 2} Z`} />
-          <rect x="14" y={y - 2} width="14" height="4" rx="1" />
-        </g>
-      ))}
-    </svg>
-  );
-}
-
-function GrenadeGlyph({ className = "h-6 w-6" }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 32 32"
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M13 5h6v4h-6z" />
-      <path d="M19 6c3 0 5 2 5 5" />
-      <ellipse cx="16" cy="19" rx="7.5" ry="9" />
-      <path d="M9 17h14M9 21h14M16 10v18" />
-    </svg>
-  );
-}
-
-function KeyHint({
-  keys,
-  label,
-  icon,
-  active = false,
-  onClick,
-}: {
-  keys: string;
-  label: string;
-  icon?: React.ReactNode;
-  active?: boolean;
-  onClick?: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`pointer-events-auto flex items-center gap-1.5 rounded-lg border px-2 py-1 text-[11px] transition ${
-        active
-          ? "border-sky-400/70 bg-sky-500/25 text-sky-100"
-          : "border-white/10 bg-slate-900/75 text-slate-200 hover:border-white/25 hover:bg-slate-800/85"
-      }`}
-    >
-      {icon}
-      <kbd className={styles.keycap}>{keys}</kbd>
-      <span className="font-semibold text-slate-300">{label}</span>
-    </button>
-  );
+function formatCountdown(msRemaining: number): string {
+  const totalSec = Math.max(0, Math.ceil(msRemaining / 1000));
+  const mins = Math.floor(totalSec / 60);
+  const secs = totalSec % 60;
+  return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
 }
 
 export function ArenaHud({
-  state,
-  currentUserId,
   telemetry,
+  scoreRows,
+  killFeed,
+  chatFeed,
+  touchVisual,
+  currentUserId,
+  mapName,
   isMobile,
-  isPortrait,
   isFullscreen,
   isPaused,
   scoreboardOpen,
   muted,
   volumes,
   debug,
+  debugCoordToast,
   fps,
-  spectatingPlayer,
-  onUnlockAudio,
-  onLeftStick,
-  onRightStick,
-  onTapFire,
-  onGrenadeAimChange,
+  spectatingName,
+  soloWaitEndsAt,
+  soloBannerDismissed,
+  onDismissSoloBanner,
+  onReload,
   onThrowBomb,
   onMelee,
-  onReload,
+  onPickup,
   onSwitchWeapon,
   onToggleScope,
+  onBindMoveStick,
+  onBindAimStick,
   onTogglePause,
   onToggleMute,
   onVolumeChange,
+  onToggleFullscreen,
   onToggleDebugCollisions,
   onToggleDebugSpawns,
-  onToggleFullscreen,
-  onToggleScoreboard,
   onSpectateStep,
   onOpenChat,
   onBackToRoom,
   onLeaveMatch,
 }: ArenaHudProps) {
-  const leftPointerIdRef = useRef<number | null>(null);
-  const rightPointerIdRef = useRef<number | null>(null);
-  const tapFirePointerIdRef = useRef<number | null>(null);
-  const grenadePointerIdRef = useRef<number | null>(null);
+  const [clockMs, setClockMs] = useState<number>(() => Date.now());
 
-  const leftKnobRef = useRef<HTMLDivElement | null>(null);
-  const rightKnobRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (soloWaitEndsAt === null) return;
+    const timer = window.setInterval(() => {
+      setClockMs(Date.now());
+    }, 500);
+    return () => window.clearInterval(timer);
+  }, [soloWaitEndsAt]);
 
-  const localPlayer = state.players[currentUserId];
-  const isAlive = localPlayer?.isAlive ?? false;
   const activeWeapon = WEAPON_CATALOG[telemetry.activeWeaponId];
-  const playersList = Object.values(state.players);
-  const contendersLeft = playersList.filter((p) => p.livesLeft > 0).length;
-  const selectedMap = MAP_CATALOG[state.settings.mapId];
-
   const hpPct = Math.max(
     0,
     Math.min(100, (telemetry.hp / Math.max(1, telemetry.maxHp)) * 100),
   );
   const fuelPct = Math.max(0, Math.min(100, telemetry.jetpackFuel));
+  const soloMsRemaining =
+    soloWaitEndsAt !== null ? Math.max(0, soloWaitEndsAt - clockMs) : 0;
 
-  const updateKnobTransform = (
-    el: HTMLDivElement | null,
-    dx: number,
-    dy: number,
-    maxTravel: number,
-  ) => {
-    if (!el) return;
-    el.style.transform = `translate3d(${(dx * maxTravel).toFixed(1)}px, ${(dy * maxTravel).toFixed(1)}px, 0)`;
-  };
-
-  // --- Pointer-ID Isolated Left Movement + Jetpack Stick ---
-  const computeStickAxes = (
-    el: HTMLElement,
-    clientX: number,
-    clientY: number,
-  ) => {
-    const rect = el.getBoundingClientRect();
-    const cx = rect.left + rect.width * 0.5;
-    const cy = rect.top + rect.height * 0.5;
-    const maxR = Math.max(24, rect.width * 0.42);
-    let dx = (clientX - cx) / maxR;
-    let dy = (clientY - cy) / maxR;
-    const len = Math.hypot(dx, dy);
-    if (len > 1) {
-      dx /= len;
-      dy /= len;
-    }
-    return { dx, dy };
-  };
-
-  const handleLeftDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (leftPointerIdRef.current !== null) return;
-    onUnlockAudio();
-    leftPointerIdRef.current = e.pointerId;
-    e.currentTarget.setPointerCapture(e.pointerId);
-    const { dx, dy } = computeStickAxes(e.currentTarget, e.clientX, e.clientY);
-    onLeftStick(dx, dy);
-    updateKnobTransform(leftKnobRef.current, dx, dy, 30);
-  };
-
-  const handleLeftMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (leftPointerIdRef.current !== e.pointerId) return;
-    const { dx, dy } = computeStickAxes(e.currentTarget, e.clientX, e.clientY);
-    onLeftStick(dx, dy);
-    updateKnobTransform(leftKnobRef.current, dx, dy, 30);
-  };
-
-  const handleLeftUp = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (leftPointerIdRef.current !== e.pointerId) return;
-    leftPointerIdRef.current = null;
-    onLeftStick(0, 0);
-    updateKnobTransform(leftKnobRef.current, 0, 0, 30);
-  };
-
-  // --- Pointer-ID Isolated Right Aim + Auto-Fire Stick ---
-  const handleRightDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (rightPointerIdRef.current !== null) return;
-    onUnlockAudio();
-    rightPointerIdRef.current = e.pointerId;
-    e.currentTarget.setPointerCapture(e.pointerId);
-    const { dx, dy } = computeStickAxes(e.currentTarget, e.clientX, e.clientY);
-    onRightStick(dx, dy, true);
-    updateKnobTransform(rightKnobRef.current, dx, dy, 32);
-  };
-
-  const handleRightMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (rightPointerIdRef.current !== e.pointerId) return;
-    const { dx, dy } = computeStickAxes(e.currentTarget, e.clientX, e.clientY);
-    onRightStick(dx, dy, true);
-    updateKnobTransform(rightKnobRef.current, dx, dy, 32);
-  };
-
-  const handleRightUp = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (rightPointerIdRef.current !== e.pointerId) return;
-    rightPointerIdRef.current = null;
-    onRightStick(0, 0, false);
-    updateKnobTransform(rightKnobRef.current, 0, 0, 32);
-  };
-
-  // --- Overlapping Smaller Red Circle: Precision Tap-Fire ---
-  const handleTapFireDown = (e: React.PointerEvent<HTMLButtonElement>) => {
-    e.stopPropagation();
-    if (tapFirePointerIdRef.current !== null) return;
-    onUnlockAudio();
-    tapFirePointerIdRef.current = e.pointerId;
-    e.currentTarget.setPointerCapture(e.pointerId);
-    onTapFire(true);
-  };
-
-  const handleTapFireUp = (e: React.PointerEvent<HTMLButtonElement>) => {
-    e.stopPropagation();
-    if (tapFirePointerIdRef.current !== e.pointerId) return;
-    tapFirePointerIdRef.current = null;
-    onTapFire(false);
-  };
-
-  // --- Hold-to-Preview, Release-to-Throw Grenade Button ---
-  const handleGrenadeDown = (e: React.PointerEvent<HTMLButtonElement>) => {
-    e.stopPropagation();
-    if (grenadePointerIdRef.current !== null) return;
-    onUnlockAudio();
-    grenadePointerIdRef.current = e.pointerId;
-    e.currentTarget.setPointerCapture(e.pointerId);
-    onGrenadeAimChange(true);
-  };
-
-  const handleGrenadeUp = (e: React.PointerEvent<HTMLButtonElement>) => {
-    e.stopPropagation();
-    if (grenadePointerIdRef.current !== e.pointerId) return;
-    grenadePointerIdRef.current = null;
-    onGrenadeAimChange(false);
-    onThrowBomb();
-  };
-
-  const handleGrenadeCancel = (e: React.PointerEvent<HTMLButtonElement>) => {
-    if (grenadePointerIdRef.current !== e.pointerId) return;
-    grenadePointerIdRef.current = null;
-    onGrenadeAimChange(false);
-  };
+  const leaveOrBackHandler = onBackToRoom ?? onLeaveMatch;
 
   return (
     <div
-      className={`pointer-events-none absolute inset-0 z-20 select-none ${styles.safeHud}`}
+      className={`pointer-events-none absolute inset-0 z-20 overflow-hidden text-white ${styles.safeHud}`}
     >
-      {/* === TOP HUD ROW (Matches Image 1 silhouette across Mobile & PC) === */}
-      <div className="flex items-start justify-between gap-2 px-2.5 pt-2 sm:px-4 sm:pt-3">
-        {/* TOP-LEFT: 5X Scope + Angled HP / Fuel / Pause Panel + Lives Pips */}
-        <div className="flex items-start gap-2 sm:gap-3">
-          {/* 5X Scope Toggle Circle (Image 1 far top-left) */}
+      {/* === TOP BAR (Zero-Overlap across 667x375, 844x390 & Desktop) === */}
+      <div className="flex w-full items-start justify-between gap-1.5 sm:gap-3">
+        {/* TOP-LEFT: 5X Scope Toggle + Chat Button */}
+        <div
+          className={`pointer-events-auto flex items-center gap-1.5 ${styles.compactTopLeftScale}`}
+        >
           <button
             type="button"
-            onClick={() => {
-              onUnlockAudio();
+            onPointerDown={(e) => {
+              e.stopPropagation();
               onToggleScope();
             }}
-            className={`pointer-events-auto flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-full border-2 shadow-lg backdrop-blur-sm transition active:scale-95 sm:h-14 sm:w-14 ${
+            className={`relative flex h-11 w-11 items-center justify-center rounded-full font-black transition active:scale-90 sm:h-13 sm:w-13 ${styles.hudCircleBtn} ${
               telemetry.isScoped
-                ? "border-sky-300 bg-sky-500/45 text-white shadow-sky-500/35"
-                : "border-white/80 bg-slate-900/45 text-white hover:bg-slate-900/65"
+                ? "ring-2 ring-rose-400 !border-rose-300 text-rose-200"
+                : "text-white"
             }`}
-            title="Toggle 5X Tactical Scope (Z / Shift)"
+            aria-label="Toggle 5X Scope"
+            title="Toggle 5X Scope (F / Shift)"
           >
-            <Crosshair className="h-3.5 w-3.5 opacity-80" />
-            <span className="-mt-0.5 text-xs font-black tracking-tight sm:text-sm">
+            <Crosshair className="h-5 w-5 opacity-45 sm:h-6 sm:w-6" />
+            <span className="absolute text-[11px] font-black tracking-tight sm:text-xs">
               5X
             </span>
+            {!isMobile && (
+              <span
+                className={`absolute -bottom-1.5 -right-1 ${styles.keycap}`}
+              >
+                F
+              </span>
+            )}
           </button>
 
-          {/* Angled Health (Magenta) + Jetpack Fuel (Blue) + Pause Bar */}
-          <div className="flex flex-col gap-1.5">
-            <div
-              className={`pointer-events-auto flex items-center gap-2 rounded-xl border-2 border-white/80 bg-slate-900/45 px-2.5 py-1.5 shadow-lg backdrop-blur-sm sm:px-3 ${styles.angledPanel}`}
-            >
-              <div className="flex w-32 flex-col gap-1.5 sm:w-48">
-                {/* Health Bar (Heart + Magenta) */}
-                <div className="flex items-center gap-1.5">
-                  <Heart className="h-3.5 w-3.5 shrink-0 fill-white text-white drop-shadow" />
-                  <div className="relative h-3 flex-1 overflow-hidden rounded-sm border border-white/70 bg-slate-950/75">
-                    <div
-                      className="h-full transition-all duration-150"
-                      style={{
-                        width: `${hpPct}%`,
-                        background:
-                          hpPct > 30
-                            ? "linear-gradient(90deg, #c026d3, #e879f9)"
-                            : "linear-gradient(90deg, #dc2626, #f43f5e)",
-                      }}
-                    />
-                    <span className="pointer-events-none absolute inset-0 flex items-center justify-end pr-1 text-[9px] font-black text-white drop-shadow">
-                      {Math.round(telemetry.hp)}
-                    </span>
-                  </div>
-                </div>
+          <button
+            type="button"
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              onOpenChat();
+            }}
+            className={`relative flex h-9 w-9 items-center justify-center rounded-full transition active:scale-90 sm:h-10 sm:w-10 ${styles.hudCircleBtn}`}
+            aria-label="Open Chat"
+            title="Chat (T)"
+          >
+            <MessageSquare className="h-4 w-4 text-sky-200" />
+            {!isMobile && (
+              <span
+                className={`absolute -bottom-1.5 -right-1 ${styles.keycap}`}
+              >
+                T
+              </span>
+            )}
+          </button>
+        </div>
 
-                {/* Jetpack Fuel Bar (Lightning + Blue + Low-Fuel Warning) */}
-                <div className="flex items-center gap-1.5">
-                  <Zap
-                    className={`h-3.5 w-3.5 shrink-0 ${
-                      telemetry.isOverheated
-                        ? "fill-rose-400 text-rose-400"
-                        : telemetry.isLowFuel
-                          ? "fill-amber-300 text-amber-300"
-                          : "fill-white text-white"
-                    } drop-shadow`}
-                  />
+        {/* TOP-CENTER: Health/Jetpack/Pause + Weapon/Ammo/Grenade Angled Panels */}
+        <div
+          className={`pointer-events-auto flex items-start gap-1.5 sm:gap-3 ${styles.compactTopScale}`}
+        >
+          {/* Left Angled Panel: HP + Jetpack Fuel + Pause + Lives */}
+          <div
+            className={`flex items-center gap-1.5 rounded-lg px-2 py-1.5 sm:gap-2.5 sm:px-3 sm:py-2 ${styles.angledPanel} ${
+              telemetry.isLowFuel ? styles.lowFuelPulse : ""
+            }`}
+          >
+            <div className="w-28 space-y-1 sm:w-40 sm:space-y-1.5">
+              {/* HP Bar */}
+              <div className="flex items-center gap-1.5">
+                <Heart className="h-3.5 w-3.5 shrink-0 fill-rose-400 text-rose-300" />
+                <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-slate-950/85 ring-1 ring-white/25 sm:h-3">
                   <div
-                    className={`relative h-3 flex-1 overflow-hidden rounded-sm border border-white/70 bg-slate-950/75 ${
-                      telemetry.isLowFuel || telemetry.isOverheated
-                        ? styles.lowFuelPulse
-                        : ""
-                    }`}
-                  >
-                    <div
-                      className="h-full transition-all duration-75"
-                      style={{
-                        width: `${fuelPct}%`,
-                        background: telemetry.isOverheated
-                          ? "linear-gradient(90deg, #dc2626, #fb7185)"
-                          : telemetry.isLowFuel
-                            ? "linear-gradient(90deg, #ea580c, #facc15)"
-                            : "linear-gradient(90deg, #1d4ed8, #38bdf8)",
-                      }}
-                    />
-                    {telemetry.isOverheated && (
-                      <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-[8px] font-black tracking-wider text-white uppercase">
-                        OVERHEAT
-                      </span>
-                    )}
-                  </div>
+                    className="h-full rounded-full bg-gradient-to-r from-fuchsia-500 via-pink-500 to-rose-400"
+                    style={{ width: `${hpPct}%` }}
+                  />
                 </div>
               </div>
 
-              {/* Pause Button inside the top-left HUD bar (Image 1) */}
-              <button
-                type="button"
-                onClick={() => {
-                  onUnlockAudio();
-                  onTogglePause();
-                }}
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 border-white/80 bg-slate-950/40 text-white transition hover:bg-slate-800/80 active:scale-95"
-                title="Pause / Settings (Esc)"
-                aria-label="Pause game"
-              >
-                <Pause className="h-3.5 w-3.5 fill-current" />
-              </button>
-            </div>
+              {/* Jetpack Fuel Bar */}
+              <div className="flex items-center gap-1.5">
+                <Zap
+                  className={`h-3.5 w-3.5 shrink-0 ${
+                    telemetry.isOverheated
+                      ? "text-rose-400"
+                      : "fill-sky-300 text-sky-200"
+                  }`}
+                />
+                <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-slate-950/85 ring-1 ring-white/25 sm:h-3">
+                  <div
+                    className={`h-full rounded-full ${
+                      telemetry.isOverheated
+                        ? "bg-rose-500"
+                        : "bg-gradient-to-r from-blue-600 via-sky-400 to-cyan-300"
+                    }`}
+                    style={{ width: `${fuelPct}%` }}
+                  />
+                </div>
+              </div>
 
-            {/* Lives Pips + Contenders + FPS (if debug) */}
-            <div className="flex flex-wrap items-center gap-1.5">
-              <div className="flex items-center gap-1 rounded-full border border-white/25 bg-slate-950/65 px-2.5 py-0.5 text-[11px] font-black text-white backdrop-blur-sm">
-                <span className="mr-0.5 text-[9px] tracking-wider text-slate-300 uppercase">
-                  Lives
-                </span>
-                {Array.from({ length: telemetry.maxLives }).map((_, idx) => {
-                  const active = idx < telemetry.livesLeft;
-                  return (
+              {/* Lives & Kills micro-row */}
+              <div className="flex items-center justify-between pt-0.5 text-[9px] font-black text-slate-200">
+                <div className="flex items-center gap-0.5" title="Lives Left">
+                  {Array.from({ length: telemetry.maxLives }, (_, idx) => (
                     <Heart
                       key={idx}
-                      className={`h-3.5 w-3.5 transition ${
-                        active
-                          ? "fill-rose-500 text-rose-400 drop-shadow"
+                      className={`h-2.5 w-2.5 ${
+                        idx < telemetry.livesLeft
+                          ? "fill-rose-500 text-rose-300"
                           : "text-slate-600"
                       }`}
                     />
-                  );
-                })}
+                  ))}
+                </div>
+                <span className="flex items-center gap-1 font-mono text-amber-300">
+                  <Swords className="h-2.5 w-2.5" />
+                  {telemetry.kills}
+                </span>
+              </div>
+            </div>
+
+            {/* Pause Button */}
+            <button
+              type="button"
+              onPointerDown={(e) => {
+                e.stopPropagation();
+                onTogglePause();
+              }}
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/75 bg-slate-950/60 text-white transition hover:bg-slate-800 active:scale-90 sm:h-9 sm:w-9"
+              aria-label="Pause menu"
+              title="Pause / Settings (Esc)"
+            >
+              <Pause className="h-4 w-4" />
+            </button>
+          </div>
+
+          {/* Right Angled Panel: Weapon Switch + Ammo + Grenade Badge */}
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onPointerDown={(e) => {
+                e.stopPropagation();
+                onSwitchWeapon();
+              }}
+              className={`relative flex min-w-32 flex-col justify-between rounded-lg px-2.5 py-1.5 text-left transition active:scale-95 sm:min-w-44 sm:px-3.5 sm:py-2 ${styles.angledPanel}`}
+              title="Switch Weapon (Q / 1 / 2)"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="truncate text-[10px] font-black tracking-wider text-amber-300 uppercase sm:text-xs">
+                  {activeWeapon.shortName}
+                </span>
+                <span className="rounded bg-white/15 px-1 py-0.5 font-mono text-[9px] font-black text-sky-200">
+                  {telemetry.activeSlot === 0 ? "1/2" : "2/2"}
+                </span>
               </div>
 
-              <button
-                type="button"
-                onClick={onToggleScoreboard}
-                className="pointer-events-auto flex items-center gap-1 rounded-full border border-white/25 bg-slate-950/65 px-2.5 py-0.5 text-[11px] font-black text-amber-300 backdrop-blur-sm hover:bg-slate-900"
-                title="Live Scoreboard (Tab)"
-              >
-                <Users className="h-3 w-3" />
-                <span>{contendersLeft} Left</span>
-              </button>
+              <div className="mt-1 flex items-baseline justify-between gap-2 font-mono">
+                <span className="text-sm font-black tracking-wider text-white sm:text-base">
+                  {String(telemetry.ammo).padStart(3, "0")}
+                </span>
+                <span className="text-[11px] font-bold text-slate-300 sm:text-xs">
+                  {telemetry.reserveAmmo < 0
+                    ? "∞"
+                    : String(telemetry.reserveAmmo).padStart(3, "0")}
+                </span>
+              </div>
 
-              {telemetry.isInvulnerable && isAlive && (
-                <div className="flex items-center gap-1 rounded-full border border-sky-400/60 bg-sky-500/25 px-2 py-0.5 text-[10px] font-black text-sky-200">
-                  <Shield className="h-3 w-3" />
-                  <span>SHIELD</span>
+              {telemetry.isReloading && (
+                <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-slate-950/80">
+                  <div
+                    className="h-full bg-amber-400 transition-[width] duration-75"
+                    style={{
+                      width: `${Math.round(telemetry.reloadProgress * 100)}%`,
+                    }}
+                  />
                 </div>
               )}
 
-              {(debug.showFps || debug.showCollisions) && (
-                <div className="rounded-full border border-emerald-400/50 bg-slate-950/80 px-2 py-0.5 font-mono text-[10px] font-bold text-emerald-300">
-                  {fps} FPS {debug.showCollisions ? "• COLLISION DEBUG" : ""}
-                </div>
+              {!isMobile && (
+                <span
+                  className={`absolute -bottom-1.5 -right-1 ${styles.keycap}`}
+                >
+                  Q
+                </span>
               )}
-            </div>
+            </button>
+
+            {/* Compact Grenade Count Indicator (desktop & quick tap) */}
+            <button
+              type="button"
+              onPointerDown={(e) => {
+                e.stopPropagation();
+                onThrowBomb();
+              }}
+              disabled={
+                telemetry.bombsLeft <= 0 || telemetry.bombCooldownRatio < 1
+              }
+              className={`relative hidden h-10 w-10 items-center justify-center rounded-full transition active:scale-90 disabled:opacity-45 sm:flex ${styles.hudCircleBtn}`}
+              title="Throw Frag Grenade (G / Right Click)"
+              aria-label="Throw Grenade"
+            >
+              <Flame className="h-4 w-4 text-amber-300" />
+              <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-400 px-1 text-[9px] font-black text-slate-950">
+                {telemetry.bombsLeft}
+              </span>
+              {!isMobile && (
+                <span
+                  className={`absolute -bottom-1.5 -right-1 ${styles.keycap}`}
+                >
+                  G
+                </span>
+              )}
+            </button>
           </div>
         </div>
 
-        {/* TOP-RIGHT: Angled Weapon Panel (Ammo + Grenade badge) + Reload Circle + Fullscreen */}
-        <div className="flex flex-col items-end gap-2">
-          <div className="flex items-start gap-2">
-            {/* Weapon Panel (tap to swap primary/secondary) */}
-            <button
-              type="button"
-              onClick={() => {
-                onUnlockAudio();
-                onSwitchWeapon();
-              }}
-              className="pointer-events-auto flex items-center gap-2 rounded-xl border-2 border-white/80 bg-slate-900/45 px-2.5 py-1.5 text-left shadow-lg backdrop-blur-sm transition hover:bg-slate-900/65 active:scale-95 sm:px-3"
-              title="Tap or press Q to switch weapon"
-            >
-              <div className="flex flex-col items-center">
-                <div className="flex items-center gap-1.5">
-                  <WeaponImageOrGlyph
-                    weaponId={activeWeapon.id}
-                    className="h-7 w-14 sm:h-8 sm:w-16"
-                  />
-                  <span className="hidden text-[10px] font-black tracking-wide text-amber-300 uppercase sm:inline">
-                    {activeWeapon.shortName}
-                  </span>
-                </div>
+        {/* TOP-RIGHT: Reload Button + Mute + Fullscreen */}
+        <div
+          className={`pointer-events-auto flex items-center gap-1.5 ${styles.compactTopRightScale}`}
+        >
+          <button
+            type="button"
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              onToggleMute();
+            }}
+            className={`flex h-9 w-9 items-center justify-center rounded-full transition active:scale-90 ${styles.hudCircleBtn}`}
+            aria-label={muted ? "Unmute audio" : "Mute audio"}
+          >
+            {muted ? (
+              <VolumeX className="h-4 w-4 text-rose-300" />
+            ) : (
+              <Volume2 className="h-4 w-4 text-sky-200" />
+            )}
+          </button>
 
-                {/* Clip / Reserve counter ("012 / 147" style from Image 1) */}
-                <div className="mt-0.5 flex items-center gap-2 font-mono text-xs font-black tracking-wider text-white sm:text-sm">
-                  {telemetry.isReloading ? (
-                    <span className="text-sky-300">
-                      RELOAD {Math.round(telemetry.reloadProgress * 100)}%
-                    </span>
-                  ) : (
-                    <>
-                      <span
-                        className={
-                          telemetry.ammo <= Math.ceil(telemetry.magSize * 0.25)
-                            ? "text-rose-300"
-                            : "text-white"
-                        }
-                      >
-                        {formatClip(telemetry.ammo)}
-                      </span>
-                      <span className="text-white/50">/</span>
-                      <span className="text-slate-200">
-                        {telemetry.reserveAmmo < 0
-                          ? "∞"
-                          : formatClip(telemetry.reserveAmmo)}
-                      </span>
-                    </>
-                  )}
-                </div>
-              </div>
+          <button
+            type="button"
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              onToggleFullscreen();
+            }}
+            className={`hidden h-9 w-9 items-center justify-center rounded-full transition active:scale-90 sm:flex ${styles.hudCircleBtn}`}
+            aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+          >
+            {isFullscreen ? (
+              <Minimize2 className="h-4 w-4 text-white" />
+            ) : (
+              <Maximize2 className="h-4 w-4 text-white" />
+            )}
+          </button>
 
-              {/* Grenade icon circle inside weapon panel (Image 1) */}
-              <div className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-white/75 bg-slate-950/50 text-amber-200">
-                <GrenadeGlyph className="h-5 w-5" />
-                <span className="absolute -right-1 -bottom-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-400 px-1 text-[9px] font-black text-slate-950">
-                  {telemetry.bombsLeft}
-                </span>
-              </div>
-            </button>
-
-            {/* Circular Reload Magazine Button (Image 1 far top-right) */}
-            <button
-              type="button"
-              onClick={() => {
-                onUnlockAudio();
-                onReload();
-              }}
-              className="pointer-events-auto relative flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-2 border-white/85 bg-slate-900/45 text-white shadow-lg backdrop-blur-sm transition hover:bg-slate-900/65 active:scale-90 sm:h-14 sm:w-14"
-              title="Reload Weapon (R)"
-              aria-label="Reload weapon"
-            >
-              <MagazineGlyph />
-              {telemetry.isReloading && (
-                <span className="absolute inset-0 rounded-full border-2 border-sky-400 border-t-transparent animate-spin" />
-              )}
-            </button>
-
-            {/* Compact Fullscreen button */}
-            <button
-              type="button"
-              onClick={onToggleFullscreen}
-              className="pointer-events-auto hidden h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/30 bg-slate-950/60 text-white backdrop-blur-sm hover:bg-slate-800 sm:flex"
-              title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
-              aria-label="Toggle fullscreen"
-            >
-              {isFullscreen ? (
-                <Minimize2 className="h-4 w-4" />
-              ) : (
-                <Maximize2 className="h-4 w-4" />
-              )}
-            </button>
-          </div>
-
-          {/* Animated Kill Feed Notifications ("User 1 killed User 2") */}
-          <div className="flex w-64 flex-col items-end gap-1 sm:w-72">
-            {state.killFeed.slice(0, 4).map((entry) => {
-              const involvesLocal =
-                entry.killerId === currentUserId ||
-                entry.victimId === currentUserId;
-              return (
-                <div
-                  key={entry.id}
-                  className={`flex max-w-full items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] shadow-md backdrop-blur-md ${styles.killFeedEntry} ${
-                    involvesLocal
-                      ? "border-amber-400/60 bg-slate-950/85"
-                      : "border-white/15 bg-slate-950/75"
-                  }`}
-                >
-                  <span className="max-w-20 truncate font-black text-amber-300">
-                    {entry.killerName}
-                  </span>
-                  <span className="text-[10px] font-semibold text-slate-400">
-                    killed
-                  </span>
-                  <span className="max-w-20 truncate font-black text-rose-400">
-                    {entry.victimName}
-                  </span>
-                  <span className="flex items-center gap-1 rounded bg-white/10 px-1.5 py-0.5 text-[9px] font-bold text-slate-200">
-                    <WeaponImageOrGlyph
-                      weaponId={entry.weaponId}
-                      className="h-3.5 w-6"
-                    />
-                  </span>
-                </div>
-              );
-            })}
-          </div>
+          <button
+            type="button"
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              onReload();
+            }}
+            className={`relative flex h-11 w-11 items-center justify-center rounded-full transition active:scale-90 sm:h-13 sm:w-13 ${styles.hudCircleBtn}`}
+            aria-label="Reload Weapon"
+            title="Reload (R)"
+          >
+            <RotateCw
+              className={`h-5 w-5 sm:h-6 sm:w-6 ${
+                telemetry.isReloading
+                  ? "animate-spin text-amber-300"
+                  : "text-white"
+              }`}
+            />
+            {!isMobile && (
+              <span
+                className={`absolute -bottom-1.5 -right-1 ${styles.keycap}`}
+              >
+                R
+              </span>
+            )}
+          </button>
         </div>
       </div>
 
-      {/* === RESPAWN COUNTDOWN BANNER (when dead with lives left) === */}
-      {!isAlive && telemetry.livesLeft > 0 && state.phase === "playing" && (
-        <div className="absolute top-1/2 left-1/2 z-30 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-2 rounded-2xl border border-sky-400/40 bg-slate-950/85 px-7 py-4 text-center shadow-2xl backdrop-blur-md">
-          <span className="text-[11px] font-black tracking-widest text-rose-400 uppercase">
-            Downed — {telemetry.livesLeft}{" "}
-            {telemetry.livesLeft === 1 ? "Life" : "Lives"} Left
-          </span>
-          <div className="text-2xl font-black text-white">
-            Respawning in {Math.max(1, telemetry.respawnSecondsLeft)}s...
-          </div>
-          <span className="text-xs text-slate-300">
-            Scanning safe jungle drop zone
-          </span>
+      {/* === 2-SECOND AUTO-DISMISSING KILL FEED (Top-Right below HUD) === */}
+      {killFeed.length > 0 && (
+        <div className="pointer-events-none absolute top-15 right-2.5 z-20 flex w-56 flex-col gap-1 sm:top-18 sm:right-4 sm:w-64">
+          {killFeed.map((item) => {
+            const isLocalInvolved =
+              item.entry.killerId === currentUserId ||
+              item.entry.victimId === currentUserId;
+            return (
+              <div
+                key={item.entry.id}
+                className={`flex items-center justify-between gap-1.5 rounded-lg border px-2 py-1 text-[10px] font-bold shadow-lg backdrop-blur-md sm:text-xs ${styles.killFeedEntry} ${
+                  isLocalInvolved
+                    ? "border-amber-400/70 bg-slate-950/88"
+                    : "border-white/15 bg-slate-950/72"
+                }`}
+              >
+                <span className="truncate font-black text-sky-300">
+                  {item.entry.killerName}
+                </span>
+                <span className="shrink-0 rounded bg-amber-400/20 px-1.5 py-0.5 text-[9px] font-black text-amber-300 uppercase">
+                  {item.entry.weaponLabel}
+                </span>
+                <span className="truncate font-black text-rose-300">
+                  {item.entry.victimName}
+                </span>
+              </div>
+            );
+          })}
         </div>
       )}
 
-      {/* === SPECTATOR MODE CONTROLS (when out of lives) === */}
-      {!isAlive && telemetry.livesLeft <= 0 && state.phase === "playing" && (
-        <div className="pointer-events-auto absolute bottom-16 left-1/2 z-30 flex -translate-x-1/2 flex-wrap items-center justify-center gap-2 rounded-2xl border border-rose-500/40 bg-slate-950/90 px-4 py-2.5 shadow-2xl backdrop-blur">
-          <span className="flex items-center gap-1.5 text-xs font-black tracking-wide text-rose-400 uppercase">
-            <ShieldAlert className="h-4 w-4" />
-            Eliminated — Spectating:
-          </span>
-          <button
-            type="button"
-            onClick={() => onSpectateStep(-1)}
-            className="rounded-lg bg-white/10 p-1.5 text-white hover:bg-white/20"
-            aria-label="Previous survivor"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </button>
-          <span className="min-w-24 text-center text-xs font-bold text-amber-300">
-            {spectatingPlayer?.username ?? "Emerald Falls"}
-          </span>
-          <button
-            type="button"
-            onClick={() => onSpectateStep(1)}
-            className="rounded-lg bg-white/10 p-1.5 text-white hover:bg-white/20"
-            aria-label="Next survivor"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </button>
-
-          {onBackToRoom && (
-            <button
-              type="button"
-              onClick={onBackToRoom}
-              className="ml-1 rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-bold text-slate-200 hover:bg-slate-700"
-            >
-              Room
-            </button>
+      {/* === TOP-LEFT STACK: DEBUG FPS & 2-SECOND CLICKABLE CHAT FEED === */}
+      {(debug.showFps || debug.showCollisions || chatFeed.length > 0) && (
+        <div className="pointer-events-none absolute top-15 left-2.5 z-20 flex max-w-60 flex-col gap-1 sm:top-18 sm:left-3 sm:max-w-72">
+          {(debug.showFps || debug.showCollisions) && (
+            <>
+              <div className="inline-flex w-fit items-center gap-2 rounded-md border border-cyan-400/40 bg-slate-950/85 px-2 py-1 font-mono text-[10px] font-bold text-cyan-200">
+                <Bug className="h-3.5 w-3.5 text-cyan-400" />
+                <span>{fps} FPS</span>
+                {debug.showCollisions && (
+                  <span className="text-lime-300">• CLICK MAP FOR (X,Y)</span>
+                )}
+              </div>
+              {debugCoordToast && (
+                <div className="w-fit rounded-md border border-lime-400/50 bg-slate-950/92 px-2.5 py-1 font-mono text-[11px] font-black text-lime-300 shadow-lg">
+                  World ({debugCoordToast.x}, {debugCoordToast.y}){" "}
+                  {debugCoordToast.copied ? "• Copied!" : ""}
+                </div>
+              )}
+            </>
           )}
-          {onLeaveMatch && (
+
+          {chatFeed.map((item) => {
+            const isMe = item.message.userId === currentUserId;
+            return (
+              <button
+                key={item.message.id}
+                type="button"
+                onPointerDown={(e) => {
+                  e.stopPropagation();
+                  onOpenChat();
+                }}
+                className={`pointer-events-auto flex w-full items-center gap-1.5 rounded-lg border px-2 py-1 text-left text-[10px] font-bold shadow-lg backdrop-blur-md transition hover:brightness-110 active:scale-[0.98] sm:text-xs ${styles.killFeedEntry} ${
+                  isMe
+                    ? "border-sky-400/70 bg-slate-950/88"
+                    : "border-white/15 bg-slate-950/75"
+                }`}
+                title="Click to open chat"
+              >
+                <MessageSquare className="h-3 w-3 shrink-0 text-sky-400" />
+                <span
+                  className={`max-w-20 shrink-0 truncate font-black ${
+                    isMe ? "text-sky-300" : "text-amber-300"
+                  }`}
+                >
+                  {item.message.username}:
+                </span>
+                <span className="min-w-0 flex-1 truncate text-slate-100">
+                  {item.message.text}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* === COMPACT SOLO-WAIT BANNER (When user clicked "Wait for Players") === */}
+      {soloWaitEndsAt !== null && soloBannerDismissed && (
+        <div className="pointer-events-auto absolute top-15 left-1/2 z-30 flex -translate-x-1/2 items-center gap-2 rounded-full border border-amber-400/60 bg-slate-950/90 px-3 py-1 text-[11px] font-bold text-amber-200 shadow-xl backdrop-blur-md">
+          <WifiOff className="h-3.5 w-3.5 text-amber-400" />
+          <span>Waiting for rivals ({formatCountdown(soloMsRemaining)})</span>
+          {leaveOrBackHandler && (
             <button
               type="button"
-              onClick={onLeaveMatch}
-              className="flex items-center gap-1 rounded-lg bg-rose-600/85 px-3 py-1.5 text-xs font-bold text-white hover:bg-rose-500"
+              onClick={leaveOrBackHandler}
+              className="rounded-full bg-rose-600 px-2 py-0.5 text-[10px] font-black text-white hover:bg-rose-500"
             >
-              <LogOut className="h-3.5 w-3.5" />
               Leave
             </button>
           )}
         </div>
       )}
 
-      {/* === MOBILE TOUCH CONTROLS ONLY (Matches Image 1 Bottom Layout) === */}
-      {isMobile && isAlive && !isPaused && (
-        <>
-          {/* Bottom-Left: Blue Movement + Jetpack Joystick + Grenade Button with Count */}
-          <div className="pointer-events-none absolute bottom-4 left-4 z-30 flex items-end gap-3">
-            {/* Left Blue Joystick */}
-            <div
-              onPointerDown={handleLeftDown}
-              onPointerMove={handleLeftMove}
-              onPointerUp={handleLeftUp}
-              onPointerCancel={handleLeftUp}
-              className="pointer-events-auto relative flex h-32 w-32 touch-none items-center justify-center rounded-full border-4 border-white/85 bg-slate-900/35 shadow-xl backdrop-blur-[2px]"
-              aria-label="Movement and Jetpack Joystick"
-            >
-              <div className="pointer-events-none h-24 w-24 rounded-full border-2 border-indigo-300/40 bg-indigo-950/30" />
-              <div
-                ref={leftKnobRef}
-                className="pointer-events-none absolute flex h-14 w-14 items-center justify-center rounded-full border-2 border-white/90 bg-indigo-500/75 shadow-lg will-change-transform"
-              >
-                <Zap className="h-5 w-5 text-white/90" />
-              </div>
-            </div>
+      {/* === NEARBY PICKUP BUTTON / PROMPT === */}
+      {telemetry.isAlive && telemetry.nearbyPickupLabel && (
+        <button
+          type="button"
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            onPickup();
+          }}
+          className="pointer-events-auto absolute bottom-16 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-emerald-400/75 bg-slate-950/90 px-3.5 py-1.5 text-xs font-black tracking-wide text-emerald-300 shadow-xl backdrop-blur-md transition hover:bg-emerald-950/90 active:scale-95 sm:bottom-14"
+          title="Pick up weapon or supply (X)"
+        >
+          {!isMobile && <span className={styles.keycap}>X</span>}
+          <span>
+            {isMobile
+              ? `Tap: ${telemetry.nearbyPickupLabel}`
+              : telemetry.nearbyPickupLabel}
+          </span>
+        </button>
+      )}
 
-            {/* Grenade Button with Count Badge ("3" in Image 1) */}
-            <button
-              type="button"
-              onPointerDown={handleGrenadeDown}
-              onPointerUp={handleGrenadeUp}
-              onPointerCancel={handleGrenadeCancel}
-              disabled={telemetry.bombsLeft <= 0}
-              className="pointer-events-auto relative mb-1 flex h-16 w-16 touch-none items-center justify-center rounded-full border-3 border-white/85 bg-slate-900/45 text-white shadow-xl backdrop-blur-[2px] active:scale-95 disabled:opacity-45"
-              aria-label="Hold to aim grenade, release to throw"
-            >
-              <GrenadeGlyph className="h-8 w-8" />
-              <span className="absolute right-1.5 bottom-1 rounded bg-slate-950/85 px-1 font-mono text-xs font-black text-white">
-                {telemetry.bombsLeft}
+      {/* === RESPAWN / SPECTATOR STATUS BAR === */}
+      {!telemetry.isAlive && (
+        <div className="pointer-events-auto absolute bottom-5 left-1/2 z-20 flex -translate-x-1/2 items-center gap-3 rounded-2xl border border-white/20 bg-slate-950/88 px-4 py-2 shadow-2xl backdrop-blur-md">
+          {telemetry.livesLeft > 0 ? (
+            <div className="flex items-center gap-2 text-xs font-black text-amber-300 sm:text-sm">
+              <Skull className="h-4 w-4 text-rose-400" />
+              <span>
+                Respawning in {Math.max(1, telemetry.respawnSecondsLeft)}s (
+                {telemetry.livesLeft} lives left)
               </span>
-              {telemetry.bombCooldownRatio < 1 && (
-                <span className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-full bg-slate-950/60 text-[10px] font-black text-amber-300">
-                  {Math.round((1 - telemetry.bombCooldownRatio) * 100)}%
-                </span>
-              )}
-            </button>
-          </div>
-
-          {/* Bottom-Right: Melee Fist Button + Overlapping Large & Small Red Fire/Aim Circles (Image 1) */}
-          <div className="pointer-events-none absolute right-4 bottom-4 z-30 flex items-end gap-3">
-            {/* Melee Fist Button */}
-            <button
-              type="button"
-              onPointerDown={(e) => {
-                e.stopPropagation();
-                onUnlockAudio();
-                onMelee();
-              }}
-              className="pointer-events-auto mb-1 flex h-16 w-16 touch-none items-center justify-center rounded-full border-3 border-white/85 bg-slate-900/45 text-white shadow-xl backdrop-blur-[2px] active:scale-90"
-              aria-label="Melee Strike"
-            >
-              <Hand className="h-8 w-8" />
-            </button>
-
-            {/* Overlapping Red Aim/Auto-Fire (large) & Tap-Fire (smaller upper-left) Circles */}
-            <div className="relative h-36 w-40">
-              {/* Smaller Upper-Left Overlapping Red Tap-Fire Circle */}
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 text-xs font-bold text-slate-200">
+              <Eye className="h-4 w-4 text-sky-400" />
+              <span>
+                Eliminated • Spectating{" "}
+                <strong className="text-white">
+                  {spectatingName ?? "Arena"}
+                </strong>
+              </span>
               <button
                 type="button"
-                onPointerDown={handleTapFireDown}
-                onPointerUp={handleTapFireUp}
-                onPointerCancel={handleTapFireUp}
-                className="pointer-events-auto absolute top-0 left-0 z-10 flex h-20 w-20 touch-none items-center justify-center rounded-full border-3 border-white/85 bg-rose-900/55 text-[10px] font-black tracking-wider text-white/95 shadow-lg backdrop-blur-[2px] active:scale-95 active:bg-rose-600/75"
-                aria-label="Tap Fire"
+                onClick={() => onSpectateStep(-1)}
+                className="rounded-md bg-white/10 p-1 hover:bg-white/20"
+                aria-label="Previous player"
               >
-                FIRE
+                <ChevronLeft className="h-4 w-4" />
               </button>
-
-              {/* Larger Bottom-Right Red Aim + Auto-Fire Stick */}
-              <div
-                onPointerDown={handleRightDown}
-                onPointerMove={handleRightMove}
-                onPointerUp={handleRightUp}
-                onPointerCancel={handleRightUp}
-                className="pointer-events-auto absolute right-0 bottom-0 z-20 flex h-32 w-32 touch-none items-center justify-center rounded-full border-4 border-white/90 bg-rose-900/50 shadow-xl backdrop-blur-[2px]"
-                aria-label="Aim and Auto-Fire Joystick"
+              <button
+                type="button"
+                onClick={() => onSpectateStep(1)}
+                className="rounded-md bg-white/10 p-1 hover:bg-white/20"
+                aria-label="Next player"
               >
-                <div
-                  ref={rightKnobRef}
-                  className="pointer-events-none flex h-14 w-14 items-center justify-center rounded-full border-2 border-white/90 bg-rose-500/80 text-white shadow-lg will-change-transform"
-                >
-                  <Crosshair className="h-6 w-6" />
-                </div>
-              </div>
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* === MOBILE MULTI-TOUCH CONTROLS (>= 3 Simultaneous Pointers, Zero Overlap) === */}
+      {isMobile && telemetry.isAlive && (
+        <>
+          {/* Bottom-Left: Move + Jetpack Virtual Joystick */}
+          <div
+            ref={onBindMoveStick}
+            className={`pointer-events-auto absolute bottom-2.5 left-3 flex h-28 w-28 items-center justify-center rounded-full border-3 border-white/80 bg-slate-950/25 shadow-lg backdrop-blur-[2px] ${styles.touchZone}`}
+            aria-label="Move and jetpack joystick"
+          >
+            <div
+              className={`flex h-12 w-12 items-center justify-center rounded-full border-2 shadow-md transition-colors ${
+                touchVisual.boosting
+                  ? "border-sky-300 bg-sky-500/75"
+                  : "border-white/90 bg-white/30"
+              }`}
+              style={{
+                transform: `translate3d(${touchVisual.moveStick.dx * 34}px, ${touchVisual.moveStick.dy * 34}px, 0)`,
+              }}
+            >
+              {touchVisual.boosting && (
+                <Zap className="h-5 w-5 text-white drop-shadow" />
+              )}
+            </div>
+          </div>
+
+          {/* Beside Left Stick: Frag Grenade Throw Button */}
+          <button
+            type="button"
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              onThrowBomb();
+            }}
+            disabled={
+              telemetry.bombsLeft <= 0 || telemetry.bombCooldownRatio < 1
+            }
+            className={`pointer-events-auto absolute bottom-3 left-34 flex h-13 w-13 items-center justify-center rounded-full transition active:scale-90 disabled:opacity-45 ${styles.hudCircleBtn} ${styles.touchZone}`}
+            aria-label="Throw grenade"
+          >
+            <Flame className="h-6 w-6 text-amber-300" />
+            <span className="absolute right-0.5 bottom-0.5 flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-amber-400 px-1 text-[10px] font-black text-slate-950">
+              {telemetry.bombsLeft}
+            </span>
+          </button>
+
+          {/* Beside Right Stick: Melee Bash Button */}
+          <button
+            type="button"
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              onMelee();
+            }}
+            className={`pointer-events-auto absolute right-34 bottom-3 flex h-13 w-13 items-center justify-center rounded-full transition active:scale-90 ${styles.hudCircleBtn} ${styles.touchZone}`}
+            aria-label="Melee strike"
+          >
+            <Hand className="h-6 w-6 text-white" />
+          </button>
+
+          {/* Bottom-Right: Aim + Auto-Fire Virtual Joystick */}
+          <div
+            ref={onBindAimStick}
+            className={`pointer-events-auto absolute right-3 bottom-2.5 flex h-28 w-28 items-center justify-center rounded-full border-3 shadow-lg backdrop-blur-[2px] ${styles.touchZone} ${
+              touchVisual.autoFiring
+                ? "border-rose-400 bg-rose-950/40"
+                : "border-white/80 bg-rose-950/25"
+            }`}
+            aria-label="Aim and fire joystick"
+          >
+            <div
+              className={`flex h-12 w-12 items-center justify-center rounded-full border-2 shadow-md transition-colors ${
+                touchVisual.autoFiring
+                  ? "border-amber-300 bg-rose-500/85"
+                  : "border-white/90 bg-rose-500/45"
+              }`}
+              style={{
+                transform: `translate3d(${touchVisual.aimStick.dx * 34}px, ${touchVisual.aimStick.dy * 34}px, 0)`,
+              }}
+            >
+              <Crosshair className="h-5 w-5 text-white" />
             </div>
           </div>
         </>
       )}
 
-      {/* === DESKTOP BOTTOM KEYCAP CONTROL BAR (PC ONLY — Zero Touch Joysticks) === */}
-      {!isMobile && !isPaused && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-2.5 z-20 flex justify-center px-4">
-          <div className="flex max-w-[96vw] flex-wrap items-center justify-center gap-1.5 rounded-2xl border border-white/15 bg-slate-950/75 px-3 py-1.5 shadow-2xl backdrop-blur-md">
-            <KeyHint keys="A / D" label="Move" />
-            <KeyHint
-              keys="W / Space"
-              label="Jetpack"
-              icon={<Zap className="h-3 w-3 text-sky-400" />}
-            />
-            <KeyHint keys="S" label="Drop" />
-            <KeyHint
-              keys="LMB"
-              label="Fire"
-              icon={<Crosshair className="h-3 w-3 text-rose-400" />}
-            />
-            <KeyHint
-              keys="RMB / G"
-              label={`Frag (${telemetry.bombsLeft})`}
-              icon={<Flame className="h-3 w-3 text-amber-400" />}
-              onClick={onThrowBomb}
-            />
-            <KeyHint
-              keys="E / F"
-              label="Melee"
-              icon={<Swords className="h-3 w-3 text-emerald-400" />}
-              onClick={onMelee}
-            />
-            <KeyHint
-              keys="R"
-              label="Reload"
-              icon={<RotateCcw className="h-3 w-3 text-sky-300" />}
-              onClick={onReload}
-            />
-            <KeyHint
-              keys="Q / 1-2"
-              label="Switch"
-              icon={<Repeat className="h-3 w-3 text-amber-300" />}
-              onClick={() => onSwitchWeapon()}
-            />
-            <KeyHint
-              keys="Z / Shift"
-              label="5X Scope"
-              active={telemetry.isScoped}
-              onClick={onToggleScope}
-            />
-            <KeyHint
-              keys="T"
-              label="Chat"
-              icon={<MessageSquare className="h-3 w-3 text-amber-300" />}
-              onClick={onOpenChat}
-            />
-            <KeyHint keys="Tab" label="Scores" onClick={onToggleScoreboard} />
-            <KeyHint keys="Esc" label="Pause" onClick={onTogglePause} />
+      {/* === DESKTOP BOTTOM KEYCAPS BAR === */}
+      {!isMobile && telemetry.isAlive && (
+        <div className="pointer-events-none absolute right-3 bottom-2.5 left-3 flex items-end justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-white/15 bg-slate-950/72 px-2.5 py-1.5 text-[10px] font-bold text-slate-300 backdrop-blur-md">
+            <span className={styles.keycap}>A/D</span>
+            <span>Move</span>
+            <span className={styles.keycap}>W/Space</span>
+            <span>Jetpack</span>
+            <span className={styles.keycap}>S</span>
+            <span>Drop</span>
+            <span className={styles.keycap}>LMB</span>
+            <span>Fire</span>
+            <span className={styles.keycap}>RMB/G</span>
+            <span>Frag</span>
+            <span className={styles.keycap}>E</span>
+            <span>Melee</span>
+            <span className={styles.keycap}>X</span>
+            <span>Pick Up</span>
+            <span className={styles.keycap}>Tab</span>
+            <span>Scores</span>
+          </div>
+
+          <button
+            type="button"
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              onMelee();
+            }}
+            className={`pointer-events-auto relative flex h-11 w-11 items-center justify-center rounded-full transition active:scale-90 ${styles.hudCircleBtn}`}
+            title="Melee Strike (E)"
+            aria-label="Melee Strike"
+          >
+            <Hand className="h-5 w-5 text-white" />
+            <span className={`absolute -right-1 -bottom-1 ${styles.keycap}`}>
+              E
+            </span>
+          </button>
+        </div>
+      )}
+
+      {/* === 3-MINUTE SOLO-WAIT MODAL (Last Player Online) === */}
+      {soloWaitEndsAt !== null && !soloBannerDismissed && (
+        <div className="pointer-events-auto fixed inset-0 z-40 flex items-center justify-center bg-slate-950/72 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-amber-400/50 bg-slate-900/95 p-5 text-center shadow-2xl">
+            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl border border-amber-400/40 bg-amber-500/15 text-amber-300">
+              <AlertTriangle className="h-6 w-6" />
+            </div>
+            <h2 className="text-lg font-black tracking-wide text-white uppercase">
+              No Opponents Online
+            </h2>
+            <p className="mt-1.5 text-xs leading-relaxed text-slate-300">
+              You are currently the last connected player in{" "}
+              <strong className="text-white">{mapName}</strong>. Wait for rivals
+              to reconnect or return to the room.
+            </p>
+            <div className="my-4 inline-flex items-center gap-2 rounded-xl border border-amber-400/35 bg-slate-950/90 px-4 py-2 font-mono text-2xl font-black text-amber-300">
+              {formatCountdown(soloMsRemaining)}
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <button
+                type="button"
+                onClick={onDismissSoloBanner}
+                className="flex-1 rounded-xl border border-white/15 bg-slate-800 px-4 py-2.5 text-xs font-black tracking-wider text-white uppercase transition hover:bg-slate-700"
+              >
+                Wait for Players
+              </button>
+              {leaveOrBackHandler && (
+                <button
+                  type="button"
+                  onClick={leaveOrBackHandler}
+                  className="flex-1 rounded-xl bg-rose-600 px-4 py-2.5 text-xs font-black tracking-wider text-white uppercase transition hover:bg-rose-500"
+                >
+                  Leave Game & Return to Room
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}
 
-      {/* === LIVE SCOREBOARD OVERLAY (Tab) === */}
+      {/* === TAB SCOREBOARD OVERLAY === */}
       {scoreboardOpen && !isPaused && (
-        <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-lg rounded-2xl border border-white/15 bg-slate-900/95 p-4 shadow-2xl">
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-sm font-black tracking-wider text-amber-400 uppercase">
-                {selectedMap.name} — Live Battle
-              </h3>
-              <span className="text-xs font-bold text-slate-400">
-                {contendersLeft} Contenders
+        <div className="pointer-events-none fixed inset-0 z-30 flex items-center justify-center p-4">
+          <div className="w-full max-w-lg rounded-2xl border border-white/20 bg-slate-950/90 p-4 shadow-2xl backdrop-blur-md">
+            <div className="mb-3 flex items-center justify-between border-b border-white/10 pb-2">
+              <span className="text-xs font-black tracking-widest text-sky-300 uppercase">
+                {mapName} • Live Standings
+              </span>
+              <span className="font-mono text-[10px] text-slate-400">
+                {telemetry.alivePlayersCount} ALIVE
               </span>
             </div>
             <div className="space-y-1.5">
-              {[...playersList]
-                .sort((a, b) => b.livesLeft - a.livesLeft || b.kills - a.kills)
-                .map((p) => {
-                  const charDef = CHARACTER_CATALOG[p.characterId];
-                  const isMe = p.userId === currentUserId;
-                  return (
-                    <div
-                      key={p.userId}
-                      className={`flex items-center justify-between rounded-xl border px-3 py-2 text-xs ${
-                        isMe
-                          ? "border-sky-400/40 bg-sky-500/15"
-                          : "border-white/5 bg-slate-950/70"
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        {p.livesLeft <= 0 && (
-                          <Skull className="h-3.5 w-3.5 text-rose-400" />
-                        )}
-                        <span
-                          className={
-                            p.livesLeft > 0
-                              ? "font-bold text-white"
-                              : "text-slate-500 line-through"
-                          }
-                        >
-                          {p.username}
-                        </span>
-                        <span
-                          className="rounded px-1.5 py-0.5 text-[10px] font-black text-slate-950"
-                          style={{ backgroundColor: charDef.palette.sashColor }}
-                        >
-                          {charDef.name}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center gap-3 text-slate-200">
-                        <span className="flex items-center gap-0.5">
-                          {Array.from({ length: p.maxLives }).map((_, i) => (
-                            <Heart
-                              key={i}
-                              className={`h-3 w-3 ${
-                                i < p.livesLeft
-                                  ? "fill-rose-500 text-rose-400"
-                                  : "text-slate-700"
-                              }`}
-                            />
-                          ))}
-                        </span>
-                        <span className="font-bold text-amber-300">
-                          {p.kills}K
-                        </span>
-                        <span className="text-slate-400">{p.deaths}D</span>
-                        <span className="hidden text-slate-400 sm:inline">
-                          {Math.round(p.damageDealt)} DMG
-                        </span>
-                      </div>
+              {scoreRows.map((row, idx) => {
+                const charDef = CHARACTER_CATALOG[row.characterId];
+                const isMe = row.userId === currentUserId;
+                return (
+                  <div
+                    key={row.userId}
+                    className={`flex items-center justify-between rounded-lg border px-3 py-1.5 text-xs ${
+                      isMe
+                        ? "border-sky-400/50 bg-sky-500/15"
+                        : "border-white/10 bg-slate-900/70"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="w-5 font-mono font-black text-amber-300">
+                        #{idx + 1}
+                      </span>
+                      <span
+                        className="rounded px-1.5 py-0.5 text-[9px] font-black text-slate-950"
+                        style={{ backgroundColor: charDef.palette.sashColor }}
+                      >
+                        {charDef.name}
+                      </span>
+                      <span className="truncate font-bold text-white">
+                        {row.username}
+                        {!row.connected ? " (Offline)" : ""}
+                      </span>
                     </div>
-                  );
-                })}
+                    <div className="flex items-center gap-3 font-mono text-[11px]">
+                      <span className="text-rose-300">{row.livesLeft}♥</span>
+                      <span className="font-black text-amber-300">
+                        {row.kills}K
+                      </span>
+                      <span className="text-slate-400">{row.deaths}D</span>
+                      <span className="text-slate-300">
+                        {Math.round(row.damageDealt)}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
       )}
 
-      {/* === PAUSE / AUDIO / ALIGNMENT DEBUG MODAL === */}
+      {/* === PAUSE & SETTINGS MODAL === */}
       {isPaused && (
-        <div className="pointer-events-auto fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl border border-white/15 bg-slate-900 p-5 text-white shadow-2xl">
+        <div
+          className="pointer-events-auto fixed inset-0 z-40 flex items-center justify-center bg-slate-950/78 p-4 backdrop-blur-sm"
+          onClick={onTogglePause}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl border border-white/15 bg-slate-900 p-5 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="mb-4 flex items-center justify-between">
               <div>
-                <h2 className="text-lg font-black tracking-wide uppercase">
-                  Game Paused
+                <h2 className="text-base font-black tracking-wider text-white uppercase">
+                  Match Paused
                 </h2>
-                <p className="text-xs text-slate-400">
-                  {selectedMap.name} • Real-time match continues in background
+                <p className="text-[11px] text-slate-400">
+                  {mapName} • Multiplayer remains live in real time
                 </p>
               </div>
               <button
                 type="button"
-                onClick={onToggleMute}
-                className="rounded-xl border border-white/15 bg-slate-800 p-2 text-white hover:bg-slate-700"
-                aria-label="Toggle mute"
+                onClick={onTogglePause}
+                className="flex items-center gap-1 rounded-xl bg-sky-500 px-3 py-1.5 text-xs font-black text-white hover:bg-sky-400"
               >
-                {muted ? (
-                  <VolumeX className="h-4 w-4 text-rose-400" />
-                ) : (
-                  <Volume2 className="h-4 w-4 text-sky-300" />
-                )}
+                <Play className="h-3.5 w-3.5 fill-current" />
+                Resume
               </button>
             </div>
 
-            {/* Audio Bus Sliders */}
-            <div className="mb-4 space-y-2.5 rounded-xl border border-white/10 bg-slate-950/60 p-3">
-              {(
-                [
-                  { key: "master", label: "Master Volume" },
-                  { key: "sfx", label: "Weapons & Explosions" },
-                  { key: "ambience", label: "Jungle Ambience" },
-                  { key: "ui", label: "UI & Hitmarkers" },
-                ] as const
-              ).map(({ key, label }) => (
-                <label key={key} className="block text-xs">
-                  <div className="mb-1 flex justify-between font-bold text-slate-300">
-                    <span>{label}</span>
-                    <span className="font-mono text-sky-300">
-                      {Math.round(volumes[key] * 100)}%
-                    </span>
-                  </div>
+            {/* Audio Bus Volume Sliders */}
+            <div className="mb-4 space-y-2.5 rounded-xl border border-white/10 bg-slate-950/65 p-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-black tracking-wider text-slate-300 uppercase">
+                  Audio Mixer
+                </span>
+                <button
+                  type="button"
+                  onClick={onToggleMute}
+                  className="rounded-md bg-white/10 px-2 py-0.5 text-[10px] font-bold text-slate-200 hover:bg-white/20"
+                >
+                  {muted ? "Unmute All" : "Mute All"}
+                </button>
+              </div>
+              {(["master", "sfx", "ambience", "ui"] as const).map((bus) => (
+                <label
+                  key={bus}
+                  className="flex items-center justify-between gap-3 text-xs"
+                >
+                  <span className="w-20 font-bold text-slate-300 capitalize">
+                    {bus}
+                  </span>
                   <input
                     type="range"
                     min={0}
                     max={1}
                     step={0.05}
-                    value={volumes[key]}
+                    value={volumes[bus]}
                     onChange={(e) =>
-                      onVolumeChange(key, Number(e.target.value))
+                      onVolumeChange(bus, Number(e.target.value))
                     }
-                    className="h-1.5 w-full cursor-pointer accent-sky-400"
+                    className="h-1.5 flex-1 accent-sky-400"
                   />
+                  <span className="w-8 text-right font-mono text-[10px] text-slate-400">
+                    {Math.round(volumes[bus] * 100)}%
+                  </span>
                 </label>
               ))}
             </div>
 
-            {/* Map Alignment Collision Debug Toggles */}
+            {/* F3 Developer & Map Collision Debug Toggles */}
             <div className="mb-4 flex flex-wrap gap-2">
               <button
                 type="button"
                 onClick={onToggleDebugCollisions}
-                className={`flex flex-1 items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-bold transition ${
+                className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11px] font-bold transition ${
                   debug.showCollisions
-                    ? "border-emerald-400 bg-emerald-500/20 text-emerald-200"
-                    : "border-white/10 bg-slate-800 text-slate-300 hover:bg-slate-700"
+                    ? "border-cyan-400 bg-cyan-500/20 text-cyan-200"
+                    : "border-white/15 bg-slate-950/70 text-slate-300 hover:bg-slate-800"
                 }`}
               >
-                <Wrench className="h-3.5 w-3.5" />
-                Collision Boxes (F3)
+                <Bug className="h-3.5 w-3.5" />
+                Collision Chains (F3)
               </button>
+
               <button
                 type="button"
                 onClick={onToggleDebugSpawns}
-                className={`flex flex-1 items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-bold transition ${
+                className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11px] font-bold transition ${
                   debug.showSpawns
                     ? "border-emerald-400 bg-emerald-500/20 text-emerald-200"
-                    : "border-white/10 bg-slate-800 text-slate-300 hover:bg-slate-700"
+                    : "border-white/15 bg-slate-950/70 text-slate-300 hover:bg-slate-800"
                 }`}
               >
-                Spawns & Pads
+                Spawn & Pickup Pads
               </button>
-            </div>
 
-            {/* Action Buttons */}
-            <div className="flex flex-col gap-2">
               <button
                 type="button"
-                onClick={onTogglePause}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-sky-500 py-2.5 text-sm font-black text-slate-950 hover:bg-sky-400"
+                onClick={onToggleFullscreen}
+                className="flex items-center gap-1.5 rounded-lg border border-white/15 bg-slate-950/70 px-2.5 py-1.5 text-[11px] font-bold text-slate-300 hover:bg-slate-800"
               >
-                <Play className="h-4 w-4 fill-current" />
-                Resume Battle
+                {isFullscreen ? (
+                  <Minimize2 className="h-3.5 w-3.5" />
+                ) : (
+                  <Maximize2 className="h-3.5 w-3.5" />
+                )}
+                {isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
               </button>
+            </div>
 
-              <div className="flex gap-2">
+            {/* Room / Leave Actions */}
+            <div className="flex flex-wrap gap-2 border-t border-white/10 pt-3">
+              {onBackToRoom && (
                 <button
                   type="button"
-                  onClick={onToggleFullscreen}
-                  className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-white/15 bg-slate-800 py-2 text-xs font-bold text-white hover:bg-slate-700"
+                  onClick={() => {
+                    onTogglePause();
+                    onBackToRoom();
+                  }}
+                  className="flex-1 rounded-xl border border-white/15 bg-slate-800 px-3 py-2 text-xs font-black text-white transition hover:bg-slate-700"
                 >
-                  {isFullscreen ? (
-                    <Minimize2 className="h-3.5 w-3.5" />
-                  ) : (
-                    <Maximize2 className="h-3.5 w-3.5" />
-                  )}
-                  {isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+                  Back to Room
                 </button>
-                {onBackToRoom && (
-                  <button
-                    type="button"
-                    onClick={onBackToRoom}
-                    className="flex-1 rounded-xl border border-white/15 bg-slate-800 py-2 text-xs font-bold text-slate-200 hover:bg-slate-700"
-                  >
-                    Back to Room
-                  </button>
-                )}
-                {onLeaveMatch && (
-                  <button
-                    type="button"
-                    onClick={onLeaveMatch}
-                    className="flex items-center justify-center gap-1 rounded-xl bg-rose-600/85 px-3 py-2 text-xs font-bold text-white hover:bg-rose-500"
-                  >
-                    <LogOut className="h-3.5 w-3.5" />
-                    Leave
-                  </button>
-                )}
-              </div>
+              )}
+              {onLeaveMatch && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onTogglePause();
+                    onLeaveMatch();
+                  }}
+                  className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-rose-600 px-3 py-2 text-xs font-black text-white transition hover:bg-rose-500"
+                >
+                  <LogOut className="h-3.5 w-3.5" />
+                  Leave Match
+                </button>
+              )}
             </div>
           </div>
-        </div>
-      )}
-
-      {/* === MOBILE PORTRAIT LANDSCAPE GUARD === */}
-      {isMobile && isPortrait && (
-        <div className="pointer-events-auto fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-slate-950/95 p-6 text-center backdrop-blur">
-          <Smartphone className="h-12 w-12 rotate-90 text-amber-400" />
-          <h2 className="text-xl font-black text-white">Rotate to Landscape</h2>
-          <p className="max-w-xs text-sm text-slate-300">
-            Pocket War plays in landscape mode for full jungle visibility and
-            dual-thumb combat controls.
-          </p>
-          <button
-            type="button"
-            onClick={onToggleFullscreen}
-            className="rounded-xl bg-sky-500 px-5 py-2.5 text-sm font-black text-slate-950"
-          >
-            Enter Fullscreen Landscape
-          </button>
         </div>
       )}
     </div>

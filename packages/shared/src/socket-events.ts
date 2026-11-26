@@ -104,10 +104,7 @@ export const pocketWarActionSchema = z.object({
   payload: z.unknown().optional(),
 });
 export const pocketWarUpdateSettingsSchema = z.object({
-  mapId: z.enum(["outpost", "catacombs", "bunker"]).optional(),
-  gameMode: z.enum(["ffa", "team_deathmatch"]).optional(),
-  killLimit: z.number().int().min(5).max(50).optional(),
-  timeLimitSeconds: z.number().int().min(60).max(1200).optional(),
+  mapId: z.enum(["emerald_falls"]).optional(),
 });
 
 export const businessUpdateSettingsSchema = z.object({
