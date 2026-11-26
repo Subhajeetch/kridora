@@ -1,0 +1,132 @@
+{
+  "files": {
+    "shot_m4a1": [
+      "/assets/pocket-war/audio/shot_m4a1.ogg",
+      "/assets/pocket-war/audio/shot_m4a1.mp3"
+    ],
+    "shot_vector_smg": [
+      "/assets/pocket-war/audio/shot_vector_smg.ogg",
+      "/assets/pocket-war/audio/shot_vector_smg.mp3"
+    ],
+    "shot_pistol": [
+      "/assets/pocket-war/audio/shot_pistol.ogg",
+      "/assets/pocket-war/audio/shot_pistol.mp3"
+    ],
+    "shot_spas12": [
+      "/assets/pocket-war/audio/shot_spas12.ogg",
+      "/assets/pocket-war/audio/shot_spas12.mp3"
+    ],
+    "shot_barrett50": [
+      "/assets/pocket-war/audio/shot_barrett50.ogg",
+      "/assets/pocket-war/audio/shot_barrett50.mp3"
+    ],
+    "shot_rpg7": [
+      "/assets/pocket-war/audio/shot_rpg7.ogg",
+      "/assets/pocket-war/audio/shot_rpg7.mp3"
+    ],
+    "explosion_grenade": [
+      "/assets/pocket-war/audio/explosion_grenade.ogg",
+      "/assets/pocket-war/audio/explosion_grenade.mp3"
+    ],
+    "explosion_rocket": [
+      "/assets/pocket-war/audio/explosion_rocket.ogg",
+      "/assets/pocket-war/audio/explosion_rocket.mp3"
+    ],
+    "explosion_barrel": [
+      "/assets/pocket-war/audio/explosion_barrel.ogg",
+      "/assets/pocket-war/audio/explosion_barrel.mp3"
+    ],
+    "reload": [
+      "/assets/pocket-war/audio/reload.ogg",
+      "/assets/pocket-war/audio/reload.mp3"
+    ],
+    "empty_click": [
+      "/assets/pocket-war/audio/empty_click.ogg",
+      "/assets/pocket-war/audio/empty_click.mp3"
+    ],
+    "melee": [
+      "/assets/pocket-war/audio/melee.ogg",
+      "/assets/pocket-war/audio/melee.mp3"
+    ],
+    "hitmarker": [
+      "/assets/pocket-war/audio/hitmarker.ogg",
+      "/assets/pocket-war/audio/hitmarker.mp3"
+    ],
+    "player_hit": [
+      "/assets/pocket-war/audio/player_hit.ogg",
+      "/assets/pocket-war/audio/player_hit.mp3"
+    ],
+    "death": [
+      "/assets/pocket-war/audio/death.ogg",
+      "/assets/pocket-war/audio/death.mp3"
+    ],
+    "kill_notify": [
+      "/assets/pocket-war/audio/kill_notify.ogg",
+      "/assets/pocket-war/audio/kill_notify.mp3"
+    ],
+    "respawn": [
+      "/assets/pocket-war/audio/respawn.ogg",
+      "/assets/pocket-war/audio/respawn.mp3"
+    ],
+    "pickup": [
+      "/assets/pocket-war/audio/pickup.ogg",
+      "/assets/pocket-war/audio/pickup.mp3"
+    ],
+    "break_mud": [
+      "/assets/pocket-war/audio/break_mud.ogg",
+      "/assets/pocket-war/audio/break_mud.mp3"
+    ],
+    "break_rock": [
+      "/assets/pocket-war/audio/break_rock.ogg",
+      "/assets/pocket-war/audio/break_rock.mp3"
+    ],
+    "break_wood": [
+      "/assets/pocket-war/audio/break_wood.ogg",
+      "/assets/pocket-war/audio/break_wood.mp3"
+    ],
+    "break_tree": [
+      "/assets/pocket-war/audio/break_tree.ogg",
+      "/assets/pocket-war/audio/break_tree.mp3"
+    ],
+    "break_concrete": [
+      "/assets/pocket-war/audio/break_concrete.ogg",
+      "/assets/pocket-war/audio/break_concrete.mp3"
+    ],
+    "break_barrel": [
+      "/assets/pocket-war/audio/break_barrel.ogg",
+      "/assets/pocket-war/audio/break_barrel.mp3"
+    ],
+    "grenade_bounce": [
+      "/assets/pocket-war/audio/grenade_bounce.ogg",
+      "/assets/pocket-war/audio/grenade_bounce.mp3"
+    ],
+    "land": [
+      "/assets/pocket-war/audio/land.ogg",
+      "/assets/pocket-war/audio/land.mp3"
+    ],
+    "water_splash": [
+      "/assets/pocket-war/audio/water_splash.ogg",
+      "/assets/pocket-war/audio/water_splash.mp3"
+    ],
+    "footstep": [
+      "/assets/pocket-war/audio/footstep.ogg",
+      "/assets/pocket-war/audio/footstep.mp3"
+    ],
+    "low_fuel_beep": [
+      "/assets/pocket-war/audio/low_fuel_beep.ogg",
+      "/assets/pocket-war/audio/low_fuel_beep.mp3"
+    ],
+    "ui_click": [
+      "/assets/pocket-war/audio/ui_click.ogg",
+      "/assets/pocket-war/audio/ui_click.mp3"
+    ],
+    "ui_switch": [
+      "/assets/pocket-war/audio/ui_switch.ogg",
+      "/assets/pocket-war/audio/ui_switch.mp3"
+    ],
+    "ui_confirm": [
+      "/assets/pocket-war/audio/ui_confirm.ogg",
+      "/assets/pocket-war/audio/ui_confirm.mp3"
+    ]
+  }
+}

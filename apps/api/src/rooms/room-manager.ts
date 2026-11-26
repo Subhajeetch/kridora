@@ -63,6 +63,7 @@ export class RoomManager {
       ) {
         room.emptyCloseAt = Date.now() + EMPTY_ROOM_CLOSE_DELAY_MS;
       }
+      room.soloReturnAt ??= null;
       this.rooms.set(code, room);
       this.inviteToRoom.set(room.inviteToken, code);
     }
@@ -87,6 +88,7 @@ export class RoomManager {
     for (const room of this.rooms.values()) {
       consider(room.ownerTransferAt);
       consider(room.emptyCloseAt);
+      consider(room.soloReturnAt);
       for (const deadline of Object.values(room.disconnectDeadlines)) {
         consider(deadline);
       }
@@ -145,28 +147,28 @@ export class RoomManager {
               delete room.disconnectDeadlines[uid];
               this.userToRoom.delete(uid);
 
-              if (room.gameState !== null) {
-                const gameModule = getServerGameModule(room.gameSlug);
-                gameModule.onPlayerLeft?.(room.gameState, uid);
-              }
-
+              this.handleMidMatchPlayerRemoved(room, uid, now);
               if (room.players.length === 0) {
                 this.destroyRoom(room, true);
                 dirty = true;
                 continue;
-              } else if (room.players.length < 2) {
-                room.status = "lobby";
-                room.gameState = null;
-                room.matchId = null;
-                for (const p of room.players) {
-                  p.isReady = p.userId === room.ownerId;
-                }
-              } else {
-                this.broadcaster.broadcastGameState(room);
               }
               roomChanged = true;
             }
           }
+        }
+
+        if (room.soloReturnAt && now >= room.soloReturnAt) {
+          const gameModule = getServerGameModule(room.gameSlug);
+          gameModule.onRoomDestroyed?.(room.code);
+          room.status = "lobby";
+          room.gameState = null;
+          room.matchId = null;
+          room.soloReturnAt = null;
+          for (const p of room.players) {
+            p.isReady = p.userId === room.ownerId;
+          }
+          roomChanged = true;
         }
       }
 
@@ -232,6 +234,7 @@ export class RoomManager {
       room.ownerTransferAt = null;
     }
 
+    this.notifyPresenceChange(room, Date.now());
     this.broadcastRoomState(room);
     return room;
   }
@@ -263,8 +266,73 @@ export class RoomManager {
       room.emptyCloseAt = now + EMPTY_ROOM_CLOSE_DELAY_MS;
     }
 
+    this.notifyPresenceChange(room, now);
     this.broadcastRoomState(room);
     return true;
+  }
+
+  private notifyPresenceChange(room: InternalRoom, now: number): void {
+    if (room.status !== "in_progress" || room.gameState === null) return;
+    const gameModule = getServerGameModule(room.gameSlug);
+    const onlineIds = room.players
+      .filter((p) => p.connected)
+      .map((p) => p.userId);
+    const mutated = Boolean(
+      gameModule.onRoomPresenceChanged?.(room.gameState, onlineIds, now),
+    );
+
+    if (gameModule.soloWaitGraceMs) {
+      if (onlineIds.length === 1) {
+        if (!room.soloReturnAt) {
+          room.soloReturnAt = now + gameModule.soloWaitGraceMs;
+        }
+      } else if (onlineIds.length >= 2) {
+        room.soloReturnAt = null;
+      }
+    }
+
+    if (mutated) {
+      this.broadcaster.broadcastGameState(room);
+    }
+  }
+
+  private handleMidMatchPlayerRemoved(
+    room: InternalRoom,
+    removedUserId: string,
+    now: number,
+  ): void {
+    let stateMutated = false;
+    const gameModule = getServerGameModule(room.gameSlug);
+    if (room.gameState !== null) {
+      stateMutated = Boolean(
+        gameModule.onPlayerLeft?.(room.gameState, removedUserId),
+      );
+    }
+
+    if (room.players.length < 2) {
+      if (gameModule.soloWaitGraceMs && room.players.length === 1) {
+        room.soloReturnAt =
+          room.soloReturnAt ?? now + gameModule.soloWaitGraceMs;
+        this.notifyPresenceChange(room, now);
+        if (stateMutated) {
+          this.broadcaster.broadcastGameState(room);
+        }
+      } else {
+        gameModule.onRoomDestroyed?.(room.code);
+        room.status = "lobby";
+        room.gameState = null;
+        room.matchId = null;
+        room.soloReturnAt = null;
+        for (const p of room.players) {
+          p.isReady = p.userId === room.ownerId;
+        }
+      }
+    } else {
+      this.notifyPresenceChange(room, now);
+      if (stateMutated) {
+        this.broadcaster.broadcastGameState(room);
+      }
+    }
   }
 
   syncPlayerName(userId: string, newName: string): boolean {
@@ -416,6 +484,7 @@ export class RoomManager {
       createdAt: now,
       ownerTransferAt: null,
       emptyCloseAt: null,
+      soloReturnAt: null,
       disconnectDeadlines: {},
       matchId: null,
       matchCompleted: false,
@@ -456,6 +525,7 @@ export class RoomManager {
       delete room.disconnectDeadlines[user.id];
       room.emptyCloseAt = null;
       if (room.ownerId === user.id) room.ownerTransferAt = null;
+      this.notifyPresenceChange(room, Date.now());
       this.broadcastRoomState(room);
       return this.toSnapshot(room);
     }
@@ -551,23 +621,7 @@ export class RoomManager {
     }
 
     if (room.status === "in_progress") {
-      let stateMutated = false;
-      if (room.gameState !== null) {
-        const gameModule = getServerGameModule(room.gameSlug);
-        stateMutated = Boolean(
-          gameModule.onPlayerLeft?.(room.gameState, userId),
-        );
-      }
-      if (room.players.length < 2) {
-        room.status = "lobby";
-        room.gameState = null;
-        room.matchId = null;
-        for (const p of room.players) {
-          p.isReady = p.userId === room.ownerId;
-        }
-      } else if (stateMutated) {
-        this.broadcaster.broadcastGameState(room);
-      }
+      this.handleMidMatchPlayerRemoved(room, userId, Date.now());
     }
 
     this.broadcastRoomState(room);
@@ -665,23 +719,7 @@ export class RoomManager {
     this.userToRoom.delete(targetUserId);
 
     if (room.status === "in_progress") {
-      let stateMutated = false;
-      if (room.gameState !== null) {
-        const gameModule = getServerGameModule(room.gameSlug);
-        stateMutated = Boolean(
-          gameModule.onPlayerLeft?.(room.gameState, targetUserId),
-        );
-      }
-      if (room.players.length < 2) {
-        room.status = "lobby";
-        room.gameState = null;
-        room.matchId = null;
-        for (const p of room.players) {
-          p.isReady = p.userId === room.ownerId;
-        }
-      } else if (stateMutated) {
-        this.broadcaster.broadcastGameState(room);
-      }
+      this.handleMidMatchPlayerRemoved(room, targetUserId, Date.now());
     }
 
     this.broadcaster.sendToUser(targetUserId, "room:kicked", {
@@ -709,9 +747,11 @@ export class RoomManager {
       );
     }
 
+    getServerGameModule(room.gameSlug).onRoomDestroyed?.(room.code);
     room.status = "lobby";
     room.gameState = null;
     room.matchId = null;
+    room.soloReturnAt = null;
     for (const p of room.players) {
       p.isReady = p.userId === room.ownerId;
     }
@@ -842,6 +882,7 @@ export class RoomManager {
     room.status = "in_progress";
     room.matchId = matchId;
     room.matchCompleted = false;
+    room.soloReturnAt = null;
     room.gameState = gameModule.createInitialState(room.players);
 
     this.broadcastRoomState(room);
@@ -850,6 +891,7 @@ export class RoomManager {
   }
 
   destroyRoom(room: InternalRoom, notifyClosed: boolean): void {
+    getServerGameModule(room.gameSlug).onRoomDestroyed?.(room.code);
     if (notifyClosed) {
       this.broadcaster.broadcastToRoom(room, "room:closed", {
         code: room.code,

@@ -1,5 +1,6 @@
 import {
   WEAPON_CATALOG,
+  type CollisionMapData,
   type KillWeaponIconId,
   type MapDefinition,
   type PickupKind,
@@ -12,7 +13,10 @@ interface ImageEntry {
   image: HTMLImageElement | null;
 }
 
-const ABILITY_ICON_PATHS: Record<"grenade" | "jetpack" | "melee", string> = {
+export const ABILITY_ICON_PATHS: Record<
+  "grenade" | "jetpack" | "melee",
+  string
+> = {
   grenade: "/assets/pocket-war/icons/ability_grenade.png",
   jetpack: "/assets/pocket-war/icons/ability_jetpack.png",
   melee: "/assets/pocket-war/icons/ability_melee.png",
@@ -45,13 +49,28 @@ export function getPickupIconPath(kind: PickupKind): string | null {
   }
 }
 
+function isValidCollisionMapData(raw: unknown): raw is CollisionMapData {
+  if (typeof raw !== "object" || raw === null) return false;
+  const obj = raw as Record<string, unknown>;
+  if (
+    typeof obj.version !== "number" ||
+    typeof obj.worldWidth !== "number" ||
+    typeof obj.worldHeight !== "number" ||
+    !Array.isArray(obj.chains)
+  ) {
+    return false;
+  }
+  return obj.chains.length > 0;
+}
+
 /**
- * Non-blocking image cache for Pocket War map layers and HUD/setup icons.
- * Gracefully records missing assets as `"error"` without throwing so procedural
- * fallbacks render seamlessly until generated art is dropped into `public/assets/pocket-war/`.
+ * Non-blocking image & collision JSON cache for Pocket War.
+ * Missing assets cleanly resolve to null / "error" so procedural fallbacks render
+ * without throwing or blocking startup.
  */
 export class AssetLoader {
   private entries = new Map<string, ImageEntry>();
+  private collisionCache = new Map<string, Promise<CollisionMapData | null>>();
   private listeners = new Set<() => void>();
 
   public subscribe(listener: () => void): () => void {
@@ -125,13 +144,39 @@ export class AssetLoader {
     return this.entries.get(path)?.status ?? "idle";
   }
 
+  /**
+   * Non-blocking fetch for precomputed collision chains (`collision.json`).
+   * Returns `null` cleanly if the file does not yet exist on disk.
+   */
+  public loadCollisionMap(path: string): Promise<CollisionMapData | null> {
+    if (typeof window === "undefined" || typeof fetch === "undefined") {
+      return Promise.resolve(null);
+    }
+
+    const cached = this.collisionCache.get(path);
+    if (cached) return cached;
+
+    const promise = fetch(path, {
+      headers: { Accept: "application/json" },
+    })
+      .then(async (res) => {
+        if (!res.ok) return null;
+        const data: unknown = await res.json();
+        return isValidCollisionMapData(data) ? data : null;
+      })
+      .catch(() => null);
+
+    this.collisionCache.set(path, promise);
+    return promise;
+  }
+
   public preloadMap(map: MapDefinition): void {
     this.requestImage(map.assets.sky);
     this.requestImage(map.assets.mountains);
     this.requestImage(map.assets.midJungle);
     this.requestImage(map.assets.terrain);
-    this.requestImage(map.assets.foreground);
     this.requestImage(map.assets.thumbnail);
+    void this.loadCollisionMap(map.assets.collisionJson);
   }
 
   public preloadIcons(): void {
