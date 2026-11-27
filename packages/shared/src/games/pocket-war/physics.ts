@@ -5,6 +5,7 @@ import {
   Edge,
   Vec2,
   World,
+  WorldManifold,
   type Body,
   type Contact,
   type Fixture,
@@ -19,9 +20,9 @@ import {
 } from "./constants";
 
 export const PPM = POCKET_WAR_LIMITS.PIXELS_PER_METER; // 30 px = 1 m
-export const GRAVITY_PX = 960;
-export const GRAVITY_M = GRAVITY_PX / PPM; // 32 m/s^2
-export const GRENADE_THROW_SPEED_PX = 640;
+export const GRAVITY_PX = 435;
+export const GRAVITY_M = GRAVITY_PX / PPM; // 14.5 m/s^2
+export const GRENADE_THROW_SPEED_PX = 580;
 
 export const CAT_TERRAIN = 0x0001;
 export const CAT_ONE_WAY = 0x0002;
@@ -141,6 +142,7 @@ export class PocketWarPhysicsWorld {
   private readonly soldiers = new Map<string, SoldierSimBody>();
   private readonly blocks = new Map<string, Body>();
   private readonly grenades = new Map<number, GrenadeBodyState>();
+  private readonly wallManifold = new WorldManifold();
   private simTimeMs = 0;
 
   constructor(
@@ -197,6 +199,33 @@ export class PocketWarPhysicsWorld {
           const vel = otherBody.getLinearVelocity();
           if (vel.y < 0) {
             contact.setEnabled(false);
+          }
+        }
+      }
+
+      const isPlayerA = dA.kind === "player";
+      const isPlayerB = dB.kind === "player";
+      if (isPlayerA !== isPlayerB) {
+        const playerData = isPlayerA ? dA : dB;
+        const otherData = isPlayerA ? dB : dA;
+        if (
+          otherData.kind === "terrain" ||
+          otherData.kind === "block" ||
+          otherData.kind === "oneway"
+        ) {
+          const soldier = playerData.id
+            ? this.soldiers.get(playerData.id)
+            : undefined;
+          const wm = contact.getWorldManifold(this.wallManifold);
+          const normal = wm?.normal;
+          // Zero out friction on vertical walls, ceilings, and active jetpack climbs
+          // so pushing against straight walls never pins or slows upward thrust.
+          const isWallOrCeiling =
+            !normal ||
+            Math.abs(normal.x) > 0.58 ||
+            (isPlayerA ? normal.y < -0.58 : normal.y > 0.58);
+          if (soldier?.isBoosting || isWallOrCeiling) {
+            contact.setFriction(0);
           }
         }
       }
@@ -490,6 +519,14 @@ export class PocketWarPhysicsWorld {
     s.body.setAwake(true);
   }
 
+  /** Keeps a freshly spawned soldier stationary until their first input packet arrives. */
+  holdSoldierAtRest(userId: string): void {
+    const s = this.soldiers.get(userId);
+    if (!s) return;
+    s.body.setLinearVelocity(new Vec2(0, 0));
+    s.body.setAwake(false);
+  }
+
   /**
    * Custom arcade movement + jetpack controller operating on the fixed-rotation Planck body.
    * Must be called BEFORE `stepWorld(dt)` for each active soldier.
@@ -570,7 +607,9 @@ export class PocketWarPhysicsWorld {
     soldier.isBoosting = wantsBoost;
 
     if (wantsBoost) {
-      const thrustPx = charDef.jetpackThrust * (soldier.inWater ? 0.78 : 1.0);
+      const thrustScale =
+        (soldier.inWater ? 0.78 : 1.0) * (vy > 20 ? 1.18 : 1.0);
+      const thrustPx = charDef.jetpackThrust * thrustScale;
       vy -= thrustPx * dt;
       soldier.jetpackFuel = Math.max(
         0,
@@ -603,12 +642,12 @@ export class PocketWarPhysicsWorld {
     if (soldier.inWater) {
       vy *= 1 - 1.6 * dt;
       if (pxY > this.map.waterSurfaceY + 26) {
-        vy -= 540 * dt;
+        vy -= 380 * dt;
       }
     }
 
     vx = Math.max(-720, Math.min(720, vx));
-    vy = Math.max(-620, Math.min(820, vy));
+    vy = Math.max(-370, Math.min(405, vy));
 
     soldier.body.setLinearVelocity(new Vec2(pxToM(vx), pxToM(vy)));
     soldier.body.setAwake(true);

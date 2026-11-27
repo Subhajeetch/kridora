@@ -84,12 +84,22 @@ interface PositionHistoryFrame {
   positions: Map<string, { x: number; y: number }>;
 }
 
+interface QueuedPlayerInput {
+  packet: ClientInputPacket;
+  remainingSteps: number;
+}
+
 interface LiveMatchRuntime {
   mapId: PocketWarMapId;
   physics: PocketWarPhysicsWorld;
   tick: number;
+  accumulator: number;
+  simTimeMs: number;
   nextProjId: number;
   lastInputs: Map<string, ClientInputPacket>;
+  highestSeqByUser: Map<string, number>;
+  inputQueues: Map<string, QueuedPlayerInput[]>;
+  extrapolatedSteps: Map<string, number>;
   latchedFlags: Map<string, number>;
   lastAcks: Record<string, number>;
   lastShotAt: Map<string, number>;
@@ -176,6 +186,7 @@ function createDefaultPlayer(
     username: member.username,
     characterId: defaultChar,
     isReady: false,
+    leftMatch: false,
     isAlive: true,
     livesLeft: POCKET_WAR_LIMITS.STARTING_LIVES,
     maxLives: POCKET_WAR_LIMITS.STARTING_LIVES,
@@ -249,8 +260,13 @@ function getOrCreateRuntime(
     mapId: state.settings.mapId,
     physics,
     tick: 0,
+    accumulator: 0,
+    simTimeMs: Date.now(),
     nextProjId: 1,
     lastInputs: new Map(),
+    highestSeqByUser: new Map(),
+    inputQueues: new Map(),
+    extrapolatedSteps: new Map(),
     latchedFlags: new Map(),
     lastAcks: {},
     lastShotAt: new Map(),
@@ -357,6 +373,8 @@ function respawnPlayer(
   player.weapons = createStarterLoadout(player.characterId);
   player.bombsLeft = Math.max(player.bombsLeft, 2);
 
+  rt.inputQueues.delete(player.userId);
+  rt.extrapolatedSteps.delete(player.userId);
   rt.physics.teleportSoldier(player.userId, pt.x, pt.y, 0, 0);
   const s = rt.physics.getSoldier(player.userId);
   if (s) {
@@ -845,8 +863,39 @@ function tryCollectPickups(
   }
 }
 
+function getRemainingMatchParticipants(
+  state: PocketWarState,
+): PocketWarPlayer[] {
+  return Object.values(state.players).filter(
+    (p) => !p.leftMatch && state.onlineUserIds.includes(p.userId),
+  );
+}
+
+function syncSoloWaitState(state: PocketWarState, now: number): void {
+  if (state.phase !== "playing") return;
+  const nonLeftPlayers = Object.values(state.players).filter(
+    (p) => !p.leftMatch,
+  );
+  const activeOnlineCount = nonLeftPlayers.filter((p) =>
+    state.onlineUserIds.includes(p.userId),
+  ).length;
+  if (activeOnlineCount === 1 && nonLeftPlayers.length >= 2) {
+    state.soloWaitEndsAt =
+      state.soloWaitEndsAt ?? now + POCKET_WAR_LIMITS.SOLO_WAIT_GRACE_MS;
+  } else {
+    state.soloWaitEndsAt = null;
+  }
+}
+
+type MatchCompletionContext = Pick<
+  RealtimeTickContext<PocketWarState>,
+  "roomCode" | "state" | "setState" | "broadcastState" | "completeMatch"
+> & {
+  persistState?: () => Promise<void>;
+};
+
 async function checkAndCompleteMatch(
-  ctx: RealtimeTickContext<PocketWarState>,
+  ctx: MatchCompletionContext,
 ): Promise<boolean> {
   const { state } = ctx;
   if (state.phase !== "playing") return false;
@@ -904,7 +953,7 @@ async function checkAndCompleteMatch(
 
   ctx.setState(state);
   ctx.broadcastState();
-  await ctx.persistState();
+  await ctx.persistState?.();
   return true;
 }
 
@@ -969,14 +1018,7 @@ export const pocketWarGameModule: ServerGameModule<PocketWarState> = {
     now: number,
   ): boolean {
     state.onlineUserIds = [...onlineUserIds];
-    if (state.phase === "playing") {
-      if (onlineUserIds.length === 1) {
-        state.soloWaitEndsAt =
-          state.soloWaitEndsAt ?? now + POCKET_WAR_LIMITS.SOLO_WAIT_GRACE_MS;
-      } else if (onlineUserIds.length >= 2) {
-        state.soloWaitEndsAt = null;
-      }
-    }
+    syncSoloWaitState(state, now);
     return true;
   },
 
@@ -1000,19 +1042,25 @@ export const pocketWarGameModule: ServerGameModule<PocketWarState> = {
     }
 
     const leaving = state.players[userId];
-    if (leaving && leaving.livesLeft > 0) {
-      const contendersBefore = Object.values(state.players).filter(
-        (p) => p.livesLeft > 0,
-      ).length;
-      leaving.isAlive = false;
-      leaving.livesLeft = 0;
-      leaving.respawnAt = null;
-      leaving.eliminatedAt = now;
-      leaving.placement = contendersBefore;
+    if (leaving) {
+      leaving.leftMatch = true;
+      if (leaving.livesLeft > 0) {
+        const contendersBefore = Object.values(state.players).filter(
+          (p) => p.livesLeft > 0,
+        ).length;
+        leaving.isAlive = false;
+        leaving.livesLeft = 0;
+        leaving.respawnAt = null;
+        leaving.eliminatedAt = now;
+        leaving.placement = contendersBefore;
+      }
     }
 
     if (state.phase === "playing") {
-      const remainingOnline = state.onlineUserIds.length;
+      const remainingOnline = state.onlineUserIds.filter((id) => {
+        const p = state.players[id];
+        return Boolean(p && !p.leftMatch);
+      }).length;
       if (remainingOnline === 1) {
         state.soloWaitEndsAt =
           state.soloWaitEndsAt ?? now + POCKET_WAR_LIMITS.SOLO_WAIT_GRACE_MS;
@@ -1031,20 +1079,64 @@ export const pocketWarGameModule: ServerGameModule<PocketWarState> = {
     bytes: Uint8Array,
   ): void {
     if (ctx.state.phase !== "playing") return;
+    if (ctx.state.players[ctx.user.id]?.leftMatch) return;
     const pkt = decodeClientInput(bytes);
     if (!pkt) return;
 
     const rt = getOrCreateRuntime(ctx.roomCode, ctx.state);
-    const prev = rt.lastInputs.get(ctx.user.id);
-    if (prev && pkt.seq <= prev.seq) return;
+    const highestSeq = rt.highestSeqByUser.get(ctx.user.id) ?? 0;
+    const isClientReset = pkt.seq <= 3 && highestSeq > 20;
+    if (pkt.seq <= highestSeq && !isClientReset) return;
+    if (isClientReset) {
+      rt.inputQueues.delete(ctx.user.id);
+      rt.extrapolatedSteps.delete(ctx.user.id);
+      rt.lastAcks[ctx.user.id] = 0;
+    }
 
+    const prevInput = rt.lastInputs.get(ctx.user.id);
+    rt.highestSeqByUser.set(ctx.user.id, pkt.seq);
     rt.lastInputs.set(ctx.user.id, pkt);
-    rt.lastAcks[ctx.user.id] = pkt.seq;
+
     const prevLatched = rt.latchedFlags.get(ctx.user.id) ?? 0;
     rt.latchedFlags.set(
       ctx.user.id,
       prevLatched | (pkt.fl & EDGE_TRIGGER_FLAGS),
     );
+
+    let steps = pkt.st !== undefined ? pkt.st : 2;
+    const extrap = rt.extrapolatedSteps.get(ctx.user.id) ?? 0;
+    if (extrap > 0) {
+      if (
+        prevInput &&
+        prevInput.mx === pkt.mx &&
+        prevInput.fl === pkt.fl &&
+        steps > 0
+      ) {
+        const deduct = Math.min(steps, extrap);
+        steps -= deduct;
+        rt.extrapolatedSteps.set(ctx.user.id, extrap - deduct);
+      } else {
+        rt.extrapolatedSteps.set(ctx.user.id, 0);
+      }
+    }
+
+    let queue = rt.inputQueues.get(ctx.user.id);
+    if (!queue) {
+      queue = [];
+      rt.inputQueues.set(ctx.user.id, queue);
+    }
+    queue.push({ packet: pkt, remainingSteps: steps });
+
+    // Prevent runaway input buffer backlog on network stalls (~200ms max queued)
+    let totalQueuedSteps = 0;
+    for (const item of queue) {
+      totalQueuedSteps += item.remainingSteps;
+    }
+    while (queue.length > 1 && totalQueuedSteps > 12) {
+      const dropped = queue.shift()!;
+      totalQueuedSteps -= dropped.remainingSteps;
+      rt.lastAcks[ctx.user.id] = dropped.packet.seq;
+    }
   },
 
   async onTick(
@@ -1053,6 +1145,14 @@ export const pocketWarGameModule: ServerGameModule<PocketWarState> = {
     dtSec: number,
   ): Promise<void> {
     const { state } = ctx;
+
+    const hasAnyLeftMatch = Object.values(state.players).some(
+      (p) => p.leftMatch,
+    );
+    if (hasAnyLeftMatch && getRemainingMatchParticipants(state).length === 0) {
+      await ctx.endMatch();
+      return;
+    }
 
     if (state.phase === "setup") {
       if (
@@ -1108,22 +1208,76 @@ export const pocketWarGameModule: ServerGameModule<PocketWarState> = {
       }
     }
 
-    // 2. Fixed 60 Hz Planck.js physics substeps
-    const subSteps = Math.max(
-      1,
-      Math.min(6, Math.round(dtSec / POCKET_WAR_LIMITS.FIXED_DT)),
-    );
+    // 2. Fixed 60 Hz Planck.js physics substeps via exact accumulator (prevents drift)
+    rt.accumulator = Math.min(0.25, rt.accumulator + dtSec);
+    let subSteps = 0;
+    while (rt.accumulator >= POCKET_WAR_LIMITS.FIXED_DT && subSteps < 12) {
+      rt.accumulator -= POCKET_WAR_LIMITS.FIXED_DT;
+      subSteps += 1;
+    }
     const subDt = POCKET_WAR_LIMITS.FIXED_DT;
+    if (Math.abs(now - rt.simTimeMs) > 250) {
+      rt.simTimeMs = now - subSteps * subDt * 1000;
+    }
 
+    const onlineSet = new Set(state.onlineUserIds);
     for (let step = 0; step < subSteps; step++) {
+      rt.simTimeMs += subDt * 1000;
+      const stepNow = Math.round(rt.simTimeMs);
+
       for (const player of Object.values(state.players)) {
-        if (!player.isAlive) continue;
+        if (!player.isAlive || !onlineSet.has(player.userId)) {
+          rt.extrapolatedSteps.delete(player.userId);
+          rt.latchedFlags.delete(player.userId);
+          rt.physics.holdSoldierAtRest(player.userId);
+          if (!onlineSet.has(player.userId)) {
+            rt.lastInputs.delete(player.userId);
+            rt.inputQueues.delete(player.userId);
+          } else {
+            const deadQueue = rt.inputQueues.get(player.userId);
+            if (deadQueue && deadQueue.length > 0) {
+              const last = deadQueue[deadQueue.length - 1]!;
+              rt.lastAcks[player.userId] = last.packet.seq;
+              deadQueue.length = 0;
+            }
+          }
+          continue;
+        }
         const soldier = rt.physics.ensureSoldier(
           player.userId,
           player.x,
           player.y,
         );
-        const inp = rt.lastInputs.get(player.userId);
+
+        const queue = rt.inputQueues.get(player.userId);
+        while (queue && queue.length > 0 && queue[0]!.remainingSteps <= 0) {
+          const zeroStep = queue.shift()!;
+          rt.lastAcks[player.userId] = zeroStep.packet.seq;
+        }
+
+        let inp: ClientInputPacket | undefined;
+        if (queue && queue.length > 0) {
+          const head = queue[0]!;
+          inp = head.packet;
+          head.remainingSteps -= 1;
+          if (head.remainingSteps <= 0) {
+            queue.shift();
+            rt.lastAcks[player.userId] = head.packet.seq;
+          }
+          rt.extrapolatedSteps.set(player.userId, 0);
+        } else {
+          inp = rt.lastInputs.get(player.userId);
+          if (inp) {
+            const curExtrap = rt.extrapolatedSteps.get(player.userId) ?? 0;
+            rt.extrapolatedSteps.set(player.userId, Math.min(6, curExtrap + 1));
+          }
+        }
+
+        if (!inp && player.lastDamagedAt <= (state.matchStartedAt ?? 0)) {
+          rt.physics.holdSoldierAtRest(player.userId);
+          continue;
+        }
+
         const charDef = CHARACTER_CATALOG[player.characterId];
         const moveX = inp ? inp.mx / 100 : 0;
         const fl = inp ? inp.fl : 0;
@@ -1137,7 +1291,7 @@ export const pocketWarGameModule: ServerGameModule<PocketWarState> = {
           },
           charDef,
           subDt,
-          now,
+          stepNow,
         );
 
         if (stepEv.justEnteredWater || stepEv.justExitedWater) {
@@ -1157,6 +1311,14 @@ export const pocketWarGameModule: ServerGameModule<PocketWarState> = {
       }
 
       rt.physics.stepWorld(subDt);
+    }
+
+    // Drain any trailing zero-step packets so edge-action acks never stall
+    for (const [uid, queue] of rt.inputQueues.entries()) {
+      while (queue.length > 0 && queue[0]!.remainingSteps <= 0) {
+        const done = queue.shift()!;
+        rt.lastAcks[uid] = done.packet.seq;
+      }
     }
 
     // 3. Read back authoritative soldier coordinates & handle discrete combat inputs
@@ -1181,7 +1343,7 @@ export const pocketWarGameModule: ServerGameModule<PocketWarState> = {
         player.jetpackOverheatedUntil = soldier.overheatedUntil;
       }
 
-      if (soldier?.inWater) {
+      if (soldier?.inWater && onlineSet.has(player.userId)) {
         let nextDamageAt = rt.waterNextDamageAt.get(player.userId);
         if (nextDamageAt === undefined) {
           nextDamageAt = now + WATER_DAMAGE_INTERVAL_MS;
@@ -1651,6 +1813,62 @@ export const pocketWarGameModule: ServerGameModule<PocketWarState> = {
     const player = state.players[ctx.user.id];
     if (!player) return state;
 
+    if (act.type === "leave_match") {
+      if (!player.leftMatch) {
+        player.leftMatch = true;
+        if (state.phase === "setup") {
+          player.isReady = false;
+          state.setupCountdownEndsAt = null;
+        } else if (state.phase === "playing") {
+          const wasAlive = player.isAlive;
+          if (player.livesLeft > 0) {
+            const contendersBefore = Object.values(state.players).filter(
+              (p) => p.livesLeft > 0,
+            ).length;
+            player.isAlive = false;
+            player.livesLeft = 0;
+            player.respawnAt = null;
+            player.eliminatedAt = now;
+            player.placement = contendersBefore;
+          }
+          const rt = runtimes.get(ctx.roomCode);
+          if (rt) {
+            rt.inputQueues.delete(player.userId);
+            rt.extrapolatedSteps.delete(player.userId);
+            rt.latchedFlags.delete(player.userId);
+            rt.physics.holdSoldierAtRest(player.userId);
+            if (wasAlive) {
+              rt.pendingEvents.push([
+                EVENT_KIND_PLAYER_DEATH,
+                Math.round(player.x),
+                Math.round(player.y),
+                0,
+                0,
+                player.userId,
+                player.userId,
+                0,
+                0,
+              ]);
+            }
+          }
+          syncSoloWaitState(state, now);
+        }
+      }
+
+      if (getRemainingMatchParticipants(state).length === 0) {
+        await ctx.endMatch();
+        return state;
+      }
+
+      if (state.phase === "playing" && (await checkAndCompleteMatch(ctx))) {
+        return state;
+      }
+
+      ctx.setState(state);
+      ctx.broadcastState();
+      return state;
+    }
+
     if (state.phase === "setup") {
       if (act.type === "select_character") {
         player.characterId = act.characterId;
@@ -1700,6 +1918,7 @@ export const pocketWarGameModule: ServerGameModule<PocketWarState> = {
       for (const p of Object.values(state.players)) {
         const c = CHARACTER_CATALOG[p.characterId];
         p.isReady = false;
+        p.leftMatch = false;
         p.isAlive = true;
         p.livesLeft = POCKET_WAR_LIMITS.STARTING_LIVES;
         p.maxLives = POCKET_WAR_LIMITS.STARTING_LIVES;

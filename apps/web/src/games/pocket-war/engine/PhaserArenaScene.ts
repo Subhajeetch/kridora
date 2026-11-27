@@ -99,6 +99,13 @@ interface PooledTracer {
   width: number;
 }
 
+function computeTargetDpr(): number {
+  if (typeof window === "undefined") return 1;
+  const raw = window.devicePixelRatio;
+  if (!Number.isFinite(raw) || raw <= 0) return 1;
+  return Math.min(raw, 2);
+}
+
 function isFirearmId(id: KillWeaponIconId): id is WeaponId {
   return (
     id === "m4a1" ||
@@ -1000,77 +1007,115 @@ export async function mountPhaserArena(
   };
 
   class PocketWarPhaserScene extends Phaser.Scene {
-    private viewportTex: Phaser.Textures.CanvasTexture | null = null;
-    private viewportImg: Phaser.GameObjects.Image | null = null;
-    private texKeyToggle = false;
-    private activeTexKey = "pw_vp_a";
-    private dpr = 1;
+    private dpr = computeTargetDpr();
     private accumulator = 0;
     private lastHudPushAt = 0;
     private lastTouchPushAt = 0;
     private lastHudSignature = "";
     private fpsFrames = 0;
     private fpsElapsed = 0;
+    private resizeObserver: ResizeObserver | null = null;
+    private detachResizeListeners: (() => void) | null = null;
+    private pendingRender: {
+      players: RenderPlayerState[];
+      projectiles: ReturnType<PocketWarNetClient["getRenderProjectiles"]>;
+      controlFrame: { aimAngle: number; isScoped: boolean };
+      timeSec: number;
+      nowEpoch: number;
+    } | null = null;
 
     constructor() {
       super({ key: "PocketWarArenaScene" });
     }
 
     public create(): void {
-      this.dpr = Math.min(window.devicePixelRatio || 1, isMobile ? 1.25 : 1.5);
-      const w = Math.max(1, Math.floor(this.scale.width));
-      const h = Math.max(1, Math.floor(this.scale.height));
-      latestViewW = w;
-      latestViewH = h;
-      this.allocateViewportSurface(w, h);
+      // Backdrop paints the full frame; skip redundant camera fill before POST_RENDER
+      this.cameras.main.setBackgroundColor("rgba(0,0,0,0)");
+      this.syncSurfaceSize();
 
-      this.scale.on("resize", (gameSize: Phaser.Structs.Size) => {
-        const nw = Math.max(1, Math.floor(gameSize.width));
-        const nh = Math.max(1, Math.floor(gameSize.height));
-        if (nw === latestViewW && nh === latestViewH) return;
-        latestViewW = nw;
-        latestViewH = nh;
-        this.dpr = Math.min(
-          window.devicePixelRatio || 1,
-          isMobile ? 1.25 : 1.5,
-        );
-        this.allocateViewportSurface(nw, nh);
+      const canvas = this.game.canvas;
+      const initCtx = this.sys.context ?? canvas?.getContext("2d");
+      if (initCtx && canvas) {
+        initCtx.fillStyle = "#60C5F1";
+        initCtx.fillRect(0, 0, canvas.width, canvas.height);
+      }
+
+      const onPostRender = () => {
+        this.handlePostRender();
+      };
+      this.game.events.on(Phaser.Core.Events.POST_RENDER, onPostRender);
+
+      const onViewportChange = () => {
+        this.syncSurfaceSize();
+      };
+
+      if (typeof ResizeObserver !== "undefined") {
+        this.resizeObserver = new ResizeObserver(onViewportChange);
+        this.resizeObserver.observe(containerEl);
+      }
+      window.addEventListener("resize", onViewportChange);
+      window.addEventListener("orientationchange", onViewportChange);
+
+      this.detachResizeListeners = () => {
+        this.game.events.off(Phaser.Core.Events.POST_RENDER, onPostRender);
+        this.resizeObserver?.disconnect();
+        this.resizeObserver = null;
+        window.removeEventListener("resize", onViewportChange);
+        window.removeEventListener("orientationchange", onViewportChange);
+      };
+
+      this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+        this.detachResizeListeners?.();
+        this.detachResizeListeners = null;
+      });
+      this.events.once(Phaser.Scenes.Events.DESTROY, () => {
+        this.detachResizeListeners?.();
+        this.detachResizeListeners = null;
       });
     }
 
-    private allocateViewportSurface(cssW: number, cssH: number): void {
-      const prevKey = this.activeTexKey;
-      this.texKeyToggle = !this.texKeyToggle;
-      const nextKey = this.texKeyToggle ? "pw_vp_b" : "pw_vp_a";
-      this.activeTexKey = nextKey;
+    private syncSurfaceSize(): void {
+      if (destroyed) return;
+      const cssW = Math.max(1, Math.floor(containerEl.clientWidth));
+      const cssH = Math.max(1, Math.floor(containerEl.clientHeight));
+      const nextDpr = computeTargetDpr();
+      const pixelW = Math.max(1, Math.round(cssW * nextDpr));
+      const pixelH = Math.max(1, Math.round(cssH * nextDpr));
 
-      const pixelW = Math.max(1, Math.round(cssW * this.dpr));
-      const pixelH = Math.max(1, Math.round(cssH * this.dpr));
+      latestViewW = cssW;
+      latestViewH = cssH;
+      this.dpr = nextDpr;
 
-      if (this.textures.exists(nextKey)) {
-        this.textures.remove(nextKey);
-      }
-
-      const created = this.textures.createCanvas(nextKey, pixelW, pixelH);
-      if (!created) return;
-      this.viewportTex = created;
-
-      if (!this.viewportImg) {
-        this.viewportImg = this.add
-          .image(0, 0, nextKey)
-          .setOrigin(0, 0)
-          .setDisplaySize(cssW, cssH);
-      } else {
-        this.viewportImg.setTexture(nextKey).setDisplaySize(cssW, cssH);
-      }
-
-      if (prevKey !== nextKey && this.textures.exists(prevKey)) {
-        this.textures.remove(prevKey);
+      if (this.scale.width !== pixelW || this.scale.height !== pixelH) {
+        this.scale.resize(pixelW, pixelH);
       }
     }
 
+    private handlePostRender(): void {
+      if (destroyed || !this.pendingRender) return;
+      const ctx = this.sys.context ?? this.game.canvas?.getContext("2d");
+      if (!ctx) return;
+
+      const frame = this.pendingRender;
+      ctx.save();
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = "source-over";
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+      this.renderFrame(
+        ctx,
+        frame.players,
+        frame.projectiles,
+        frame.controlFrame,
+        frame.timeSec,
+        frame.nowEpoch,
+      );
+      ctx.restore();
+    }
+
     public override update(time: number, delta: number): void {
-      if (destroyed || !this.viewportTex) return;
+      if (destroyed) return;
 
       const rawDt = Math.min(0.05, Math.max(0.001, delta / 1000));
       const timeSec = time / 1000;
@@ -1087,6 +1132,7 @@ export async function mountPhaserArena(
         this.fpsElapsed = 0;
       }
 
+      input.stepAim(rawDt);
       const localPos = netClient.getLocalRenderPosition();
       const localScreenX = (localPos.x - camX) * camZoom + latestViewW * 0.5;
       const localScreenY = (localPos.y - camY) * camZoom + latestViewH * 0.5;
@@ -1152,19 +1198,13 @@ export async function mountPhaserArena(
 
       this.updateCamera(players, controlFrame, rawDt);
 
-      const ctx = this.viewportTex.context;
-      ctx.save();
-      ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-      this.renderFrame(
-        ctx,
+      this.pendingRender = {
         players,
         projectiles,
         controlFrame,
         timeSec,
         nowEpoch,
-      );
-      ctx.restore();
-      this.viewportTex.refresh();
+      };
 
       if (nowPerf - this.lastHudPushAt >= 55) {
         this.lastHudPushAt = nowPerf;
@@ -1262,6 +1302,7 @@ export async function mountPhaserArena(
         zoom: camZoom,
         viewW: latestViewW,
         viewH: latestViewH,
+        dpr: this.dpr,
       };
 
       worldRenderer.drawBackdrop(ctx, map, cam, timeSec);
@@ -1456,16 +1497,20 @@ export async function mountPhaserArena(
   }
 
   const scene = new PocketWarPhaserScene();
+  const initialDpr = computeTargetDpr();
+  const initialPixelW = Math.max(1, Math.round(latestViewW * initialDpr));
+  const initialPixelH = Math.max(1, Math.round(latestViewH * initialDpr));
 
   const game = new Phaser.Game({
     type: Phaser.CANVAS,
     parent: containerEl,
     backgroundColor: "#60C5F1",
+    clearBeforeRender: false,
     antialias: true,
     scale: {
-      mode: Phaser.Scale.RESIZE,
-      width: latestViewW,
-      height: latestViewH,
+      mode: Phaser.Scale.NONE,
+      width: initialPixelW,
+      height: initialPixelH,
     },
     scene: [scene],
     audio: { noAudio: true },
@@ -1476,9 +1521,21 @@ export async function mountPhaserArena(
     },
   });
 
-  const detachInput = input.attach(containerEl);
-  netClient.start();
-  soundFx.setAmbienceActive(true);
+  let detachInput: () => void = () => undefined;
+  try {
+    detachInput = input.attach(containerEl);
+    netClient.start();
+    soundFx.setAmbienceActive(true);
+  } catch (err) {
+    destroyed = true;
+    netClient.stop();
+    detachInput();
+    input.destroy();
+    soundFx.setJetpackActive(false);
+    soundFx.setAmbienceActive(false);
+    game.destroy(true);
+    throw err;
+  }
 
   return {
     setPaused: (paused) => {

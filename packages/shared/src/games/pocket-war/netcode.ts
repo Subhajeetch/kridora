@@ -112,6 +112,8 @@ export interface ClientInputPacket {
   sl: 0 | 1;
   /** Last server tick seen by client (for lag compensation) */
   ct: number;
+  /** Fixed 60 Hz physics steps accumulated since previous packet (0..6) */
+  st?: number;
 }
 
 export interface SnapshotPlayerState {
@@ -291,6 +293,10 @@ export function decodeClientInput(bytes: Uint8Array): ClientInputPacket | null {
     ) {
       return null;
     }
+    const steps =
+      typeof raw.st === "number" && Number.isFinite(raw.st)
+        ? Math.max(0, Math.min(6, Math.floor(raw.st)))
+        : undefined;
     return {
       t: PW_BIN_TYPE_INPUT,
       seq: Math.max(0, Math.floor(raw.seq)),
@@ -299,6 +305,7 @@ export function decodeClientInput(bytes: Uint8Array): ClientInputPacket | null {
       aim: Math.max(-6284, Math.min(6284, Math.round(raw.aim))),
       sl: raw.sl,
       ct: Math.max(0, Math.floor(raw.ct)),
+      ...(steps !== undefined ? { st: steps } : {}),
     };
   } catch {
     return null;

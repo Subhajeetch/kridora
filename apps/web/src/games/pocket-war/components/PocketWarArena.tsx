@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { RoomPlayer } from "@kridora/shared";
 import {
   CHARACTER_CATALOG,
   MAP_CATALOG,
@@ -21,10 +22,13 @@ import type { SoundFX } from "../engine/SoundFX";
 import { mountPhaserArena } from "../engine/PhaserArenaScene";
 import styles from "../pocket-war.module.css";
 import { ArenaHud } from "./ArenaHud";
+import { OfflineWaitModal } from "./OfflineWaitModal";
 
 export interface PocketWarArenaProps {
   state: PocketWarState;
   currentUserId: string;
+  roomPlayers?: readonly RoomPlayer[];
+  isRoomOwner?: boolean;
   soundFx: SoundFX;
   muted: boolean;
   isMobile: boolean;
@@ -35,6 +39,7 @@ export interface PocketWarArenaProps {
   onOpenChat: () => void;
   onBackToRoom?: () => void;
   onLeaveMatch?: () => void;
+  onKickPlayer?: (targetUserId: string) => Promise<void>;
 }
 
 function buildInitialTelemetry(
@@ -129,6 +134,8 @@ const EMPTY_TOUCH_VISUAL: TouchControllerVisualState = {
 export function PocketWarArena({
   state,
   currentUserId,
+  roomPlayers = [],
+  isRoomOwner = false,
   soundFx,
   muted,
   isMobile,
@@ -139,6 +146,7 @@ export function PocketWarArena({
   onOpenChat,
   onBackToRoom,
   onLeaveMatch,
+  onKickPlayer,
 }: PocketWarArenaProps) {
   const phaserHostRef = useRef<HTMLDivElement | null>(null);
   const bridgeRef = useRef<PhaserArenaBridge | null>(null);
@@ -150,6 +158,8 @@ export function PocketWarArena({
   const onOpenChatRef = useRef<() => void>(onOpenChat);
 
   const [phaserReady, setPhaserReady] = useState<boolean>(false);
+  const [mountError, setMountError] = useState<string | null>(null);
+  const [mountAttempt, setMountAttempt] = useState<number>(0);
   const [isPaused, setIsPaused] = useState<boolean>(false);
   const [scoreboardOpen, setScoreboardOpen] = useState<boolean>(false);
   const [spectateIndex, setSpectateIndex] = useState<number>(0);
@@ -329,28 +339,39 @@ export function PocketWarArena({
       onDebugCoordPicked: (toast) => {
         if (!cancelled) setDebugCoordToast(toast);
       },
-    }).then((bridge) => {
-      if (cancelled) {
-        bridge.destroy();
-        return;
-      }
-      activeBridge = bridge;
-      bridgeRef.current = bridge;
+    })
+      .then((bridge) => {
+        if (cancelled) {
+          bridge.destroy();
+          return;
+        }
+        activeBridge = bridge;
+        bridgeRef.current = bridge;
 
-      if (moveStickElRef.current) {
-        unbindMoveStickRef.current?.();
-        unbindMoveStickRef.current = bridge.bindMoveStickElement(
-          moveStickElRef.current,
-        );
-      }
-      if (aimStickElRef.current) {
-        unbindAimStickRef.current?.();
-        unbindAimStickRef.current = bridge.bindAimStickElement(
-          aimStickElRef.current,
-        );
-      }
-      setPhaserReady(true);
-    });
+        if (moveStickElRef.current) {
+          unbindMoveStickRef.current?.();
+          unbindMoveStickRef.current = bridge.bindMoveStickElement(
+            moveStickElRef.current,
+          );
+        }
+        if (aimStickElRef.current) {
+          unbindAimStickRef.current?.();
+          unbindAimStickRef.current = bridge.bindAimStickElement(
+            aimStickElRef.current,
+          );
+        }
+        setMountError(null);
+        setPhaserReady(true);
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        const message =
+          err instanceof Error && err.message
+            ? err.message
+            : "Unable to initialize Pocket War renderer.";
+        console.error("Failed to mount Pocket War arena:", err);
+        setMountError(message);
+      });
 
     return () => {
       cancelled = true;
@@ -367,6 +388,7 @@ export function PocketWarArena({
     handleToggleDebugCollisions,
     handleTogglePause,
     isMobile,
+    mountAttempt,
     soundFx,
   ]);
 
@@ -461,11 +483,32 @@ export function PocketWarArena({
     effectiveSoloWaitEndsAt !== null &&
     dismissedSoloForTs === effectiveSoloWaitEndsAt;
 
+  const offlinePlayers = useMemo(
+    () =>
+      roomPlayers.filter((rp) => {
+        const sp = state.players[rp.userId];
+        return Boolean(sp && !sp.leftMatch && !rp.connected);
+      }),
+    [roomPlayers, state.players],
+  );
+
   const handleDismissSoloBanner = useCallback(() => {
     if (effectiveSoloWaitEndsAt !== null) {
       setDismissedSoloForTs(effectiveSoloWaitEndsAt);
     }
   }, [effectiveSoloWaitEndsAt]);
+
+  const handleExpandSoloModal = useCallback(() => {
+    setDismissedSoloForTs(null);
+  }, []);
+
+  const handleKickOffline = useCallback(
+    async (targetUserId: string) => {
+      if (!onKickPlayer) return;
+      await onKickPlayer(targetUserId);
+    },
+    [onKickPlayer],
+  );
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-sky-950 select-none">
@@ -473,12 +516,44 @@ export function PocketWarArena({
       <div ref={phaserHostRef} className={styles.phaserHost} />
 
       {/* Brief lazy-chunk loading indicator while Phaser initializes */}
-      {!phaserReady && (
+      {!phaserReady && !mountError && (
         <div className="pointer-events-none absolute inset-0 z-30 flex flex-col items-center justify-center bg-slate-950/70 backdrop-blur-xs">
           <div className="size-9 animate-spin rounded-full border-3 border-sky-400 border-t-transparent" />
           <span className="mt-3 text-xs font-black tracking-widest text-sky-200 uppercase">
             Booting {mapDef.name}...
           </span>
+        </div>
+      )}
+
+      {/* Graceful renderer recovery overlay if Phaser chunk or canvas init fails */}
+      {mountError && (
+        <div className="pointer-events-auto absolute inset-0 z-40 flex flex-col items-center justify-center bg-slate-950/90 p-6 text-center text-white backdrop-blur-md">
+          <p className="text-sm font-black tracking-wide text-rose-300 uppercase">
+            Arena Renderer Error
+          </p>
+          <p className="mt-1.5 max-w-sm text-xs text-slate-300">{mountError}</p>
+          <div className="mt-4 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setMountError(null);
+                setPhaserReady(false);
+                setMountAttempt((n) => n + 1);
+              }}
+              className="rounded-xl bg-[#1a95e8] px-4 py-2 text-xs font-black text-white uppercase shadow-lg transition hover:bg-[#2aa5f8] active:scale-95"
+            >
+              Retry Arena
+            </button>
+            {onBackToRoom && (
+              <button
+                type="button"
+                onClick={onBackToRoom}
+                className="rounded-xl border border-white/15 bg-slate-800 px-4 py-2 text-xs font-bold text-white transition hover:bg-slate-700"
+              >
+                Back to Room
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -501,9 +576,6 @@ export function PocketWarArena({
         debugCoordToast={debugCoordToast}
         fps={fps}
         spectatingName={spectatingRow?.username ?? null}
-        soloWaitEndsAt={effectiveSoloWaitEndsAt}
-        soloBannerDismissed={soloBannerDismissed}
-        onDismissSoloBanner={handleDismissSoloBanner}
         onReload={handleReload}
         onThrowBomb={handleThrowBomb}
         onMelee={handleMelee}
@@ -523,6 +595,23 @@ export function PocketWarArena({
         onBackToRoom={onBackToRoom}
         onLeaveMatch={onLeaveMatch}
       />
+
+      {/* Ludo-style Offline / Last-Player Wait Screen (stays strictly inside room on leave) */}
+      {effectiveSoloWaitEndsAt !== null &&
+        (!isPaused || soloBannerDismissed) && (
+          <OfflineWaitModal
+            soloWaitEndsAt={effectiveSoloWaitEndsAt}
+            soloBannerDismissed={soloBannerDismissed}
+            offlinePlayers={offlinePlayers}
+            totalRoomPlayers={roomPlayers.length}
+            isRoomOwner={isRoomOwner}
+            mapName={mapDef.name}
+            onDismissToBanner={handleDismissSoloBanner}
+            onExpandFromBanner={handleExpandSoloModal}
+            onRequestLeaveMatch={() => (onLeaveMatch ?? onBackToRoom)?.()}
+            onKickPlayer={handleKickOffline}
+          />
+        )}
     </div>
   );
 }

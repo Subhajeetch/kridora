@@ -732,6 +732,29 @@ export class RoomManager {
     return this.toSnapshot(room);
   }
 
+  /**
+   * Ends an active match and returns every room member back to the lobby
+   * without removing anyone from the room.
+   */
+  endMatch(room: InternalRoom): RoomSnapshot {
+    if (room.status !== "in_progress") {
+      return this.toSnapshot(room);
+    }
+
+    getServerGameModule(room.gameSlug).onRoomDestroyed?.(room.code);
+    room.status = "lobby";
+    room.gameState = null;
+    room.matchId = null;
+    room.matchCompleted = false;
+    room.soloReturnAt = null;
+    for (const p of room.players) {
+      p.isReady = p.userId === room.ownerId;
+    }
+
+    this.broadcastRoomState(room);
+    return this.toSnapshot(room);
+  }
+
   endGame(userId: string): RoomSnapshot {
     const room = this.getRequiredRoomForUser(userId);
     if (room.ownerId !== userId) {
@@ -747,17 +770,7 @@ export class RoomManager {
       );
     }
 
-    getServerGameModule(room.gameSlug).onRoomDestroyed?.(room.code);
-    room.status = "lobby";
-    room.gameState = null;
-    room.matchId = null;
-    room.soloReturnAt = null;
-    for (const p of room.players) {
-      p.isReady = p.userId === room.ownerId;
-    }
-
-    this.broadcastRoomState(room);
-    return this.toSnapshot(room);
+    return this.endMatch(room);
   }
 
   changeGame(userId: string, newSlug: string): RoomSnapshot {

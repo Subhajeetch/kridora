@@ -35,6 +35,8 @@ export interface GameActionContext<TState> {
   sendBinaryToPlayer?: (userId: string, bytes: Uint8Array) => void;
   /** Atomically marks the match completed in D1 and awards Rings & XP once. */
   completeMatch: (outcome: MatchCompletionOutcome) => Promise<void>;
+  /** Ends the active match and returns all players to the room lobby without leaving the room. */
+  endMatch: () => Promise<void>;
 }
 
 export interface RealtimeTickContext<TState> {
@@ -48,6 +50,7 @@ export interface RealtimeTickContext<TState> {
   broadcastState: () => void;
   broadcastBinary: (bytes: Uint8Array) => void;
   completeMatch: (outcome: MatchCompletionOutcome) => Promise<void>;
+  endMatch: () => Promise<void>;
   persistState: () => Promise<void>;
 }
 

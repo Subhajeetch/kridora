@@ -1,12 +1,10 @@
-import { useEffect, useState } from "react";
+import { useRef } from "react";
 import {
-  AlertTriangle,
   Bug,
   ChevronLeft,
   ChevronRight,
   Crosshair,
   Eye,
-  Flame,
   Hand,
   Heart,
   LogOut,
@@ -15,14 +13,13 @@ import {
   Minimize2,
   Pause,
   Play,
-  RotateCw,
   Skull,
   Swords,
   Volume2,
   VolumeX,
-  WifiOff,
   Zap,
 } from "lucide-react";
+import { GrenadeIcon, MagazineReloadIcon } from "./PocketWarIcons";
 import {
   CHARACTER_CATALOG,
   WEAPON_CATALOG,
@@ -56,9 +53,6 @@ export interface ArenaHudProps {
   debugCoordToast: DebugCoordToast | null;
   fps: number;
   spectatingName: string | null;
-  soloWaitEndsAt: number | null;
-  soloBannerDismissed: boolean;
-  onDismissSoloBanner: () => void;
   onReload: () => void;
   onThrowBomb: () => void;
   onMelee: () => void;
@@ -79,13 +73,6 @@ export interface ArenaHudProps {
   onLeaveMatch?: () => void;
 }
 
-function formatCountdown(msRemaining: number): string {
-  const totalSec = Math.max(0, Math.ceil(msRemaining / 1000));
-  const mins = Math.floor(totalSec / 60);
-  const secs = totalSec % 60;
-  return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
-}
-
 export function ArenaHud({
   telemetry,
   scoreRows,
@@ -104,9 +91,6 @@ export function ArenaHud({
   debugCoordToast,
   fps,
   spectatingName,
-  soloWaitEndsAt,
-  soloBannerDismissed,
-  onDismissSoloBanner,
   onReload,
   onThrowBomb,
   onMelee,
@@ -126,26 +110,13 @@ export function ArenaHud({
   onBackToRoom,
   onLeaveMatch,
 }: ArenaHudProps) {
-  const [clockMs, setClockMs] = useState<number>(() => Date.now());
-
-  useEffect(() => {
-    if (soloWaitEndsAt === null) return;
-    const timer = window.setInterval(() => {
-      setClockMs(Date.now());
-    }, 500);
-    return () => window.clearInterval(timer);
-  }, [soloWaitEndsAt]);
-
+  const pauseBackdropDownRef = useRef(false);
   const activeWeapon = WEAPON_CATALOG[telemetry.activeWeaponId];
   const hpPct = Math.max(
     0,
     Math.min(100, (telemetry.hp / Math.max(1, telemetry.maxHp)) * 100),
   );
   const fuelPct = Math.max(0, Math.min(100, telemetry.jetpackFuel));
-  const soloMsRemaining =
-    soloWaitEndsAt !== null ? Math.max(0, soloWaitEndsAt - clockMs) : 0;
-
-  const leaveOrBackHandler = onBackToRoom ?? onLeaveMatch;
 
   return (
     <div
@@ -274,6 +245,9 @@ export function ArenaHud({
               type="button"
               onPointerDown={(e) => {
                 e.stopPropagation();
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
                 onTogglePause();
               }}
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/75 bg-slate-950/60 text-white transition hover:bg-slate-800 active:scale-90 sm:h-9 sm:w-9"
@@ -335,32 +309,32 @@ export function ArenaHud({
               )}
             </button>
 
-            {/* Compact Grenade Count Indicator (desktop & quick tap) */}
-            <button
-              type="button"
-              onPointerDown={(e) => {
-                e.stopPropagation();
-                onThrowBomb();
-              }}
-              disabled={
-                telemetry.bombsLeft <= 0 || telemetry.bombCooldownRatio < 1
-              }
-              className={`relative hidden h-10 w-10 items-center justify-center rounded-full transition active:scale-90 disabled:opacity-45 sm:flex ${styles.hudCircleBtn}`}
-              title="Throw Frag Grenade (G / Right Click)"
-              aria-label="Throw Grenade"
-            >
-              <Flame className="h-4 w-4 text-amber-300" />
-              <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-400 px-1 text-[9px] font-black text-slate-950">
-                {telemetry.bombsLeft}
-              </span>
-              {!isMobile && (
+            {/* Compact Grenade Count Indicator (desktop only; mobile uses dedicated bottom-left button) */}
+            {!isMobile && (
+              <button
+                type="button"
+                onPointerDown={(e) => {
+                  e.stopPropagation();
+                  onThrowBomb();
+                }}
+                disabled={
+                  telemetry.bombsLeft <= 0 || telemetry.bombCooldownRatio < 1
+                }
+                className={`relative hidden h-10 w-10 items-center justify-center rounded-full transition active:scale-90 disabled:opacity-45 sm:flex ${styles.hudCircleBtn}`}
+                title="Throw Frag Grenade (G / Right Click)"
+                aria-label="Throw Grenade"
+              >
+                <GrenadeIcon className="h-5 w-5 text-amber-300" />
+                <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-400 px-1 text-[9px] font-black text-slate-950">
+                  {telemetry.bombsLeft}
+                </span>
                 <span
                   className={`absolute -bottom-1.5 -right-1 ${styles.keycap}`}
                 >
                   G
                 </span>
-              )}
-            </button>
+              </button>
+            )}
           </div>
         </div>
 
@@ -410,10 +384,32 @@ export function ArenaHud({
             aria-label="Reload Weapon"
             title="Reload (R)"
           >
-            <RotateCw
+            {telemetry.isReloading && (
+              <svg
+                viewBox="0 0 36 36"
+                className="pointer-events-none absolute inset-0 h-full w-full -rotate-90"
+                aria-hidden="true"
+              >
+                <circle
+                  cx="18"
+                  cy="18"
+                  r="15.5"
+                  fill="none"
+                  stroke="#FBBF24"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeDasharray="97.4"
+                  strokeDashoffset={
+                    97.4 *
+                    (1 - Math.max(0, Math.min(1, telemetry.reloadProgress)))
+                  }
+                />
+              </svg>
+            )}
+            <MagazineReloadIcon
               className={`h-5 w-5 sm:h-6 sm:w-6 ${
                 telemetry.isReloading
-                  ? "animate-spin text-amber-300"
+                  ? "animate-pulse text-amber-300"
                   : "text-white"
               }`}
             />
@@ -511,23 +507,6 @@ export function ArenaHud({
               </button>
             );
           })}
-        </div>
-      )}
-
-      {/* === COMPACT SOLO-WAIT BANNER (When user clicked "Wait for Players") === */}
-      {soloWaitEndsAt !== null && soloBannerDismissed && (
-        <div className="pointer-events-auto absolute top-15 left-1/2 z-30 flex -translate-x-1/2 items-center gap-2 rounded-full border border-amber-400/60 bg-slate-950/90 px-3 py-1 text-[11px] font-bold text-amber-200 shadow-xl backdrop-blur-md">
-          <WifiOff className="h-3.5 w-3.5 text-amber-400" />
-          <span>Waiting for rivals ({formatCountdown(soloMsRemaining)})</span>
-          {leaveOrBackHandler && (
-            <button
-              type="button"
-              onClick={leaveOrBackHandler}
-              className="rounded-full bg-rose-600 px-2 py-0.5 text-[10px] font-black text-white hover:bg-rose-500"
-            >
-              Leave
-            </button>
-          )}
         </div>
       )}
 
@@ -630,29 +609,29 @@ export function ArenaHud({
             className={`pointer-events-auto absolute bottom-3 left-34 flex h-13 w-13 items-center justify-center rounded-full transition active:scale-90 disabled:opacity-45 ${styles.hudCircleBtn} ${styles.touchZone}`}
             aria-label="Throw grenade"
           >
-            <Flame className="h-6 w-6 text-amber-300" />
+            <GrenadeIcon className="h-6 w-6 text-amber-300" />
             <span className="absolute right-0.5 bottom-0.5 flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-amber-400 px-1 text-[10px] font-black text-slate-950">
               {telemetry.bombsLeft}
             </span>
           </button>
 
-          {/* Beside Right Stick: Melee Bash Button */}
+          {/* Beside Right Stick: Melee Bash Button (kept clear of repositioned fire stick) */}
           <button
             type="button"
             onPointerDown={(e) => {
               e.stopPropagation();
               onMelee();
             }}
-            className={`pointer-events-auto absolute right-34 bottom-3 flex h-13 w-13 items-center justify-center rounded-full transition active:scale-90 ${styles.hudCircleBtn} ${styles.touchZone}`}
+            className={`pointer-events-auto absolute right-44 bottom-3 flex h-13 w-13 items-center justify-center rounded-full transition active:scale-90 ${styles.hudCircleBtn} ${styles.touchZone}`}
             aria-label="Melee strike"
           >
             <Hand className="h-6 w-6 text-white" />
           </button>
 
-          {/* Bottom-Right: Aim + Auto-Fire Virtual Joystick */}
+          {/* Bottom-Right: Aim + Auto-Fire Virtual Joystick (+40px up, +40px left from edge) */}
           <div
             ref={onBindAimStick}
-            className={`pointer-events-auto absolute right-3 bottom-2.5 flex h-28 w-28 items-center justify-center rounded-full border-3 shadow-lg backdrop-blur-[2px] ${styles.touchZone} ${
+            className={`pointer-events-auto absolute right-[52px] bottom-[50px] flex h-28 w-28 items-center justify-center rounded-full border-3 shadow-lg backdrop-blur-[2px] ${styles.touchZone} ${
               touchVisual.autoFiring
                 ? "border-rose-400 bg-rose-950/40"
                 : "border-white/80 bg-rose-950/25"
@@ -712,46 +691,6 @@ export function ArenaHud({
               E
             </span>
           </button>
-        </div>
-      )}
-
-      {/* === 3-MINUTE SOLO-WAIT MODAL (Last Player Online) === */}
-      {soloWaitEndsAt !== null && !soloBannerDismissed && (
-        <div className="pointer-events-auto fixed inset-0 z-40 flex items-center justify-center bg-slate-950/72 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl border border-amber-400/50 bg-slate-900/95 p-5 text-center shadow-2xl">
-            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl border border-amber-400/40 bg-amber-500/15 text-amber-300">
-              <AlertTriangle className="h-6 w-6" />
-            </div>
-            <h2 className="text-lg font-black tracking-wide text-white uppercase">
-              No Opponents Online
-            </h2>
-            <p className="mt-1.5 text-xs leading-relaxed text-slate-300">
-              You are currently the last connected player in{" "}
-              <strong className="text-white">{mapName}</strong>. Wait for rivals
-              to reconnect or return to the room.
-            </p>
-            <div className="my-4 inline-flex items-center gap-2 rounded-xl border border-amber-400/35 bg-slate-950/90 px-4 py-2 font-mono text-2xl font-black text-amber-300">
-              {formatCountdown(soloMsRemaining)}
-            </div>
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <button
-                type="button"
-                onClick={onDismissSoloBanner}
-                className="flex-1 rounded-xl border border-white/15 bg-slate-800 px-4 py-2.5 text-xs font-black tracking-wider text-white uppercase transition hover:bg-slate-700"
-              >
-                Wait for Players
-              </button>
-              {leaveOrBackHandler && (
-                <button
-                  type="button"
-                  onClick={leaveOrBackHandler}
-                  className="flex-1 rounded-xl bg-rose-600 px-4 py-2.5 text-xs font-black tracking-wider text-white uppercase transition hover:bg-rose-500"
-                >
-                  Leave Game & Return to Room
-                </button>
-              )}
-            </div>
-          </div>
         </div>
       )}
 
@@ -817,10 +756,21 @@ export function ArenaHud({
       {isPaused && (
         <div
           className="pointer-events-auto fixed inset-0 z-40 flex items-center justify-center bg-slate-950/78 p-4 backdrop-blur-sm"
-          onClick={onTogglePause}
+          onPointerDown={(e) => {
+            pauseBackdropDownRef.current = e.target === e.currentTarget;
+            e.stopPropagation();
+          }}
+          onClick={(e) => {
+            const shouldClose =
+              pauseBackdropDownRef.current && e.target === e.currentTarget;
+            pauseBackdropDownRef.current = false;
+            if (shouldClose) {
+              onTogglePause();
+            }
+          }}
         >
           <div
-            className="w-full max-w-md rounded-2xl border border-white/15 bg-slate-900 p-5 shadow-2xl"
+            className="max-h-[92dvh] w-full max-w-md overflow-y-auto rounded-2xl border border-white/15 bg-slate-900 p-5 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-4 flex items-center justify-between">

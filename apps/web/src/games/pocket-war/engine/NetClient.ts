@@ -119,10 +119,11 @@ const MAX_EXTRAPOLATION_MS = 80;
 const MAX_PENDING_INPUTS = 90;
 const MAX_SNAPSHOT_BUFFER = 16;
 const INPUT_SEND_INTERVAL_MS = 33; // 30 Hz heartbeat + instant edge/shot packets
-const RECONCILE_DEADBAND_PX = 18;
+const RECONCILE_DEADBAND_PX = 26;
+const RECONCILE_VEL_DEADBAND_PX = 160;
 const RECONCILE_DRIFT_MIN_PX = 2.5;
 const RECONCILE_FUEL_DEADBAND = 6;
-const RECONCILE_SNAP_THRESHOLD_PX = 220;
+const RECONCILE_SNAP_THRESHOLD_PX = 380;
 const RECONCILE_SMOOTH_THRESHOLD_PX = 3.5;
 const EDGE_ACTION_MASK =
   INPUT_FLAG_RELOAD |
@@ -145,6 +146,8 @@ interface PredictedProjectilePreview {
 interface SentSnapshotSample {
   x: number;
   y: number;
+  vx: number;
+  vy: number;
   fuel: number;
 }
 
@@ -636,11 +639,13 @@ export class PocketWarNetClient {
 
     const hasEdgeAction =
       (flags & EDGE_ACTION_MASK) !== 0 || shootPressed || canLocalShootNow;
-    const due = nowPerfMs - this.lastInputSendAt >= INPUT_SEND_INTERVAL_MS;
+    const due =
+      nowPerfMs - this.lastInputSendAt >= INPUT_SEND_INTERVAL_MS &&
+      this.stepsSinceLastSend > 0;
     if (!due && !hasEdgeAction) return;
 
     this.lastInputSendAt = nowPerfMs;
-    const steps = Math.max(1, Math.min(4, this.stepsSinceLastSend));
+    const steps = Math.min(6, this.stepsSinceLastSend);
     this.stepsSinceLastSend = 0;
 
     const seq = this.nextSeq++;
@@ -717,6 +722,7 @@ export class PocketWarNetClient {
       aim: Math.max(-6284, Math.min(6284, Math.round(frame.aimAngle * 1000))),
       sl: frame.activeSlot,
       ct: this.lastServerTick,
+      st: steps,
     });
 
     socket.sendBinary(packetBytes);
@@ -725,6 +731,8 @@ export class PocketWarNetClient {
       this.sentSnapshots.set(seq, {
         x: this.localX,
         y: this.localY,
+        vx: this.localVx,
+        vy: this.localVy,
         fuel: this.localFuel,
       });
       if (this.sentSnapshots.size > MAX_PENDING_INPUTS) {
@@ -899,7 +907,7 @@ export class PocketWarNetClient {
     const refSnap = ackSeq > 0 ? this.sentSnapshots.get(ackSeq) : undefined;
     if (ackSeq > 0) {
       for (const k of this.sentSnapshots.keys()) {
-        if (k <= ackSeq) this.sentSnapshots.delete(k);
+        if (k < ackSeq) this.sentSnapshots.delete(k);
       }
     }
 
@@ -978,21 +986,28 @@ export class PocketWarNetClient {
       return;
     }
 
-    // Deadband reconciliation: if prediction & server match closely, skip expensive Box2D re-sim!
+    // Deadband reconciliation: if prediction & server match closely, nudge smoothly with zero pop!
     if (refSnap) {
       const dx = serverState.x - refSnap.x;
       const dy = serverState.y - refSnap.y;
       const posErr = Math.hypot(dx, dy);
+      const velErr = Math.hypot(
+        serverState.vx - refSnap.vx,
+        serverState.vy - refSnap.vy,
+      );
       const fuelDiff = Math.abs(serverState.jetpackFuel - refSnap.fuel);
       if (
         posErr <= RECONCILE_DEADBAND_PX &&
+        velErr <= RECONCILE_VEL_DEADBAND_PX &&
         fuelDiff <= RECONCILE_FUEL_DEADBAND
       ) {
         if (posErr > RECONCILE_DRIFT_MIN_PX) {
-          const nudgeX = dx * 0.14;
-          const nudgeY = dy * 0.14;
+          const nudgeX = dx * 0.15;
+          const nudgeY = dy * 0.15;
           this.localX += nudgeX;
           this.localY += nudgeY;
+          this.visualOffsetX -= nudgeX;
+          this.visualOffsetY -= nudgeY;
           this.physics.teleportSoldier(
             this.localUserId,
             this.localX,
@@ -1033,7 +1048,7 @@ export class PocketWarNetClient {
     );
     soldier.jetpackFuel = serverState.jetpackFuel;
     if ((serverState.flags & PLAYER_FLAG_BOOSTING) !== 0) {
-      soldier.lastBoostAt = nowEpoch;
+      soldier.lastBoostAt = this.pendingInputs[0]?.sentAt ?? nowEpoch;
     }
     soldier.overheatedUntil =
       (serverState.flags & PLAYER_FLAG_OVERHEATED) !== 0

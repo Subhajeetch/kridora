@@ -28,11 +28,21 @@ export interface InputManagerCallbacks {
   onFirstInteraction?: () => void;
 }
 
-const STICK_MAX_RADIUS = 56;
+const MOVE_STICK_MAX_RADIUS = 56;
+const AIM_STICK_MAX_RADIUS = 70;
 const STICK_DEADZONE = 0.14;
-const STICK_FIRE_THRESHOLD = 0.54;
+const AIM_STICK_FIRE_THRESHOLD = 0.46;
 const STICK_BOOST_THRESHOLD = -0.34;
 const STICK_DROP_THRESHOLD = 0.64;
+const AIM_SMOOTH_FINE_RATE = 10.5;
+const AIM_SMOOTH_FAST_RATE = 15.5;
+
+function wrapAngle(angle: number): number {
+  let a = angle;
+  while (a > Math.PI) a -= Math.PI * 2;
+  while (a < -Math.PI) a += Math.PI * 2;
+  return a;
+}
 
 function createEmptyStick(): VirtualStickVisual {
   return {
@@ -421,23 +431,32 @@ export class InputManager {
     stick.currentX = e.clientX;
     stick.currentY = e.clientY;
     this.updateStick(stick, e);
+
+    if (stick === this.aimStick) {
+      const mag = Math.hypot(stick.dx, stick.dy);
+      if (mag >= STICK_DEADZONE) {
+        this.aimAngle = Math.atan2(stick.dy, stick.dx);
+      }
+    }
   }
 
   private updateStick(stick: VirtualStickVisual, e: PointerEvent): void {
+    const maxRadius =
+      stick === this.aimStick ? AIM_STICK_MAX_RADIUS : MOVE_STICK_MAX_RADIUS;
     const rawDx = e.clientX - stick.originX;
     const rawDy = e.clientY - stick.originY;
     const dist = Math.hypot(rawDx, rawDy);
-    const clamped = Math.min(dist, STICK_MAX_RADIUS);
+    const clamped = Math.min(dist, maxRadius);
     const angle = dist > 0.001 ? Math.atan2(rawDy, rawDx) : 0;
 
     stick.currentX = stick.originX + Math.cos(angle) * clamped;
     stick.currentY = stick.originY + Math.sin(angle) * clamped;
-    stick.dx = (Math.cos(angle) * clamped) / STICK_MAX_RADIUS;
-    stick.dy = (Math.sin(angle) * clamped) / STICK_MAX_RADIUS;
+    stick.dx = (Math.cos(angle) * clamped) / maxRadius;
+    stick.dy = (Math.sin(angle) * clamped) / maxRadius;
 
     if (stick === this.aimStick) {
       const mag = Math.hypot(stick.dx, stick.dy);
-      const isFiring = stick.active && mag >= STICK_FIRE_THRESHOLD;
+      const isFiring = stick.active && mag >= AIM_STICK_FIRE_THRESHOLD;
       if (isFiring && !this.wasAimAutoFiring) {
         this.shootEdgePressed = true;
         this.latchEdgeFlag(INPUT_FLAG_SHOOT);
@@ -456,12 +475,34 @@ export class InputManager {
     }
   }
 
+  /**
+   * Advances touch aim-stick angular damping once per render frame so 360°
+   * touch aiming feels steady and resists thumb micro-jitter without lag.
+   */
+  public stepAim(dtSec: number): void {
+    if (this.paused || this.suspendedForChat || !this.aimStick.active) return;
+    const mag = Math.hypot(this.aimStick.dx, this.aimStick.dy);
+    if (mag < STICK_DEADZONE) return;
+
+    const targetAngle = Math.atan2(this.aimStick.dy, this.aimStick.dx);
+    const diff = wrapAngle(targetAngle - this.aimAngle);
+    if (Math.abs(diff) < 0.006) return;
+
+    const turnBlend = Math.min(1, Math.abs(diff) / (Math.PI * 0.4));
+    const baseRate =
+      AIM_SMOOTH_FINE_RATE +
+      turnBlend * (AIM_SMOOTH_FAST_RATE - AIM_SMOOTH_FINE_RATE);
+    const rate = baseRate * (this.isScoped ? 0.8 : 1.0);
+    const alpha = 1 - Math.exp(-rate * Math.max(0.001, dtSec));
+    this.aimAngle = wrapAngle(this.aimAngle + diff * alpha);
+  }
+
   public getTouchVisualState(): TouchControllerVisualState {
     const aimMag = Math.hypot(this.aimStick.dx, this.aimStick.dy);
     return {
       moveStick: { ...this.moveStick },
       aimStick: { ...this.aimStick },
-      autoFiring: this.aimStick.active && aimMag >= STICK_FIRE_THRESHOLD,
+      autoFiring: this.aimStick.active && aimMag >= AIM_STICK_FIRE_THRESHOLD,
       boosting:
         this.moveStick.active && this.moveStick.dy <= STICK_BOOST_THRESHOLD,
     };
@@ -507,10 +548,7 @@ export class InputManager {
 
     if (this.aimStick.active) {
       const mag = Math.hypot(this.aimStick.dx, this.aimStick.dy);
-      if (mag >= STICK_DEADZONE) {
-        this.aimAngle = Math.atan2(this.aimStick.dy, this.aimStick.dx);
-      }
-      if (mag >= STICK_FIRE_THRESHOLD) {
+      if (mag >= AIM_STICK_FIRE_THRESHOLD) {
         shooting = true;
       }
     } else if (!isMobile && this.hasMouseMoved && this.canvasEl) {

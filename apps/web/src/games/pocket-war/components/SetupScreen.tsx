@@ -6,9 +6,9 @@ import {
   ChevronRight,
   Crosshair,
   Crown,
-  Flame,
   Heart,
   Info,
+  LogOut,
   Map as MapIcon,
   Maximize2,
   Minimize2,
@@ -20,6 +20,7 @@ import {
   X,
   Zap,
 } from "lucide-react";
+import { GrenadeIcon } from "./PocketWarIcons";
 import {
   CHARACTER_CATALOG,
   CHARACTER_IDS,
@@ -51,11 +52,12 @@ export interface SetupScreenProps {
   onForceStart: () => void;
   onRefreshState: () => void;
   onBackToRoom?: () => void;
+  onLeaveMatch?: () => void;
 }
 
 function AbilityFallbackGlyph({ abilityId }: { abilityId: string }) {
   if (abilityId.includes("grenade")) {
-    return <Flame className="h-5 w-5 text-amber-300 sm:h-6 sm:w-6" />;
+    return <GrenadeIcon className="h-5 w-5 text-amber-300 sm:h-6 sm:w-6" />;
   }
   if (abilityId.includes("jetpack")) {
     return <Zap className="h-5 w-5 text-sky-300 sm:h-6 sm:w-6" />;
@@ -135,6 +137,7 @@ export function SetupScreen({
   onForceStart,
   onRefreshState,
   onBackToRoom,
+  onLeaveMatch,
 }: SetupScreenProps) {
   const stageCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const countdownPingedRef = useRef<number | null>(null);
@@ -147,7 +150,7 @@ export function SetupScreen({
   const [nowMs, setNowMs] = useState<number>(() => Date.now());
 
   const playersList = useMemo(
-    () => Object.values(state.players),
+    () => Object.values(state.players).filter((p) => !p.leftMatch),
     [state.players],
   );
   const currentPlayer = state.players[currentUserId];
@@ -469,6 +472,23 @@ export function SetupScreen({
               <Maximize2 className="h-4 w-4 text-slate-200" />
             )}
           </button>
+
+          {onLeaveMatch && (
+            <button
+              type="button"
+              onClick={() => {
+                soundFx.unlock();
+                soundFx.playUiClick();
+                onLeaveMatch();
+              }}
+              className="flex h-8 items-center gap-1 rounded-full border border-rose-500/40 bg-rose-950/50 px-2.5 text-[10px] font-black text-rose-200 shadow transition hover:bg-rose-900/70 sm:h-9 sm:px-3 sm:text-[11px]"
+              aria-label="Leave match"
+              title="Leave match (stay in room)"
+            >
+              <LogOut className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Leave Match</span>
+            </button>
+          )}
         </div>
       </header>
 

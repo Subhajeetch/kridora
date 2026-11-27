@@ -14,6 +14,7 @@ export interface WorldRenderCamera {
   zoom: number;
   viewW: number;
   viewH: number;
+  dpr?: number;
 }
 
 function drawRoundedRect(
@@ -52,27 +53,33 @@ function drawParallaxLayer(
   cache?: Map<string, CachedParallaxCanvas>,
   cacheKey?: string,
 ): void {
+  const minScale = Math.min(1.08, Math.max(0.55, cam.viewH / 620));
   const scale = Math.max(
     cam.viewW / img.naturalWidth,
-    cam.viewH / img.naturalHeight,
-    1.08,
+    (cam.viewH * 1.32) / img.naturalHeight,
+    minScale,
   );
   const drawW = Math.max(1, Math.round(img.naturalWidth * scale));
   const drawH = Math.max(1, Math.round(img.naturalHeight * scale));
+  const dpr = Math.max(1, cam.dpr ?? 1);
+  const cacheW = Math.max(1, Math.round(drawW * dpr));
+  const cacheH = Math.max(1, Math.round(drawH * dpr));
 
   let source: HTMLImageElement | HTMLCanvasElement = img;
   if (cache && cacheKey && typeof document !== "undefined") {
     const hit = cache.get(cacheKey);
-    if (hit && hit.img === img && hit.w === drawW && hit.h === drawH) {
+    if (hit && hit.img === img && hit.w === cacheW && hit.h === cacheH) {
       source = hit.canvas;
     } else {
       const c = document.createElement("canvas");
-      c.width = drawW;
-      c.height = drawH;
+      c.width = cacheW;
+      c.height = cacheH;
       const cctx = c.getContext("2d");
       if (cctx) {
-        cctx.drawImage(img, 0, 0, drawW, drawH);
-        cache.set(cacheKey, { img, w: drawW, h: drawH, canvas: c });
+        cctx.imageSmoothingEnabled = true;
+        cctx.imageSmoothingQuality = "high";
+        cctx.drawImage(img, 0, 0, cacheW, cacheH);
+        cache.set(cacheKey, { img, w: cacheW, h: cacheH, canvas: c });
         source = c;
       }
     }
@@ -94,7 +101,7 @@ function drawParallaxLayer(
   ctx.save();
   ctx.globalAlpha = alpha;
   for (let x = Math.round(wrappedX); x < cam.viewW + 4; x += drawW - 2) {
-    ctx.drawImage(source, x, drawY);
+    ctx.drawImage(source, x, drawY, drawW, drawH);
   }
   ctx.restore();
 }
@@ -136,7 +143,7 @@ export class WorldArtworkRenderer {
       skyGrad.addColorStop(0.7, map.skyBottom);
       skyGrad.addColorStop(1, "#BCE8FA");
       ctx.fillStyle = skyGrad;
-      ctx.fillRect(0, 0, cam.viewW, cam.viewH);
+      ctx.fillRect(0, 0, cam.viewW + 2, cam.viewH + 2);
     }
 
     const sunX = cam.viewW * 0.42 - (cam.x / map.width) * 90;

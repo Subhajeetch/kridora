@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { RoomPlayer } from "@kridora/shared";
 import {
   ArrowLeft,
   Award,
@@ -13,9 +14,12 @@ import {
   Trophy,
 } from "lucide-react";
 import { useInGameRoom } from "@/games/hooks";
-import { request as socketRequest, socket } from "@/lib/socket";
+import { describeError, request as socketRequest, socket } from "@/lib/socket";
+import { useRealtime } from "@/providers/realtime-context";
 import type { GameComponentProps } from "../types";
 import { ChatOverlay } from "./components/ChatOverlay";
+import { LeaveMatchDialog } from "./components/LeaveMatchDialog";
+import { MatchRoomToast } from "./components/MatchRoomToast";
 import { PocketWarArena } from "./components/PocketWarArena";
 import { SetupScreen } from "./components/SetupScreen";
 import { SoundFX } from "./engine/SoundFX";
@@ -34,13 +38,15 @@ export interface PocketWarMainProps {
   currentUserId: string;
   isHost: boolean;
   roomCode: string;
+  roomPlayers?: readonly RoomPlayer[];
   request: (
     event: "pocket-war:action",
     payload: PocketWarActionPayload,
   ) => void;
   onRefreshState: () => void;
   onBackToRoom?: () => void;
-  onLeaveMatch?: () => void;
+  onLeaveMatch?: () => Promise<void> | void;
+  onKickPlayer?: (targetUserId: string) => Promise<void>;
 }
 
 interface LockableScreenOrientation {
@@ -102,10 +108,12 @@ export function PocketWarMain({
   currentUserId,
   isHost,
   roomCode,
+  roomPlayers = [],
   request,
   onRefreshState,
   onBackToRoom,
   onLeaveMatch,
+  onKickPlayer,
 }: PocketWarMainProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [soundInstance] = useState<SoundFX>(() => new SoundFX());
@@ -113,6 +121,9 @@ export function PocketWarMain({
   const [muted, setMuted] = useState<boolean>(false);
   const [chatOpen, setChatOpen] = useState<boolean>(false);
   const [chatFocused, setChatFocused] = useState<boolean>(false);
+  const [leaveDialogOpen, setLeaveDialogOpen] = useState<boolean>(false);
+  const [isLeavingMatch, setIsLeavingMatch] = useState<boolean>(false);
+  const [leaveError, setLeaveError] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] =
     useState<boolean>(isDocumentFullscreen);
   const [isPortrait, setIsPortrait] = useState<boolean>(() =>
@@ -191,7 +202,7 @@ export function PocketWarMain({
     }
   }, [enterFullscreenLandscape]);
 
-  // Exit fullscreen BEFORE leaving or opening RoomPage's Leave Confirmation Dialog
+  // Exit fullscreen BEFORE returning to Room view or leaving the active match
   const handleSafeBackToRoom = useCallback(() => {
     if (!onBackToRoom) return;
     void exitFullscreenSafely().finally(() => {
@@ -199,12 +210,42 @@ export function PocketWarMain({
     });
   }, [onBackToRoom]);
 
-  const handleSafeLeaveMatch = useCallback(() => {
+  const handleOpenLeaveDialog = useCallback(() => {
     if (!onLeaveMatch) return;
-    void exitFullscreenSafely().finally(() => {
-      onLeaveMatch();
-    });
-  }, [onLeaveMatch]);
+    soundInstance.unlock();
+    soundInstance.playUiClick();
+    setLeaveError(null);
+    setLeaveDialogOpen(true);
+  }, [onLeaveMatch, soundInstance]);
+
+  const handleConfirmLeaveMatch = useCallback(async () => {
+    if (!onLeaveMatch || isLeavingMatch) return;
+    soundInstance.unlock();
+    soundInstance.playUiClick();
+    setIsLeavingMatch(true);
+    setLeaveError(null);
+    try {
+      await exitFullscreenSafely();
+      await onLeaveMatch();
+      setLeaveDialogOpen(false);
+    } catch (err) {
+      setLeaveError(describeError(err));
+    } finally {
+      setIsLeavingMatch(false);
+    }
+  }, [isLeavingMatch, onLeaveMatch, soundInstance]);
+
+  const handleDirectLeaveMatch = useCallback(() => {
+    if (!onLeaveMatch || isLeavingMatch) return;
+    soundInstance.unlock();
+    soundInstance.playUiClick();
+    setIsLeavingMatch(true);
+    void exitFullscreenSafely()
+      .then(() => onLeaveMatch())
+      .finally(() => {
+        setIsLeavingMatch(false);
+      });
+  }, [isLeavingMatch, onLeaveMatch, soundInstance]);
 
   const dispatchAction = useCallback(
     (payload: PocketWarActionPayload) => {
@@ -272,12 +313,57 @@ export function PocketWarMain({
     [state.players],
   );
   const selectedMap = MAP_CATALOG[state.settings.mapId];
+  const myPlayer = state.players[currentUserId];
+
+  const activeMatchPlayersCount = useMemo(() => {
+    if (roomPlayers.length > 0) {
+      return roomPlayers.filter((rp) => {
+        const sp = state.players[rp.userId];
+        return Boolean(sp && !sp.leftMatch && rp.connected);
+      }).length;
+    }
+    const onlineSet = new Set(state.onlineUserIds);
+    return playersList.filter(
+      (p) => !p.leftMatch && (onlineSet.size === 0 || onlineSet.has(p.userId)),
+    ).length;
+  }, [playersList, roomPlayers, state.onlineUserIds, state.players]);
+
+  const isLastActivePlayer =
+    state.soloWaitEndsAt !== null || activeMatchPlayersCount <= 1;
 
   // Show mobile landscape/fullscreen entry guard across setup, arena, and game_over
   const showMobileLandscapeGuard =
     isMobile && (isPortrait || (!isFullscreen && !mobileGuardAck));
 
   const renderPhaseContent = () => {
+    if (myPlayer?.leftMatch && state.phase !== "game_over") {
+      return (
+        <div className="flex h-full w-full flex-col items-center justify-center bg-gradient-to-b from-[#0f172a] via-[#152238] to-[#090d16] p-6 text-center text-white">
+          <div className="w-full max-w-md rounded-3xl border border-white/15 bg-slate-900/90 p-6 shadow-2xl backdrop-blur-md">
+            <h2 className="text-xl font-black tracking-wide text-white uppercase">
+              You Left the Match
+            </h2>
+            <p className="mt-2 text-xs leading-relaxed text-slate-300">
+              Other players are still finishing this battle in{" "}
+              <strong className="text-white">{selectedMap.name}</strong>. You
+              are still in the room and will return to the lobby as soon as the
+              match ends.
+            </p>
+            {onBackToRoom && (
+              <button
+                type="button"
+                onClick={handleSafeBackToRoom}
+                className="mt-5 inline-flex items-center justify-center gap-2 rounded-xl bg-[#1a95e8] px-5 py-2.5 text-xs font-black tracking-wider text-white uppercase shadow-lg shadow-sky-500/25 transition hover:bg-[#2aa5f8] active:scale-95"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                <span>Return to Room</span>
+              </button>
+            )}
+          </div>
+        </div>
+      );
+    }
+
     if (state.phase === "setup") {
       return (
         <>
@@ -297,6 +383,7 @@ export function PocketWarMain({
             onForceStart={handleForceStart}
             onRefreshState={onRefreshState}
             onBackToRoom={onBackToRoom ? handleSafeBackToRoom : undefined}
+            onLeaveMatch={onLeaveMatch ? handleOpenLeaveDialog : undefined}
           />
 
           <ChatOverlay
@@ -443,11 +530,12 @@ export function PocketWarMain({
               {onLeaveMatch && (
                 <button
                   type="button"
-                  onClick={handleSafeLeaveMatch}
-                  className="flex items-center gap-1.5 rounded-xl bg-rose-600/85 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-rose-500 sm:text-sm"
+                  disabled={isLeavingMatch}
+                  onClick={handleDirectLeaveMatch}
+                  className="flex items-center gap-1.5 rounded-xl bg-rose-600/85 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-rose-500 disabled:opacity-50 sm:text-sm"
                 >
                   <LogOut className="h-4 w-4" />
-                  Leave
+                  <span>{isLeavingMatch ? "Leaving..." : "Leave Match"}</span>
                 </button>
               )}
             </div>
@@ -471,6 +559,8 @@ export function PocketWarMain({
         <PocketWarArena
           state={state}
           currentUserId={currentUserId}
+          roomPlayers={roomPlayers}
+          isRoomOwner={isHost}
           soundFx={soundInstance}
           muted={muted}
           isMobile={isMobile}
@@ -480,7 +570,8 @@ export function PocketWarMain({
           onToggleFullscreen={handleToggleFullscreen}
           onOpenChat={handleOpenChat}
           onBackToRoom={onBackToRoom ? handleSafeBackToRoom : undefined}
-          onLeaveMatch={onLeaveMatch ? handleSafeLeaveMatch : undefined}
+          onLeaveMatch={onLeaveMatch ? handleOpenLeaveDialog : undefined}
+          onKickPlayer={onKickPlayer}
         />
 
         <ChatOverlay
@@ -505,6 +596,32 @@ export function PocketWarMain({
       className={`${styles.fullscreenRoot} bg-slate-950`}
     >
       {renderPhaseContent()}
+
+      {/* Ludo-style Room Join / Leave / Disconnect Toasts */}
+      {roomPlayers.length > 0 && (
+        <MatchRoomToast
+          players={roomPlayers}
+          matchPlayers={state.players}
+          currentUserId={currentUserId}
+          soundFx={soundInstance}
+        />
+      )}
+
+      {/* Ludo-style In-Match Leave Confirmation Modal (never leaves room) */}
+      <LeaveMatchDialog
+        open={leaveDialogOpen}
+        phase={state.phase}
+        roomCode={roomCode}
+        isLastActivePlayer={isLastActivePlayer}
+        isLeaving={isLeavingMatch}
+        error={leaveError}
+        onCancel={() => {
+          if (!isLeavingMatch) setLeaveDialogOpen(false);
+        }}
+        onConfirm={() => {
+          void handleConfirmLeaveMatch();
+        }}
+      />
 
       {/* Persistent Mobile Fullscreen & Landscape Entry Guard (active from SetupScreen onward) */}
       {showMobileLandscapeGuard && (
@@ -563,10 +680,12 @@ export function PocketWarMain({
 }
 
 export default function PocketWarGame({ room, userId }: GameComponentProps) {
-  const { roomCode, owner, onBackToRoom, onLeaveRoom } = useInGameRoom();
+  const { roomCode, owner, onBackToRoom } = useInGameRoom();
+  const { setActiveRoom } = useRealtime();
   const isHost = room.ownerId === userId || owner?.userId === userId;
 
   const [state, setState] = useState<PocketWarState | null>(null);
+  const leavingMatchRef = useRef(false);
 
   const refreshState = useCallback(() => {
     socketRequest("pocket-war:get-state", {})
@@ -581,23 +700,29 @@ export default function PocketWarGame({ room, userId }: GameComponentProps) {
   useEffect(() => {
     let mounted = true;
 
-    socketRequest("pocket-war:get-state", {})
-      .then((s) => {
-        if (mounted && s) setState(s as PocketWarState);
-      })
-      .catch((err) => {
-        console.warn("Failed to load initial Pocket War state:", err);
-      });
+    const fetchLatestState = () => {
+      socketRequest("pocket-war:get-state", {})
+        .then((s) => {
+          if (mounted && s) setState(s as PocketWarState);
+        })
+        .catch((err) => {
+          console.warn("Failed to load Pocket War state:", err);
+        });
+    };
+
+    fetchLatestState();
 
     const handleState = (nextState: PocketWarState) => {
       if (mounted) setState(nextState);
     };
 
     socket.on("pocket-war:state", handleState);
+    socket.on("connect", fetchLatestState);
 
     return () => {
       mounted = false;
       socket.off("pocket-war:state", handleState);
+      socket.off("connect", fetchLatestState);
     };
   }, []);
 
@@ -612,6 +737,32 @@ export default function PocketWarGame({ room, userId }: GameComponentProps) {
         });
     },
     [],
+  );
+
+  const handleLeaveMatch = useCallback(async () => {
+    if (leavingMatchRef.current) return;
+    leavingMatchRef.current = true;
+    try {
+      const next = await socketRequest("pocket-war:action", {
+        type: "leave_match",
+      });
+      if (next) setState(next as PocketWarState);
+    } catch (err) {
+      console.error("Failed to leave Pocket War match:", err);
+    } finally {
+      leavingMatchRef.current = false;
+      onBackToRoom();
+    }
+  }, [onBackToRoom]);
+
+  const handleKickOfflinePlayer = useCallback(
+    async (targetUserId: string) => {
+      const updated = await socketRequest("room:kick", {
+        userId: targetUserId,
+      });
+      setActiveRoom(updated);
+    },
+    [setActiveRoom],
   );
 
   if (!state) {
@@ -633,10 +784,12 @@ export default function PocketWarGame({ room, userId }: GameComponentProps) {
       currentUserId={userId}
       isHost={isHost}
       roomCode={roomCode}
+      roomPlayers={room.players}
       request={handleAction}
       onRefreshState={refreshState}
       onBackToRoom={onBackToRoom}
-      onLeaveMatch={onLeaveRoom}
+      onLeaveMatch={handleLeaveMatch}
+      onKickPlayer={handleKickOfflinePlayer}
     />
   );
 }

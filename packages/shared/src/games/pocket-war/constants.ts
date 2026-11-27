@@ -322,7 +322,7 @@ export const CHARACTER_CATALOG: Record<
     secondaryWeaponId: "pistol",
     maxHp: 125,
     moveSpeed: 350,
-    jetpackThrust: 1080,
+    jetpackThrust: 735,
     jetpackDrainPerSec: 16.5,
     startingBombs: 3,
     meleeDamage: 36,
@@ -391,7 +391,7 @@ export const CHARACTER_CATALOG: Record<
     secondaryWeaponId: "pistol",
     maxHp: 115,
     moveSpeed: 375,
-    jetpackThrust: 1110,
+    jetpackThrust: 770,
     jetpackDrainPerSec: 14.8,
     startingBombs: 3,
     meleeDamage: 34,
@@ -919,6 +919,8 @@ export interface PocketWarPlayer {
   username: string;
   characterId: PocketWarCharacterId;
   isReady: boolean;
+  /** True once the player explicitly leaves the active or finished match while remaining in the room. */
+  leftMatch?: boolean;
   isAlive: boolean;
   livesLeft: number;
   maxLives: number;
@@ -1060,6 +1062,9 @@ export const pocketWarActionPayloadSchema = z.discriminatedUnion("type", [
   }),
   z.object({
     type: z.literal("play_again"),
+  }),
+  z.object({
+    type: z.literal("leave_match"),
   }),
 ]);
 

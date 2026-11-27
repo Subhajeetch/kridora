@@ -140,6 +140,10 @@ export class RealtimeHub extends DurableObject<Env> {
               outcome,
             });
           },
+          endMatch: async () => {
+            this.roomManager.endMatch(room);
+            await this.persistAndSchedule();
+          },
           persistState: async () => {
             await this.persistAndSchedule();
           },
@@ -451,6 +455,10 @@ export class RealtimeHub extends DurableObject<Env> {
           outcome,
         });
       },
+      endMatch: async () => {
+        this.roomManager.endMatch(room);
+        await this.persistAndSchedule();
+      },
     };
 
     gameModule.handleBinaryFrame(ctx, bytes);
@@ -565,6 +573,10 @@ export class RealtimeHub extends DurableObject<Env> {
           players: room.players,
           outcome,
         });
+      },
+      endMatch: async () => {
+        this.roomManager.endMatch(room);
+        await this.persistAndSchedule();
       },
     };
 
